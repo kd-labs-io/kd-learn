@@ -13,3 +13,4 @@
 - **Cập nhật:** 2026-11-17: chốt các mục chờ xác nhận: ngoại lệ `@tanstack/ai*` trong `packages/ai` (mục 2.5), quy ước import port của `agent` (mục 3.2), chạy `astryx init`, ghi chú i18n trong `AGENTS.md`; hoãn kiểm Safari iOS sang phase 6 (mục 4, 5, 6, 7, 8)
 - **Cập nhật:** 2026-11-17: merge PR #1, đóng phase 0 (chuyển sang `archive/phase-0.md`); bước tiếp theo là spike port AI của phase 1 (mục 7, 8)
 - **Cập nhật:** 2026-11-17: thêm `spike-port-ai.md` (plan spike port AI, tài liệu TanStack AI 1.4 và ACP SDK 2.7) và `progress/phase-1.md` (mục 8)
+- **Cập nhật:** 2026-11-17: backend ACP dùng Antigravity CLI (`agy acp`) thay cho Gemini CLI (mục 2.4, spike port AI)

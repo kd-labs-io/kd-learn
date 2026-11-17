@@ -13,9 +13,10 @@
 | `@tanstack/ai-effect` | 0.1.1 (0.x) | Cầu nối với Effect v4. Còn 0.x, cần đánh giá trước khi dùng |
 | `@agentclientprotocol/sdk` | 2.7.0, protocol 1 | Client spawn agent qua stdio. Tool của kd-learn đưa vào bằng MCP trong `session/new` (stdio luôn có; http khi agent báo `mcpCapabilities.http`). Không có cơ chế output theo JSON schema |
 | `@agentclientprotocol/claude-agent-acp` | 0.107.3 | Thay cho `@zed-industries/claude-code-acp` (đã deprecated) |
+| Antigravity CLI | `agy acp` (ACP từ v1.5.0) | Đăng nhập trước bằng `agy` hoặc `agy acp --login`. Chưa rõ có nhận MCP và `systemPrompt` từ `session/new` không |
 | opencode | `opencode acp` | Cấu hình MCP lấy từ config của opencode, cần kiểm có nhận MCP từ `session/new` không |
 
-Gemini CLI (`gemini --acp`) đang được thay bằng Antigravity CLI và đã dừng gói miễn phí: không đưa vào spike.
+Không dùng Gemini CLI (`gemini --acp`): đã bị Antigravity CLI thay thế.
 
 ## Port (bản nháp, sẽ chốt sau spike)
 
@@ -37,7 +38,7 @@ Gemini CLI (`gemini --acp`) đang được thay bằng Antigravity CLI và đã 
 
 **B. Backend ACP, [rủi ro 1](05-rui-ro.md):**
 
-1. Spawn `claude-agent-acp` và `opencode acp`, đi hết `initialize` → `session/new` → `session/prompt` → `session/update`.
+1. Spawn `claude-agent-acp`, `agy acp` và `opencode acp`, đi hết `initialize` → `session/new` → `session/prompt` → `session/update`.
 2. Đưa tool của kd-learn vào qua một MCP server do kd-learn chạy; agent gọi được.
 3. Output có cấu trúc: bắt agent gọi tool `submit_result` có schema, server validate; sai thì trả lỗi để agent sửa.
 4. Chặn tool có sẵn của agent (sửa file, shell): không khai báo capability `fs` và `terminal`, từ chối mọi `session/request_permission`, `cwd` là thư mục tạm rỗng. Kiểm agent không ghi được ra ngoài thư mục đó.
@@ -52,9 +53,9 @@ Gemini CLI (`gemini --acp`) đang được thay bằng Antigravity CLI và đã 
 
 ## Không làm trong spike
 
-UI, DB, auth, lưu lịch sử, Gemini CLI. Mã spike nằm trong `packages/ai` (port + adapter) và một script chạy thử; test chạy với provider thật chỉ chạy tay, không chạy trong CI.
+UI, DB, auth, lưu lịch sử. Mã spike nằm trong `packages/ai` (port + adapter) và một script chạy thử; test chạy với provider thật chỉ chạy tay, không chạy trong CI.
 
 ## Cần chuẩn bị
 
 - API key Anthropic, OpenAI, Gemini (biến môi trường, không commit) cho phần A.
-- Claude Code đã đăng nhập cho `claude-agent-acp`; opencode đã cấu hình provider cho phần B. Cả hai đã cài trên máy dev.
+- Claude Code đã đăng nhập cho `claude-agent-acp`, Antigravity CLI đã đăng nhập, opencode đã cấu hình provider cho phần B. Cả ba đã cài trên máy dev.
