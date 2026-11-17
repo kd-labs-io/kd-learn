@@ -45,11 +45,11 @@ Không dùng Gemini CLI (`gemini --acp`): đã bị Antigravity CLI thay thế.
 5. `session/cancel` khi Stream bị interrupt; process agent được dọn khi xong.
 6. Ánh xạ `session/update` (`agent_message_chunk`, `tool_call`, `tool_call_update`, `usage_update`) sang `TurnEvent`.
 
-## Tiêu chí đạt (đề xuất)
+## Tiêu chí đạt (chốt 2026-11-17)
 
-- **Rủi ro 2 đạt** khi A1–A3 chạy được với ít nhất Anthropic và OpenAI, có test cho interrupt.
-- **Rủi ro 1 đạt** khi B3 cho kết quả hợp lệ ở ít nhất 19/20 lượt với mỗi agent (cho phép một lần sửa sau lỗi validate). Không đạt thì ACP chỉ dùng cho vai không cần cấu trúc chặt, như đã ghi ở rủi ro 1.
-- B4 không đạt thì chưa bật ACP; ghi thành rủi ro mới.
+- **Rủi ro 2 đạt** khi A1–A3 chạy được với ít nhất Anthropic, có test cho interrupt. OpenAI, Gemini, endpoint tương thích OpenAI chạy được thì ghi lại, không bắt buộc.
+- **Rủi ro 1 đạt** khi B1–B3 chạy được với cả ba agent: Claude Code, Antigravity CLI, opencode (dùng gói OpenCode Go). Mỗi agent cho kết quả hợp lệ ở ít nhất 19/20 lượt (cho phép một lần sửa sau lỗi validate). Agent nào không đạt thì chỉ dùng cho vai không cần cấu trúc chặt, như đã ghi ở rủi ro 1.
+- **B4 (chặn tool có sẵn):** agent nào không chặn được thì ghi lại trước (cách đã thử, tool nào còn chạy được) thành rủi ro mới; chưa quyết định chặn ACP trong spike.
 
 ## Không làm trong spike
 
@@ -58,4 +58,4 @@ UI, DB, auth, lưu lịch sử. Mã spike nằm trong `packages/ai` (port + adap
 ## Cần chuẩn bị
 
 - API key Anthropic, OpenAI, Gemini (biến môi trường, không commit) cho phần A.
-- Claude Code đã đăng nhập cho `claude-agent-acp`, Antigravity CLI đã đăng nhập, opencode đã cấu hình provider cho phần B. Cả ba đã cài trên máy dev.
+- Claude Code đã đăng nhập cho `claude-agent-acp`, Antigravity CLI đã đăng nhập, opencode đã đăng nhập gói OpenCode Go cho phần B. Cả ba đã cài trên máy dev.
