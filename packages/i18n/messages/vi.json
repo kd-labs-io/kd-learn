@@ -1,0 +1,9 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_name": "kd-learn",
+  "app_tagline": "Học bất cứ điều gì cùng gia sư AI.",
+  "theme_apply": "Áp dụng theme",
+  "theme_reset": "Khôi phục theme",
+  "theme_invalid": "Theme không hợp lệ: {reason}",
+  "locale_label": "Ngôn ngữ"
+}

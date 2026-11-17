@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": ["messages/**", "project.inlang/settings.json"],
+      "outputs": ["src/paraglide/**"]
+    },
+    "typecheck": { "dependsOn": ["build"] },
+    "test": { "dependsOn": ["build"] },
+    "lint": { "dependsOn": ["build"] }
+  }
+}

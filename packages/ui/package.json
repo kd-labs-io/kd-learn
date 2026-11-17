@@ -1,0 +1,31 @@
+{
+  "name": "@kd-learn/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "kd-learn components on top of Astryx (an Astryx integration package).",
+  "type": "module",
+  "exports": {
+    "./components/LessonText": "./components/LessonText.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc && astryx integration check --strict",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "catalog:",
+    "@astryxdesign/core": "catalog:",
+    "@kd-learn/config": "workspace:*",
+    "@stylexjs/stylex": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@astryxdesign/core": "catalog:",
+    "@stylexjs/stylex": "catalog:",
+    "react": "catalog:"
+  }
+}

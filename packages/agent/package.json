@@ -1,0 +1,24 @@
+{
+  "name": "@kd-learn/agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prober, Teacher and Practitioner agents. Depends on core and ports only.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@kd-learn/core": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

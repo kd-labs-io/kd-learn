@@ -1,0 +1,9 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_name": "kd-learn",
+  "app_tagline": "Learn anything with an AI tutor.",
+  "theme_apply": "Apply theme",
+  "theme_reset": "Reset theme",
+  "theme_invalid": "This theme is not valid: {reason}",
+  "locale_label": "Language"
+}

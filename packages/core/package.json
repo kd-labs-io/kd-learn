@@ -1,0 +1,23 @@
+{
+  "name": "@kd-learn/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure domain model: records, events, projections, graph, exercise registry. No IO.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
