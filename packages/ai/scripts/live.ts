@@ -43,6 +43,7 @@ const Answer = Schema.Struct({
   sum: Schema.Finite,
   confidence: Schema.Literals(['low', 'medium', 'high']),
   explanation: Schema.String,
+  note: Schema.optionalKey(Schema.String),
 });
 
 const which = process.argv[2] ?? 'anthropic';

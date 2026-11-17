@@ -51,13 +51,17 @@ Phần A đạt tiêu chí. Mã ở `packages/ai`: port ở `src/port` (chỉ im
 
 | Việc | Kết quả |
 | --- | --- |
-| A1 Effect Schema | Đạt, nhưng không qua Standard Schema. `Schema.toStandardJSONSchemaV1` chỉ có JSON Schema, không có `validate`, nên TanStack không kiểm input. Cách chốt: gửi JSON Schema thuần (`Schema.toJsonSchemaDocument`) cho TanStack, tự decode input của tool và output bằng Effect. Hai lưu ý: dùng `Schema.Finite` thay `Schema.Number` (`Number` sinh `anyOf` có chuỗi `"Infinity"`, model gửi số dạng chuỗi); đổi `additionalProperties: true` thành `false`, nếu không OpenAI tắt chế độ strict |
-| A2 Output có cấu trúc kèm tool khi stream | Đạt: gọi tool rồi trả `structured-output.complete`. Text JSON thô của output bị ẩn khỏi `TextDelta` |
-| A3 Huỷ | Đạt. Interrupt Stream thì abort request: test với client Anthropic giả (bỏ lệnh abort thì test fail). Chạy thật: Stream đóng khoảng 1 ms sau delta đầu |
-| A4 `@tanstack/ai-effect` | Chưa so sánh. Lớp tự viết khoảng 200 dòng, đủ dùng; `ai-effect` còn 0.x |
-| A5 Provider | Anthropic (`claude-haiku-5-5`), Gemini (`gemini-3.5-flash`), OpenRouter qua `openaiCompatibleText` (`openai/gpt-5-mini`): mỗi bên 3/3 lượt đúng |
+| A1 Effect Schema | Đạt, nhưng không qua Standard Schema. `Schema.toStandardJSONSchemaV1` chỉ cho JSON Schema, không có `validate`. Cách chốt: gửi JSON Schema thuần (`Schema.toJsonSchemaDocument`) cho TanStack; TanStack kiểm input của tool theo JSON Schema đó, adapter decode lại bằng Effect (lớp chặn thứ hai, giữ kiểu). Lưu ý: dùng `Schema.Finite` thay `Schema.Number` (`Number` sinh `anyOf` có chuỗi `"Infinity"`, model gửi số dạng chuỗi); đóng object có `properties` (`additionalProperties: false`), nếu không OpenAI tắt chế độ strict, còn `Record` vẫn để mở. Trường không bắt buộc (`optionalKey`) chạy được qua OpenRouter |
+| A2 Output có cấu trúc kèm tool khi stream | Đạt: gọi tool rồi trả `structured-output.complete`. Text JSON thô của output bị ẩn khỏi `TextDelta`. Output sai schema thành lỗi `OutputInvalid` (test) |
+| A3 Huỷ và lỗi | Đạt. Interrupt Stream thì abort request: test với client Anthropic giả (bỏ lệnh abort thì test fail); chạy thật, Stream đóng khoảng 5 ms (Anthropic) và 1 ms (OpenRouter) sau delta đầu. Provider từ chối (key sai) thành `ProviderError` có `code` (test và chạy thật). Tool lỗi được gửi lại cho model, lượt chạy tiếp (test) |
+| A4 `@tanstack/ai-effect` | Không so sánh; mặc định giữ lớp tự viết (khoảng 200 dòng, đủ dùng). `ai-effect` còn 0.x, xem lại khi lên 1.0 |
+| A5 Provider | Anthropic (`claude-haiku-5-5`), Gemini (`gemini-3.5-flash`), OpenRouter qua `openaiCompatibleText` (`openai/gpt-5-mini`): mỗi bên 2–3 lượt đúng. Mẫu nhỏ, chỉ chứng minh chạy được |
 
-Ghi chú: mỗi lần gọi model trong vòng tool có một `RUN_FINISHED` riêng, nên một lượt có nhiều sự kiện `Usage`; `Finish` lấy lý do dừng của lần gọi cuối. Chưa chạy thật nhánh lỗi: tool thất bại, output sai schema (`OutputInvalid`).
+Ghi chú:
+
+- Mỗi lần gọi model trong vòng tool có một `RUN_FINISHED` riêng, nên một lượt có nhiều sự kiện `Usage`; `Finish` lấy lý do dừng của lần gọi cuối.
+- Adapter Anthropic, khi model không hỗ trợ tool và output schema cùng lúc, tạo tool `structured_output` chỉ giữ `properties` và `required` của schema: `$defs` bị bỏ. Schema output có kiểu đệ quy hoặc dùng lại kiểu cần kiểm lại với model đó.
+- Test chạy trong CI bằng client Anthropic giả; Gemini và OpenAI-compatible chỉ kiểm bằng chạy tay.
 
 ## Tiêu chí đạt (chốt 2026-11-17)
 

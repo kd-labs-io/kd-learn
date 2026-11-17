@@ -1,6 +1,7 @@
-import { Effect, Schema, Stream } from 'effect';
+import { Effect, Exit, Schema, Stream } from 'effect';
 import { describe, expect, it } from 'vitest';
 import type { AnthropicMessagesClient } from '@tanstack/ai-anthropic';
+import { tool, ToolError } from '../port/index.ts';
 import { jsonSchemaOf, runTurn } from './index.ts';
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -67,6 +68,11 @@ describe('jsonSchemaOf', () => {
       required: ['a', 'nested'],
     });
   });
+
+  it('keeps records open', () => {
+    const schema = jsonSchemaOf(Schema.Record(Schema.String, Schema.Unknown));
+    expect(schema.additionalProperties).not.toBe(false);
+  });
 });
 
 describe('runTurn (TanStack AI)', () => {
@@ -83,5 +89,152 @@ describe('runTurn (TanStack AI)', () => {
     expect(state.requests).toBe(1);
     await sleep(20);
     expect(state.aborted).toBe(true);
+  });
+});
+
+type Script = ReadonlyArray<
+  | { readonly kind: 'stream'; readonly events: ReadonlyArray<unknown> }
+  | { readonly kind: 'message'; readonly message: unknown }
+  | { readonly kind: 'reject'; readonly error: Error }
+>;
+
+/** A fake Anthropic client that answers each request with the next scripted response. */
+const scriptedClient = (script: Script) => {
+  const requests: Array<Record<string, unknown>> = [];
+  const client = {
+    beta: {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          requests.push(params);
+          const step = script[requests.length - 1];
+          if (!step) throw new Error(`unexpected request ${requests.length}`);
+          if (step.kind === 'reject') throw step.error;
+          if (step.kind === 'message') return step.message;
+          return (async function* () {
+            yield* step.events;
+          })();
+        },
+      },
+    },
+  } as unknown as AnthropicMessagesClient;
+  return { client, requests };
+};
+
+const start = {
+  type: 'message_start',
+  message: { id: 'msg', model: 'claude-haiku-5-5', usage: { input_tokens: 1, output_tokens: 0 } },
+};
+const stop = (reason: string) => [
+  { type: 'message_delta', delta: { stop_reason: reason }, usage: { output_tokens: 1 } },
+  { type: 'message_stop' },
+];
+const toolUse = (id: string, name: string, input: unknown) => [
+  start,
+  {
+    type: 'content_block_start',
+    index: 0,
+    content_block: { type: 'tool_use', id, name, input: {} },
+  },
+  {
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) },
+  },
+  { type: 'content_block_stop', index: 0 },
+  ...stop('tool_use'),
+];
+const text = (value: string) => [
+  start,
+  { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+  { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: value } },
+  { type: 'content_block_stop', index: 0 },
+  ...stop('end_turn'),
+];
+
+const model = { provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'unused' } as const;
+
+describe('runTurn (TanStack AI) error paths', () => {
+  it('fails with ProviderError when the provider rejects the request', async () => {
+    const { client } = scriptedClient([
+      { kind: 'reject', error: Object.assign(new Error('invalid x-api-key'), { status: 401 }) },
+    ]);
+    const exit = await Effect.runPromiseExit(
+      runTurn({ anthropicClient: client })({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+      }).pipe(Stream.runCollect),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    const error = Exit.isFailure(exit) ? exit.cause.reasons[0] : undefined;
+    expect(error).toMatchObject({ _tag: 'Fail', error: { _tag: 'ProviderError' } });
+    expect(JSON.stringify(error)).toContain('invalid x-api-key');
+    expect(error).toMatchObject({ error: { code: '401' } });
+  });
+
+  it('sends a failed tool call back to the model and continues the turn', async () => {
+    const flaky = tool({
+      name: 'flaky',
+      description: 'Fails on purpose.',
+      input: Schema.Struct({ n: Schema.Finite }),
+      run: () => Effect.fail(new ToolError({ message: 'service down' })),
+    });
+    const { client, requests } = scriptedClient([
+      { kind: 'stream', events: toolUse('toolu_1', 'flaky', { n: 1 }) },
+      { kind: 'stream', events: text('Sorry, the tool failed.') },
+    ]);
+    const events = await Effect.runPromise(
+      runTurn({ anthropicClient: client })({
+        model,
+        messages: [{ role: 'user', content: 'call flaky' }],
+        tools: [flaky],
+      }).pipe(Stream.runCollect),
+    );
+
+    expect(requests).toHaveLength(2);
+    const result = events.find((e) => e._tag === 'ToolResult');
+    expect(result).toMatchObject({ _tag: 'ToolResult', id: 'toolu_1' });
+    expect(result?._tag === 'ToolResult' && result.output).toContain('service down');
+    // The second request carries the failure to the model.
+    expect(JSON.stringify(requests[1])).toContain('service down');
+    expect(events.at(-1)).toEqual({ _tag: 'Finish', reason: 'stop' });
+  });
+
+  it('rejects tool input that does not match the schema without calling run', async () => {
+    let ran = false;
+    const strict = tool({
+      name: 'strict',
+      description: 'Needs a number.',
+      input: Schema.Struct({ n: Schema.Finite }),
+      run: () => Effect.sync(() => (ran = true)),
+    });
+    const { client, requests } = scriptedClient([
+      { kind: 'stream', events: toolUse('toolu_2', 'strict', { n: 'one' }) },
+      { kind: 'stream', events: text('ok') },
+    ]);
+    await Effect.runPromise(
+      runTurn({ anthropicClient: client })({
+        model,
+        messages: [{ role: 'user', content: 'call strict' }],
+        tools: [strict],
+      }).pipe(Stream.runDrain),
+    );
+    expect(ran).toBe(false);
+    // TanStack checks the JSON Schema first; the Effect decode in the adapter is a second guard.
+    expect(JSON.stringify(requests[1])).toContain('Input validation failed for tool strict');
+  });
+
+  it('fails with OutputInvalid when the structured result does not match the schema', async () => {
+    // claude-haiku-5-5 supports tools and an output schema together: the result streams as JSON text.
+    const { client } = scriptedClient([{ kind: 'stream', events: text('{"sum":"many"}') }]);
+    const exit = await Effect.runPromiseExit(
+      runTurn({ anthropicClient: client })({
+        model,
+        messages: [{ role: 'user', content: 'sum' }],
+        output: Schema.Struct({ sum: Schema.Finite }),
+      }).pipe(Stream.runCollect),
+    );
+    const error = Exit.isFailure(exit) ? exit.cause.reasons[0] : undefined;
+    expect(error).toMatchObject({ _tag: 'Fail', error: { _tag: 'OutputInvalid' } });
+    expect(JSON.stringify(error)).toContain('many');
   });
 });

@@ -19,13 +19,13 @@ import {
   type TurnRequest,
 } from '../port/index.ts';
 
-/** Closes open objects: Effect emits `additionalProperties: true`, which disables strict tool calls. */
+/** Closes struct objects: Effect emits `additionalProperties: true`, which disables strict tool calls. Records stay open. */
 const closeObjects = (node: unknown): unknown => {
   if (Array.isArray(node)) return node.map(closeObjects);
   if (!node || typeof node !== 'object') return node;
   const entries = Object.entries(node).map(([key, value]) => [key, closeObjects(value)] as const);
   const out = Object.fromEntries(entries) as Record<string, unknown>;
-  if (out.additionalProperties === true) out.additionalProperties = false;
+  if (out.additionalProperties === true && 'properties' in out) out.additionalProperties = false;
   return out;
 };
 
@@ -140,7 +140,9 @@ const makeMapper = <A>(output: Schema.Codec<A, unknown> | undefined) => {
         );
       }
       case 'RUN_ERROR': {
-        const code = typeof event.code === 'string' ? event.code : undefined;
+        // TanStack sends the string 'undefined' when the provider gave no code.
+        const code =
+          typeof event.code === 'string' && event.code !== 'undefined' ? event.code : undefined;
         const tanstack = event.metadata?.tanstack as Record<string, unknown> | undefined;
         if (code?.startsWith('structured-output-')) {
           return Effect.fail(
