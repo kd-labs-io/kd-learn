@@ -20,7 +20,7 @@
 | Lõi | Effect v4 cho service, lỗi, đồng thời, schema, job nền |
 | Model | TanStack AI cho backend API. Không dùng module AI của Effect |
 | Provider | Anthropic, OpenAI, Google Gemini, endpoint tương thích OpenAI (admin khai báo danh sách được phép) |
-| ACP | Agent Client Protocol: server điều khiển agent CLI (Claude Code, Antigravity CLI, opencode). Không dùng Gemini CLI (đã bị Antigravity CLI thay thế) làm backend. Admin bật, chỉ cho chế độ tài khoản |
+| ACP | Agent Client Protocol: server điều khiển agent CLI (Claude Code, Antigravity CLI, opencode) làm backend. Admin bật, chỉ cho chế độ tài khoản. Không dùng Gemini CLI (đã bị Antigravity CLI thay thế) |
 | Tìm kiếm | Port với 5 nguồn: SearXNG, Exa, web search của OpenAI, Anthropic, Gemini. Có UI cấu hình |
 | Hình minh hoạ | LLM sinh mã (SVG / Mermaid, HTML + JS) chạy trong iframe sandbox, cộng tool sinh ảnh (OpenAI, Gemini) |
 | Triển khai | Docker Compose trên VPS hoặc máy ở nhà |
