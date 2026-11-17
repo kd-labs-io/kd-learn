@@ -1,0 +1,7 @@
+{
+  "extends": "@kd-learn/config/tsconfig/dom.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"]
+  },
+  "include": ["src", "vite.config.ts"]
+}

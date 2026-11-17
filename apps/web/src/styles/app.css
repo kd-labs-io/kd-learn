@@ -1,0 +1,14 @@
+/* Layer order: reset < astryx-base < astryx-theme. Unlayered app CSS wins. */
+@import '@astryxdesign/core/reset.css';
+@import '@kd-learn/tokens/astryx.css';
+
+/* Self-hosted fonts (DESIGN.md), all with Vietnamese glyphs. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/source-serif-4';
+@import '@fontsource-variable/jetbrains-mono';
+
+html,
+body {
+  margin: 0;
+  background: var(--color-background-body);
+}

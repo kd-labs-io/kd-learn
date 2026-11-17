@@ -1,0 +1,25 @@
+{
+  "name": "@kd-learn/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UI strings for vi and en (Paraglide JS).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/paraglide/server.js"
+  },
+  "scripts": {
+    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --no-emit-readme",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@inlang/paraglide-js": "3.2.2",
+    "@inlang/plugin-message-format": "4.5.0",
+    "@kd-learn/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

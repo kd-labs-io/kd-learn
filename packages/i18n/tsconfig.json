@@ -1,0 +1,5 @@
+{
+  "extends": "@kd-learn/config/tsconfig/pure.json",
+  "compilerOptions": { "allowJs": false },
+  "include": ["src", "test"]
+}

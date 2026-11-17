@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "//": "For packages that must not touch Node or DOM APIs (core, agent). No DOM lib, no @types/node.",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": []
+  }
+}

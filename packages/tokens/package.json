@@ -1,0 +1,37 @@
+{
+  "name": "@kd-learn/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "kd-learn theme: token schema, default theme from DESIGN.md, Astryx theme.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./astryx": {
+      "types": "./dist/kd.d.ts",
+      "default": "./dist/kd.js"
+    },
+    "./astryx.css": "./dist/kd.css"
+  },
+  "scripts": {
+    "build": "astryx theme build src/astryx/kdTheme.ts --out dist/kd.css",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "catalog:",
+    "@astryxdesign/core": "catalog:",
+    "@kd-learn/config": "workspace:*",
+    "@stylexjs/stylex": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "@astryxdesign/core": "catalog:"
+  }
+}
