@@ -30,6 +30,7 @@ kd-learn/
 
 - `core` và `agent` không import API của Node hay DOM. Ràng buộc bằng lint rule từ phase 0.
 - Mọi IO đi qua port: lưu trữ, model, tìm kiếm. Adapter nằm ở package riêng.
+- `agent` chỉ được import `@kd-learn/core` và phần port của `ai`, `search`, `storage` qua đường dẫn `@kd-learn/<package>/port`, không import adapter. Ràng buộc bằng lint.
 - Schema định nghĩa một lần bằng Effect Schema, dùng chung cho DB, API và tool của agent.
 
 ## 3.3 Port AI

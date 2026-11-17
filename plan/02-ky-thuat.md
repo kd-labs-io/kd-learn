@@ -28,7 +28,7 @@
 
 ## 2.5 Thư viện TanStack
 
-Mỗi phase chỉ thêm thư viện khi thật sự cần. Các thư viện này chỉ nằm trong `apps/web` và `packages/ui`; `core` và `agent` không phụ thuộc vào chúng.
+Mỗi phase chỉ thêm thư viện khi thật sự cần. Các thư viện này chỉ nằm trong `apps/web` và `packages/ui`; `core` và `agent` không phụ thuộc vào chúng. Ngoại lệ duy nhất: `packages/ai` được dùng `@tanstack/ai*` để làm adapter cho port AI (lint đã cho phép).
 
 | Thư viện | Dùng cho | Từ phase | Trạng thái |
 | --- | --- | --- | --- |
