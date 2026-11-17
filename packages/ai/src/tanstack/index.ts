@@ -46,6 +46,8 @@ export interface AdapterOverrides {
 
 const adapterFor = (ref: ModelRef, overrides: AdapterOverrides): Adapter => {
   switch (ref.provider) {
+    case 'acp':
+      throw new Error('unreachable: runTurn rejects ACP models');
     case 'anthropic': {
       const model = ref.model as Parameters<typeof createAnthropicChat>[0];
       return (

@@ -14,6 +14,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "^0.107.0",
+    "@agentclientprotocol/sdk": "^2.7.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@tanstack/ai": "1.4.0",
     "@tanstack/ai-anthropic": "^1.1.1",
     "@tanstack/ai-gemini": "^1.2.2",

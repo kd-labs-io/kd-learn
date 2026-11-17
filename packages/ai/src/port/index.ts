@@ -11,6 +11,14 @@ export type ModelRef =
       readonly model: string;
       readonly apiKey: string;
       readonly baseURL: string;
+    }
+  | {
+      /** An agent CLI driven over ACP. Auth comes from the agent's own login on the server. */
+      readonly provider: 'acp';
+      readonly agent: 'claude-code' | 'antigravity' | 'opencode';
+      readonly model?: string;
+      /** Optional key for agents that accept one (Antigravity: Gemini API key). */
+      readonly apiKey?: string;
     };
 
 export interface Message {
