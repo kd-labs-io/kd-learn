@@ -45,6 +45,20 @@ Không dùng Gemini CLI (`gemini --acp`): đã bị Antigravity CLI thay thế.
 5. `session/cancel` khi Stream bị interrupt; process agent được dọn khi xong.
 6. Ánh xạ `session/update` (`agent_message_chunk`, `tool_call`, `tool_call_update`, `usage_update`) sang `TurnEvent`.
 
+## Kết quả phần A (2026-11-17)
+
+Phần A đạt tiêu chí. Mã ở `packages/ai`: port ở `src/port` (chỉ import `effect`, lint chặn adapter), adapter ở `src/tanstack`, script chạy tay `scripts/live.ts`.
+
+| Việc | Kết quả |
+| --- | --- |
+| A1 Effect Schema | Đạt, nhưng không qua Standard Schema. `Schema.toStandardJSONSchemaV1` chỉ có JSON Schema, không có `validate`, nên TanStack không kiểm input. Cách chốt: gửi JSON Schema thuần (`Schema.toJsonSchemaDocument`) cho TanStack, tự decode input của tool và output bằng Effect. Hai lưu ý: dùng `Schema.Finite` thay `Schema.Number` (`Number` sinh `anyOf` có chuỗi `"Infinity"`, model gửi số dạng chuỗi); đổi `additionalProperties: true` thành `false`, nếu không OpenAI tắt chế độ strict |
+| A2 Output có cấu trúc kèm tool khi stream | Đạt: gọi tool rồi trả `structured-output.complete`. Text JSON thô của output bị ẩn khỏi `TextDelta` |
+| A3 Huỷ | Đạt. Interrupt Stream thì abort request: test với client Anthropic giả (bỏ lệnh abort thì test fail). Chạy thật: Stream đóng khoảng 1 ms sau delta đầu |
+| A4 `@tanstack/ai-effect` | Chưa so sánh. Lớp tự viết khoảng 200 dòng, đủ dùng; `ai-effect` còn 0.x |
+| A5 Provider | Anthropic (`claude-haiku-5-5`), Gemini (`gemini-3.5-flash`), OpenRouter qua `openaiCompatibleText` (`openai/gpt-5-mini`): mỗi bên 3/3 lượt đúng |
+
+Ghi chú: mỗi lần gọi model trong vòng tool có một `RUN_FINISHED` riêng, nên một lượt có nhiều sự kiện `Usage`; `Finish` lấy lý do dừng của lần gọi cuối. Chưa chạy thật nhánh lỗi: tool thất bại, output sai schema (`OutputInvalid`).
+
 ## Tiêu chí đạt (chốt 2026-11-17)
 
 - **Rủi ro 2 đạt** khi A1–A3 chạy được với ít nhất Anthropic, có test cho interrupt. OpenAI, Gemini, endpoint tương thích OpenAI chạy được thì ghi lại, không bắt buộc.

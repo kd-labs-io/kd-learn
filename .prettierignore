@@ -8,4 +8,4 @@ routeTree.gen.ts
 plan/
 DESIGN.md
 AGENTS.md
-src/paraglide/
+**/src/paraglide/

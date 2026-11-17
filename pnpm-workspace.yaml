@@ -40,8 +40,12 @@ minimumReleaseAgeExclude:
 allowBuilds:
   '@astryxdesign/core': false
   '@astryxdesign/cli': false
+  '@google/genai': false
+  protobufjs: false
 
 permissions:
+  '@tanstack/ai':
+    skills: true
   '@tanstack/react-router':
     skills: [router-query, migrate-from-react-router, react-router]
   '@tanstack/react-start':

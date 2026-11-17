@@ -4,7 +4,7 @@
 | # | Rủi ro | Cách xử lý |
 | --- | --- | --- |
 | 1 | Output có cấu trúc qua ACP không đủ tin cậy | Thử ở spike đầu phase 1. Nếu không đạt, ACP chỉ dùng cho vai không cần cấu trúc chặt |
-| 2 | Ranh giới giữa stream của TanStack AI và Effect | Thử cùng spike trên |
+| 2 | Ranh giới giữa stream của TanStack AI và Effect | **Đã kiểm chứng (2026-11-17): đạt.** Adapter tự viết trong `packages/ai/src/tanstack` chuyển stream sang `Stream` của Effect; huỷ Stream thì abort request (có test). Chi tiết ở [spike port AI](spike-port-ai.md) |
 | 3 | Khách phải gửi lại lịch sử buổi học mỗi lượt | Giới hạn kích thước request, thiết kế cách tóm tắt lịch sử dài. Chưa thiết kế |
 | 4 | Việc nền của khách dừng khi đóng tab | Research và PDF ở chế độ khách phải chạy lại được sau khi bị ngắt |
 | 5 | SQLite WASM (OPFS), SSE và CSS anchor positioning trong WebView iOS | Kiểm chứng trước phase 6. Lần mở thử trên Safari iOS của spike UI phase 0 (theme, font, đổi theme lúc chạy, đổi ngôn ngữ) cũng hoãn tới đây (2026-11-17: chưa có máy hoặc simulator). Phương án lùi cho SQLite: plugin SQLite native của Capacitor. Astryx cần Safari 26+ để định vị popover, menu, tooltip; iOS 17–25 vẫn dùng được nhưng các lớp này có thể lệch vị trí. Chốt phiên bản iOS tối thiểu. Theo MDN (2026-11-17): theme cần `light-dark()` (Safari 17.5) và `@scope` (17.4), nên sàn thực tế là **iOS 17.5**; OPFS có từ 15.2; Popover API từ 17 |

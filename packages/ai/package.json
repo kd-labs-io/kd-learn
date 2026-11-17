@@ -1,0 +1,29 @@
+{
+  "name": "@kd-learn/ai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI port (run one turn with a toolset, stream events) and its adapters: TanStack AI, ACP.",
+  "type": "module",
+  "exports": {
+    "./port": "./src/port/index.ts",
+    "./tanstack": "./src/tanstack/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@tanstack/ai": "1.4.0",
+    "@tanstack/ai-anthropic": "^1.1.1",
+    "@tanstack/ai-gemini": "^1.2.2",
+    "@tanstack/ai-openai": "^1.1.1",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

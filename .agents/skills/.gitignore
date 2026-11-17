@@ -1,4 +1,5 @@
 # pnpm
+/ai-core
 /migrate-from-nextjs
 /migrate-from-react-router
 /react-router
