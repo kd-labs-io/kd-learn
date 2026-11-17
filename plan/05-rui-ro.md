@@ -16,5 +16,5 @@
 | 11 | Theme import hoặc tải từ marketplace là dữ liệu không tin cậy (chèn CSS, URL ngoài để theo dõi, chữ không đọc được) | Theme chỉ chứa giá trị token đã qua schema (màu, độ dài, tên font trong danh sách cho phép). Không cho CSS tự do hay URL ngoài. Kiểm độ tương phản trước khi áp dụng |
 | 12 | Theme của Astryx / StyleX biên dịch lúc build, chưa chắc đổi được lúc chạy | **Đã kiểm chứng (2026-11-17): đổi được.** Đặt biến CSS inline trên phần tử nằm trong wrapper `[data-astryx-theme]` (đặt trên `:root` thì không ăn, vì theme đã build khai báo lại mọi token trên wrapper). Đã thử trên trình duyệt với Button, Card, Banner, Popover và component StyleX riêng, ở cả dev, SSR và SPA |
 | 13 | Paraglide không nạp được plugin vẫn báo biên dịch thành công nhưng không sinh chuỗi nào | Test trong `packages/i18n` kiểm mọi key trong `messages/*.json` đều có hàm tương ứng |
-| 14 | Ba chỗ chỉnh để `@astryxdesign/build` chạy với TanStack Start (xem [mục 8](progress/phase-0.md)) dựa vào chi tiết nội bộ, có thể vỡ khi nâng Astryx | Kiểm lại cả dev, SSR, SPA sau mỗi lần nâng Astryx |
+| 14 | Ba chỗ chỉnh để `@astryxdesign/build` chạy với TanStack Start (xem [phase 0](archive/phase-0.md)) dựa vào chi tiết nội bộ, có thể vỡ khi nâng Astryx | Kiểm lại cả dev, SSR, SPA sau mỗi lần nâng Astryx |
 

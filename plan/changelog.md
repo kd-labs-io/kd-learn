@@ -11,3 +11,4 @@
 - **Cập nhật:** 2026-11-17: thêm thư mục `archive/` cho phần đã xong
 - **Cập nhật:** 2026-11-17: commit nhánh `phase-0-scaffold`, mở PR #1, CI chạy xanh trên GitHub (mục 7, 8)
 - **Cập nhật:** 2026-11-17: chốt các mục chờ xác nhận: ngoại lệ `@tanstack/ai*` trong `packages/ai` (mục 2.5), quy ước import port của `agent` (mục 3.2), chạy `astryx init`, ghi chú i18n trong `AGENTS.md`; hoãn kiểm Safari iOS sang phase 6 (mục 4, 5, 6, 7, 8)
+- **Cập nhật:** 2026-11-17: merge PR #1, đóng phase 0 (chuyển sang `archive/phase-0.md`); bước tiếp theo là spike port AI của phase 1 (mục 7, 8)
