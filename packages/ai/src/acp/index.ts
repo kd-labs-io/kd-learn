@@ -25,7 +25,9 @@ import { startToolServer, type ServedTool } from './tool-server.ts';
 // Remove a temp dir; retry while the agent's last writes land, and never fail the turn on cleanup.
 const removeDir = (dir: string) =>
   Effect.promise(() =>
-    rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined),
+    rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(
+      () => undefined,
+    ),
   );
 
 // Kill the agent and wait for it to exit (SIGKILL after 2 s), so it no longer writes to its temp dirs.
@@ -125,7 +127,7 @@ const finishOf = (stop: acp.StopReason): FinishReason => {
 };
 
 /** ACP has one prompt per turn: system text and history go in as one transcript. */
-const promptText = (request: TurnRequest<unknown>, hasOutput: boolean) => {
+const promptText = (request: TurnRequest<unknown>, hasOutput: boolean, toolRule: boolean) => {
   const parts: Array<string> = [];
   if (request.system) parts.push(`<instructions>\n${request.system}\n</instructions>`);
   for (const m of request.messages.slice(0, -1))
@@ -138,7 +140,8 @@ const promptText = (request: TurnRequest<unknown>, hasOutput: boolean) => {
         'If it reports an error, fix the input and call it again.',
     );
   }
-  parts.push('Use only kd-learn tools. Do not read or write files and do not run commands.');
+  if (toolRule)
+    parts.push('Use only kd-learn tools. Do not read or write files and do not run commands.');
   return parts.join('\n\n');
 };
 
@@ -147,6 +150,10 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 /** Test hook: start a fake agent instead of the real CLI. */
 export interface AcpOverrides {
   readonly launch?: (ref: AcpRef, home: string) => Launch;
+  /** Spike hook: called on every `submit_result` call, accepted or not. */
+  readonly onSubmit?: (accepted: boolean) => void;
+  /** Spike hook: false drops the "use only kd-learn tools" line, to test the technical block alone. */
+  readonly toolRule?: boolean;
 }
 
 export const runTurn =
@@ -208,6 +215,7 @@ export const runTurn =
             call: async (args) => {
               attempts++;
               const exit = await Effect.runPromiseExit(Schema.decodeUnknownEffect(output)(args));
+              overrides.onSubmit?.(exit._tag === 'Success');
               if (exit._tag === 'Success') {
                 submitted = { value: exit.value };
                 emit({ _tag: 'StructuredResult', value: exit.value });
@@ -308,7 +316,11 @@ export const runTurn =
               cancel = () =>
                 ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
               void session.prompt(
-                promptText(request as TurnRequest<unknown>, output !== undefined),
+                promptText(
+                  request as TurnRequest<unknown>,
+                  output !== undefined,
+                  overrides.toolRule ?? true,
+                ),
               );
               for (;;) {
                 const next = await session.nextUpdate();
