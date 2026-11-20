@@ -63,6 +63,28 @@ Ghi chú:
 - Adapter Anthropic, khi model không hỗ trợ tool và output schema cùng lúc, tạo tool `structured_output` chỉ giữ `properties` và `required` của schema: `$defs` bị bỏ. Schema output có kiểu đệ quy hoặc dùng lại kiểu cần kiểm lại với model đó.
 - Test chạy trong CI bằng client Anthropic giả; Gemini và OpenAI-compatible chỉ kiểm bằng chạy tay.
 
+## Kết quả phần B (2026-11-21, chưa xong)
+
+Mã ở `packages/ai/src/acp`, script chạy tay `scripts/acp-live.ts` (độ tin cậy, huỷ) và `scripts/acp-probe.ts` (đi từng bước một agent). Test trong CI dùng agent ACP giả.
+
+Đã chạy 10/20 lượt mỗi agent với `acp-live.ts`: bài cộng hai số, gọi tool `add` rồi `submit_result` theo schema có object lồng, mảng, literal.
+
+| Agent | Hợp lệ | Huỷ: Stream đóng sau delta đầu |
+| --- | --- | --- |
+| Claude Code (`claude-agent-acp`) | 10/10 | 8 ms |
+| opencode (`opencode-go/claude-haiku-5-5`) | 10/10 | 10 ms |
+| Antigravity CLI (`agy acp`, API key Gemini) | 10/10 | 1256 ms |
+
+- Mọi lượt gọi tool `add` đúng một lần, kết quả đúng.
+- Lỗi đã sửa: Antigravity vẫn ghi vào thư mục home tạm sau SIGTERM, xoá thư mục bị `ENOTEMPTY` và làm hỏng lượt. Giờ adapter chờ process thoát (SIGKILL sau 2 s) rồi mới xoá, xoá có thử lại, dọn lỗi không làm hỏng lượt.
+
+Còn thiếu:
+
+- Chạy thêm 10 lượt mỗi agent cho đủ 20 theo tiêu chí.
+- Script chưa đếm số lần agent phải sửa sau lỗi validate (`attempts`).
+- Antigravity huỷ chậm hơn hẳn (khoảng 1,3 s): chưa rõ do `session/cancel` hay do chờ kill.
+- B4 (agent không ghi được ra ngoài thư mục tạm) chưa kiểm.
+
 ## Tiêu chí đạt (chốt 2026-11-17)
 
 - **Rủi ro 2 đạt** khi A1–A3 chạy được với ít nhất Anthropic, có test cho interrupt. OpenAI, Gemini, endpoint tương thích OpenAI chạy được thì ghi lại, không bắt buộc.
