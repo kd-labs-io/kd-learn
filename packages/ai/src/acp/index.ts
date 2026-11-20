@@ -22,6 +22,27 @@ import {
 import { jsonSchemaOf } from '../tanstack/index.ts';
 import { startToolServer, type ServedTool } from './tool-server.ts';
 
+// Remove a temp dir; retry while the agent's last writes land, and never fail the turn on cleanup.
+const removeDir = (dir: string) =>
+  Effect.promise(() =>
+    rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined),
+  );
+
+// Kill the agent and wait for it to exit (SIGKILL after 2 s), so it no longer writes to its temp dirs.
+const stopChild = (child: ChildProcess) =>
+  Effect.promise(
+    () =>
+      new Promise<void>((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) return resolve();
+        const timer = setTimeout(() => child.kill('SIGKILL'), 2000);
+        child.once('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        child.kill();
+      }),
+  );
+
 export type AcpRef = Extract<ModelRef, { provider: 'acp' }>;
 
 const SUBMIT = 'submit_result';
@@ -144,11 +165,11 @@ export const runTurn =
 
         const cwd = yield* Effect.acquireRelease(
           Effect.promise(() => mkdtemp(join(tmpdir(), 'kd-acp-'))),
-          (dir) => Effect.promise(() => rm(dir, { recursive: true, force: true })),
+          removeDir,
         );
         const home = yield* Effect.acquireRelease(
           Effect.promise(() => mkdtemp(join(tmpdir(), 'kd-acp-home-'))),
-          (dir) => Effect.promise(() => rm(dir, { recursive: true, force: true })),
+          removeDir,
         );
 
         // kd-learn tools, plus `submit_result` when a structured result is wanted.
@@ -218,7 +239,7 @@ export const runTurn =
               stdio: ['pipe', 'pipe', 'pipe'],
             }),
           ),
-          (c) => Effect.sync(() => c.kill()),
+          stopChild,
         );
         let stderr = '';
         child.stderr?.on('data', (chunk) => (stderr = (stderr + String(chunk)).slice(-2000)));
