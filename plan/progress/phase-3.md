@@ -10,7 +10,7 @@
 | Bước 0: spike hình graph (C1) | Xong (2026-11-21). TanStack Charts không có kéo node; chọn sigma 4 + graphology (WebGL, kéo 60 fps với 3.000 node). Xem ghi chú bước 0 bên dưới |
 | Bước 1: spike extraction với Haiku (C2, C3) | Xong (2026-11-21). Pipeline 3 lần gọi (extractor, auditor kiểm cả mệnh đề và cạnh, merge theo ứng viên của từng mệnh đề), chọn lát theo từ vựng K = 5 mỗi mệnh đề, giữ 5 quan hệ. Không dùng TanStack DB. Khoảng $0,007 mỗi buổi với Haiku. Xem ghi chú bước 1 bên dưới |
 | Bước 2: log kiến thức (core, storage) | Chưa bắt đầu |
-| Bước 3: hồ sơ dạy học v2, vai mới | Chưa bắt đầu |
+| Bước 3: hồ sơ dạy học v2, vai mới | Xong (2026-11-21). `TeachingProfile` thêm `name` và bốn prompt tuỳ chọn, `resolveProfile` điền từ hồ sơ mặc định; hồ sơ lưu qua port ở cả hai driver; `GET` / `PUT` / `DELETE /api/account/profile`; vai `practitioner` / `extractor` chưa đặt thì dùng model của `teacher`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: pipeline extraction (agent) | Chưa bắt đầu |
 | Bước 5: extraction trên server | Chưa bắt đầu |
 | Bước 6: registry bài tập, Practitioner | Chưa bắt đầu |
@@ -135,3 +135,35 @@ Không còn log buổi học thật từ phase 1–2 (DB khách ở OPFS của t
 - **Pipeline 3 lần gọi:** extractor → auditor (mệnh đề và cạnh, cho phép tách một mệnh đề hai ý thành hai) → merge theo ứng viên của từng mệnh đề.
 - **Quan hệ:** giữ 5 quan hệ `requires`, `implies`, `supports`, `exampleOf`, `contrastsWith`, kèm định nghĩa đọc theo câu "from RELATION to" trong prompt. Cấm chu trình trên `requires` và `implies` (chuỗi lập luận cho bài sắp xếp đi theo hai quan hệ này). `contrastsWith` không có hướng: projection coi hai chiều là một cạnh.
 - **Lát:** K = 5 ứng viên mỗi mệnh đề mới, lấy hợp; trần tổng 200 mệnh đề và theo số byte.
+
+## Bước 3: hồ sơ dạy học v2, vai mới (2026-11-21)
+
+**Hồ sơ v2 (`core`, `agent`):**
+
+- `TeachingProfile` thêm `name` và `prompts.practitioner`, `prompts.extractor`, `prompts.auditor`, `prompts.merge`, đều tuỳ chọn. Schema của event không thêm giới hạn nào, nên log cũ không bao giờ bị từ chối vì giới hạn đặt sau.
+- `ResolvedProfile` (core) là hồ sơ đã điền đủ mọi trường. `resolveProfile(profile)` (`@kd-learn/agent`, cả `@kd-learn/agent/client`) điền phần thiếu từ `defaultProfile`; `defaultProfile` giờ có kiểu `ResolvedProfile`. Bước 4 và 6 lấy prompt bằng `resolveProfile(profile).prompts.extractor` (và `auditor`, `merge`, `practitioner`).
+- Prompt mặc định của extractor, auditor (mệnh đề và cạnh trong một lần gọi, cho tách mệnh đề hai ý) và merge (bản v2 theo ứng viên) lấy từ spike bước 1. Prompt practitioner là bản đầu; bước 6 chỉnh khi có schema của từng loại bài.
+- `SavedProfile` (core): hồ sơ người dùng lưu, chặt hơn: id dạng slug tối đa 64 ký tự, `language` là thẻ BCP 47, N từ 1 tới 20, M từ 1 tới 50, mỗi prompt 1–20.000 ký tự, `name` tối đa 100.
+- Fixture log phase 2 thật (`packages/core/src/fixtures/phase-2-session.ts`, buổi `bayes` của spike bước 1, hồ sơ chưa có trường mới) vẫn decode và dựng projection tới `Done` (`profile.test.ts`).
+
+**Lưu hồ sơ (`storage`):**
+
+- Port thêm `getProfile` (trả `TeachingProfile | undefined`, đọc bằng schema lỏng), `saveProfile(profile | undefined)` (undefined là về mặc định; driver kiểm `SavedProfile`, sai thì `StorageFailure`, hồ sơ cũ giữ nguyên) và thay đổi `ProfileChanged`. Bộ test port chạy trên memory và sqlite-node; sqlite-wasm kiểm bằng Playwright (`storage.e2e.ts`).
+- Khách: migration v2 của danh sách khách, bảng `teaching_profile` (một hàng, `slot = 1`). Server: migration v6 của danh sách server, bảng `teaching_profiles` khoá `user_id`, chỉ đọc ghi qua `forUser` (không có khoá ngoại tới `users`, giống `sessions`). Test hai người dùng: không đọc, không thay, không xoá được hồ sơ của người kia.
+
+**API và server:**
+
+- `GET`, `PUT` (`ProfileRequest`), `DELETE /api/account/profile`, đều trả `ProfileResponse { profile, saved }` (`profile` đã điền mặc định). Thân `PUT` tối đa 512 KiB (`MAX_PROFILE_BODY_BYTES`; các route tài khoản khác vẫn 16 KiB), decode bằng `SavedProfile` và từ chối trường thừa. Client: `profile()`, `saveProfile()`, `resetProfile()` trong `account-client.ts`. Test: lưu / đọc / về mặc định, sai giới hạn bị từ chối (400, 413), cross-user, buổi mới chụp hồ sơ đã lưu.
+- Server dùng `activeProfile(storage)` (`packages/server/src/profile.ts`) để lấy hồ sơ đang dùng; `Accounts` có thêm `storage` (`ServerStorage`). Buổi tài khoản mới chụp hồ sơ đang dùng; ngôn ngữ vẫn lấy theo request như trước.
+- Khách: màn chính chụp hồ sơ đã lưu trong DB local vào `SessionCreated`. Demo luôn chụp hồ sơ mặc định, và server vẫn thay cả hồ sơ bằng của mình (`withServerProfile`, có test cho prompt của phase 3).
+
+**Vai và model:**
+
+- `ModelRole` / `RoleModels` (api) và `AgentRole` (core) thêm `practitioner`, `extractor`. `MessageAppended.agent` không đổi.
+- `roleFallback` (`@kd-learn/api`): `practitioner` và `extractor` chưa đặt thì dùng vai `teacher`. `SettingsService.resolveModel(userId, role)` áp dụng sẵn; cả hai chưa đặt thì trả `RoleNotConfigured` với tên vai được hỏi, route luyện tập (bước 7) đổi thành `409 RoleNotConfigured` như route lượt. Job extraction (bước 5) cũng gọi `resolveModel(userId, 'extractor')`, gặp `RoleNotConfigured` thì không ghi `ExtractionStarted` (A3).
+- Cài đặt tài khoản hiện thêm hai dòng vai, kèm dòng "chưa đặt thì dùng model của Teacher". Khách vẫn một model cho mọi vai, không đổi.
+
+**Còn mở:**
+
+- Không có màn sửa hồ sơ (bước 11). Chưa chặn id `default` cho hồ sơ đã lưu: bước 11 tự sinh id khi nhân bản.
+- Số thứ tự migration (khách v2, server v6) có thể dời sau khi bước 2 vào `main` trước; xem số cuối cùng trong `packages/storage/src/sqlite/schema.ts` và `sqlite-node/schema.ts`.

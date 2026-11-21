@@ -13,7 +13,14 @@ import {
   type StorageError,
   type StorageService,
 } from '../port/index.ts';
-import { decodeLog, summarize, toEventRow, type SessionRow } from '../sqlite/codec.ts';
+import {
+  decodeLog,
+  decodeProfile,
+  encodeProfile,
+  summarize,
+  toEventRow,
+  type SessionRow,
+} from '../sqlite/codec.ts';
 import { toStorageError, type ServerDatabase } from './database.ts';
 
 export { openServerDatabase, toStorageError } from './database.ts';
@@ -66,6 +73,13 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
       GROUP BY e.session_id
       ORDER BY updated_at DESC, e.session_id`,
   );
+
+  const getProfile = db.prepare('SELECT payload FROM teaching_profiles WHERE user_id = ?');
+  const putProfile = db.prepare(
+    `INSERT INTO teaching_profiles (user_id, payload, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
+  );
+  const removeProfile = db.prepare('DELETE FROM teaching_profiles WHERE user_id = ?');
 
   /** Runs a synchronous query as an Effect, mapping anything thrown to a typed storage error. */
   const run = <T>(work: () => T): Effect.Effect<T, StorageError> =>
@@ -139,6 +153,31 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
     getSettings: Effect.succeed(undefined),
     saveSettings: () => guestOnly,
     deleteApiKey: guestOnly,
+
+    getProfile: run(() => getProfile.get(userId) as { payload: string } | undefined).pipe(
+      Effect.flatMap((row) =>
+        row === undefined
+          ? Effect.succeed(undefined)
+          : Effect.try({
+              try: () => decodeProfile(row.payload),
+              catch: () => new StorageFailure({ message: 'Stored profile is not valid' }),
+            }),
+      ),
+    ),
+
+    saveProfile: (profile) =>
+      Effect.try({
+        try: () => (profile === undefined ? undefined : encodeProfile(profile)),
+        catch: () => new StorageFailure({ message: 'Profile is not valid' }),
+      }).pipe(
+        Effect.flatMap((payload) =>
+          run(() => {
+            if (payload === undefined) removeProfile.run(userId);
+            else putProfile.run(userId, payload, Date.now());
+            notify(userId, { _tag: 'ProfileChanged' });
+          }),
+        ),
+      ),
 
     changes: Stream.callback<StorageChange>((queue) =>
       Effect.acquireRelease(

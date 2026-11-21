@@ -31,6 +31,9 @@ import {
   MeResponse,
   PublicConfig,
   REGISTER_PATH,
+  PROFILE_PATH,
+  ProfileRequest,
+  ProfileResponse,
   ROLES_PATH,
   RegisterRequest,
   SESSIONS_PATH,
@@ -44,6 +47,7 @@ import {
   UpdateUserRequest,
 } from './contract.ts';
 import type { Failure, RoleModels } from './contract.ts';
+import type { SavedProfile } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
 /** Client-side codes of `ApiError` (status 0): the server never sends these. */
@@ -207,6 +211,17 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         body: bodyOf(SetRolesRequest, { roles }),
         response: codec(AccountSettings),
       }),
+
+    profile: () => go({ method: 'GET', path: PROFILE_PATH, response: codec(ProfileResponse) }),
+    saveProfile: (profile: SavedProfile) =>
+      go({
+        method: 'PUT',
+        path: PROFILE_PATH,
+        body: bodyOf(ProfileRequest, { profile }),
+        response: codec(ProfileResponse),
+      }),
+    resetProfile: () =>
+      go({ method: 'DELETE', path: PROFILE_PATH, response: codec(ProfileResponse) }),
 
     sessions: () => go({ method: 'GET', path: SESSIONS_PATH, response: codec(SessionList) }),
     createSession: (input: CreateSessionRequest) =>

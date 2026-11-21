@@ -79,8 +79,9 @@ export const makeRouteKit = (deps: {
   const decode = async <S extends Schema.Top>(
     ctx: Ctx,
     schema: S,
+    maxBytes = MAX_BODY_BYTES,
   ): Promise<S['Type'] | Response> => {
-    const body = await readLimited(ctx.request, MAX_BODY_BYTES);
+    const body = await readLimited(ctx.request, maxBytes);
     if (body === 'too-large')
       return ctx.reject(413, ErrorCode.InvalidRequest, 'The request is too large.');
     if (body === 'unreadable') {

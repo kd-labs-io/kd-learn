@@ -1,7 +1,7 @@
 // In-memory driver: tests, and the fallback when OPFS is not available (private windows, some
 // WebKit contexts). `persistent` is false so the UI can warn that nothing survives a reload.
-import { Effect, Queue, Stream } from 'effect';
-import type { DomainEvent } from '@kd-learn/core';
+import { Effect, Queue, Schema, Stream } from 'effect';
+import { SavedProfile, type DomainEvent, type TeachingProfile } from '@kd-learn/core';
 import {
   StorageFailure,
   type GuestSettings,
@@ -14,6 +14,7 @@ export const makeMemoryStorage = (): StorageService => {
   const sessions = new Map<string, DomainEvent[]>();
   const eventIds = new Set<string>();
   let settings: GuestSettings | undefined;
+  let profile: TeachingProfile | undefined;
   const listeners = new Set<(change: StorageChange) => void>();
   const emit = (change: StorageChange) => listeners.forEach((listener) => listener(change));
 
@@ -73,6 +74,21 @@ export const makeMemoryStorage = (): StorageService => {
       }
       emit({ _tag: 'SettingsChanged' });
     }),
+
+    getProfile: Effect.sync(() => profile),
+
+    saveProfile: (next) =>
+      Effect.suspend(() => {
+        if (
+          next !== undefined &&
+          Schema.decodeUnknownResult(SavedProfile)(next)._tag === 'Failure'
+        ) {
+          return Effect.fail(new StorageFailure({ message: 'Profile is not valid' }));
+        }
+        profile = next === undefined ? undefined : structuredClone(next);
+        emit({ _tag: 'ProfileChanged' });
+        return Effect.void;
+      }),
 
     changes: Stream.callback<StorageChange>((queue) =>
       Effect.acquireRelease(

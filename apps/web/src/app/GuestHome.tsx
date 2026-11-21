@@ -7,7 +7,8 @@ import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
-import { defaultProfile } from '@kd-learn/agent/client';
+import { defaultProfile, resolveProfile } from '@kd-learn/agent/client';
+import { Effect } from 'effect';
 import { getLocale, getLocaleTag, m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -43,18 +44,26 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
     setError(undefined);
     try {
       const sessionId = crypto.randomUUID();
-      // The log starts with the profile it was created with, in the learner's language (plan A1, A6).
+      // The log starts with the profile in use, in the learner's language (plan A1, A6; phase 3
+      // A2). Demo mode always runs the server's profile, so it snapshots the default.
       await runStorage((storage) =>
-        storage.appendEvents(sessionId, [
-          {
-            _tag: 'SessionCreated',
-            id: crypto.randomUUID(),
-            at: Date.now(),
-            sessionId,
-            topic: name,
-            profile: { ...defaultProfile, language: getLocale() },
-          },
-        ]),
+        (mode === 'guest' ? storage.getProfile : Effect.succeed(undefined)).pipe(
+          Effect.flatMap((saved) =>
+            storage.appendEvents(sessionId, [
+              {
+                _tag: 'SessionCreated',
+                id: crypto.randomUUID(),
+                at: Date.now(),
+                sessionId,
+                topic: name,
+                profile: {
+                  ...(saved === undefined ? defaultProfile : resolveProfile(saved)),
+                  language: getLocale(),
+                },
+              },
+            ]),
+          ),
+        ),
       );
       await navigate({ to: '/s/$sessionId', params: { sessionId } });
     } catch (cause) {

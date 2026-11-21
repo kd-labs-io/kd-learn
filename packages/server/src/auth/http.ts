@@ -18,6 +18,7 @@ import {
   makeServerStorage,
   openServerDatabase,
   type ServerDatabase,
+  type ServerStorage,
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
@@ -38,6 +39,8 @@ const HOUR = 60 * 60 * 1000;
 
 export interface Accounts {
   readonly database: ServerDatabase;
+  /** The storage port per user (`forUser`): the only way to reach a user's sessions or profile. */
+  readonly storage: ServerStorage;
   readonly auth: AuthService;
   readonly settings: SettingsService;
   readonly sessions: SessionRunner;
@@ -94,8 +97,9 @@ export const initAccounts = async (
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
   const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
   const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
+  const storage = makeServerStorage(database);
   const sessions = makeSessionRunner({
-    storage: makeServerStorage(database),
+    storage,
     settings,
     ai: routedAi({
       api: options.ai,
@@ -106,7 +110,7 @@ export const initAccounts = async (
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
   const acpAvailable = lazyAcp === undefined ? () => Promise.resolve(true) : lazyAcp.available;
-  return { database, auth, settings, sessions, admin, demo, acpAvailable };
+  return { database, storage, auth, settings, sessions, admin, demo, acpAvailable };
 };
 
 export interface AccountHandlers {

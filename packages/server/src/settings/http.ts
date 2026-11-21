@@ -1,13 +1,17 @@
 // `/api/account/*` (plan step 3): settings of the signed-in user. One handler routes by path, so
 // the host mounts a single catch-all route. Keys never appear in a response or a log line.
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import {
   AccountSettings,
   ConnectionInfo,
   CreateConnectionRequest,
   ErrorCode,
+  MAX_PROFILE_BODY_BYTES,
+  ProfileRequest,
+  ProfileResponse,
   SetRolesRequest,
 } from '@kd-learn/api';
+import { activeProfile } from '../profile.ts';
 import type { Handler, Logger } from '../handler.ts';
 import { SECURITY_HEADERS } from '../http.ts';
 import type { Ctx, makeRouteKit } from '../routes.ts';
@@ -85,6 +89,25 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     }),
   );
 
+  /** `GET`, `PUT` and `DELETE` of the teaching profile (phase 3 A2), all through `forUser`. */
+  const profile = route('account.profile', ['GET', 'PUT', 'DELETE'], (ctx) =>
+    signedIn(ctx, async (user) => {
+      const storage = ctx.accounts.storage.forUser(user.id);
+      const method = ctx.request.method;
+      if (method === 'PUT') {
+        const input = await decode(ctx, ProfileRequest, MAX_PROFILE_BODY_BYTES);
+        if (input instanceof Response) return input;
+        await Effect.runPromise(storage.saveProfile(input.profile));
+        log({ event: 'account.profile.saved', fields: {} });
+      } else if (method === 'DELETE') {
+        await Effect.runPromise(storage.saveProfile(undefined));
+        log({ event: 'account.profile.reset', fields: {} });
+      }
+      const active = await Effect.runPromise(activeProfile(storage));
+      return json(ctx, Schema.encodeSync(ProfileResponse)(active));
+    }),
+  );
+
   const sessions = makeSessionsHandler(kit, log);
 
   const fallback = route('account', ['GET', 'POST', 'PUT', 'DELETE'], notFound);
@@ -96,6 +119,7 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     const one = /^connections\/([A-Za-z0-9-]{1,64})$/.exec(path);
     if (one?.[1] !== undefined) return deleteConnection(one[1])(request, context);
     if (path === 'roles') return setRoles(request, context);
+    if (path === 'profile') return profile(request, context);
     const session = sessions(path);
     if (session !== undefined) return session(request, context);
     return fallback(request, context);

@@ -1,7 +1,7 @@
 // Mapping between domain events and rows of the `events` table, shared by every SQLite driver.
 // Pure: no driver code here.
 import { Schema } from 'effect';
-import { DomainEvent, type EventLog } from '@kd-learn/core';
+import { DomainEvent, SavedProfile, TeachingProfile, type EventLog } from '@kd-learn/core';
 import type { SessionSummary } from '../port/index.ts';
 
 /** An event as stored: the payload is the JSON of the whole event. */
@@ -53,3 +53,14 @@ export const summarize = (row: SessionRow): SessionSummary => {
     eventCount: row.eventCount,
   };
 };
+
+const checkProfile = Schema.encodeUnknownSync(SavedProfile);
+const decodeProfilePayload = Schema.decodeUnknownSync(TeachingProfile);
+
+/** JSON of a profile to save. Throws when it is not a valid `SavedProfile`. */
+export const encodeProfile = (profile: SavedProfile): string =>
+  JSON.stringify(checkProfile(profile));
+
+/** A stored profile. Throws on a payload that is not a valid `TeachingProfile`. */
+export const decodeProfile = (payload: string): TeachingProfile =>
+  decodeProfilePayload(JSON.parse(payload));

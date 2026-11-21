@@ -32,6 +32,14 @@ export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
        value TEXT NOT NULL
      ) WITHOUT ROWID`,
   ],
+  // v2: the saved teaching profile (phase 3 A2). One person per local DB, so at most one row.
+  [
+    `CREATE TABLE teaching_profile (
+       slot INTEGER PRIMARY KEY CHECK (slot = 1),
+       payload TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+  ],
 ];
 
 /** The schema version this build of the code expects. */

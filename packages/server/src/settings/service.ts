@@ -3,6 +3,7 @@
 // `resolveModel`, for a turn, and never returned by any other function.
 import { randomUUID } from 'node:crypto';
 import type { ModelRef } from '@kd-learn/ai/port';
+import { roleFallback } from '@kd-learn/api';
 import type {
   AcpAgent,
   AcpModels,
@@ -16,7 +17,13 @@ import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import type { Endpoint } from '../config.ts';
 import type { SecretBox } from './secret-box.ts';
 
-export const modelRoles: ReadonlyArray<ModelRole> = ['prober', 'teacher', 'sideChat'];
+export const modelRoles: ReadonlyArray<ModelRole> = [
+  'prober',
+  'teacher',
+  'sideChat',
+  'practitioner',
+  'extractor',
+];
 
 export type CreateConnectionResult =
   | { readonly _tag: 'Ok'; readonly connection: ConnectionInfo }
@@ -56,7 +63,11 @@ export interface SettingsService {
   readonly deleteConnection: (userId: string, connectionId: string) => boolean;
   /** Replaces the whole map. Every connection must belong to the user. */
   readonly setRoles: (userId: string, roles: RoleModels) => SetRolesResult;
-  /** The model for one role, with the decrypted key. Only for running a turn; never log it. */
+  /**
+   * The model for one role, with the decrypted key. Only for running a turn; never log it. A phase 3
+   * role that is not set uses its `roleFallback` (the teacher's model); `RoleNotConfigured` names
+   * the role that was asked for.
+   */
   readonly resolveModel: (userId: string, role: ModelRole) => ResolveResult;
 }
 
@@ -209,8 +220,11 @@ export const makeSettings = (
       })(),
 
     resolveModel: (userId, role) => {
-      const choice = q.role.get(userId, role) as
-        { connection_id: string; model: string } | undefined;
+      type Choice = { connection_id: string; model: string } | undefined;
+      const fallback = roleFallback[role];
+      const choice =
+        (q.role.get(userId, role) as Choice) ??
+        (fallback === undefined ? undefined : (q.role.get(userId, fallback) as Choice));
       const row =
         choice === undefined
           ? undefined
