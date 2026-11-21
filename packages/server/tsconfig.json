@@ -1,0 +1,4 @@
+{
+  "extends": "@kd-learn/config/tsconfig/node.json",
+  "include": ["src"]
+}
