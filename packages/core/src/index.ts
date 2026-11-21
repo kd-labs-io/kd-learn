@@ -1,2 +1,5 @@
-// Domain model lives here from phase 1 on (plan 3.1).
-export {};
+// Pure domain model (plan 3.1): schemas, events, projection. Only `effect` is imported here.
+export * from './event.ts';
+export * from './plan.ts';
+export * from './profile.ts';
+export * from './session.ts';
