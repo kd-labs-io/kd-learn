@@ -11,11 +11,44 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Bước 1: spike SQLite WASM + TanStack DB | Xong (2026-11-21). Driver: `@journeyapps/wa-sqlite` + `OPFSCoopSyncVFS` trong Worker của ta; không dùng TanStack DB ở phase 1. Xem ghi chú bước 1 bên dưới |
 | Bước 2: schema, projection (`core`) | Xong (2026-11-21). Xem ghi chú bước 2 bên dưới |
 | Bước 3: vòng turn, Prober → Teacher, side chat (`agent`) | Xong (2026-11-21). A4 xác nhận bằng model thật. Xem ghi chú bước 3 bên dưới |
-| Bước 4: API, server, SSE | Chưa bắt đầu |
+| Bước 4: API, server, SSE | Xong (2026-11-21). Hợp đồng `api`, handler `server`, route `/api/turns` và `/api/endpoints` trong `apps/web`, 1 lượt Haiku qua route. Xem ghi chú bước 4 bên dưới |
 | Bước 5: DB local | Xong (2026-11-21). Port `storage` chốt, driver `wa-sqlite` trong Worker của `packages/storage`, store phía client, Playwright chính thức, mã spike đã xoá. Xem ghi chú bước 5 bên dưới |
 | Bước 6: spike Markdown + KaTeX | Chưa bắt đầu |
 | Bước 7: UI | Chưa bắt đầu |
 | Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
+
+## Bước 4: API và server (2026-11-21)
+
+Test: `packages/api` (14: hợp đồng, parser SSE, client) và `packages/server` (36: handler, hợp đồng đầu cuối bằng client thật, huỷ, giới hạn, không lộ key, cấu hình). Chạy thật 1 lượt Haiku (`claude-haiku-5-5`) qua bản build SSR (`node .output/server/index.mjs`, route `/api/turns`): 1.080 token vào, 49 ra, khoảng 0,00013 USD; có `MessageAppended`, `UsageRecorded`, `TurnCompleted`, `done`; phản hồi và log của server không chứa key.
+
+**Hợp đồng (`@kd-learn/api`, Effect Schema, không API của Node):**
+
+- `POST /api/turns`, body `TurnRequest {model, turn, log}`:
+  - `model` là `ModelChoice`: `{provider: 'anthropic'|'gemini', model, apiKey}` hoặc `{provider: 'openai-compatible', endpointId, model, apiKey}`. Không có trường `baseURL`; ACP không có trong hợp đồng (chỉ chế độ tài khoản).
+  - `turn` là `{kind: 'main'}` hoặc `{kind: 'side', threadId}`. `log` là `EventLog` của `core`, kết thúc bằng `TurnStarted` mở (main) hoặc tin của người học (side). Không có trường `input` riêng (lấy từ `TurnStarted` cuối log).
+- Phản hồi 200 là SSE, mỗi message `event: <tag>` + `data: <json>`. `Frame` là `delta {messageId, delta}` | `event {event}` | `error {error: {code, message, retryable}}` | `done {outcome: 'completed'|'failed'}` (tag nằm ở `_tag`, như event của `core`). `done` luôn là frame cuối.
+- Lỗi trước khi có stream là HTTP lỗi với body `ErrorBody {error}`: 400 `InvalidRequest` / `UnknownEndpoint`, 405 `MethodNotAllowed`, 413 `HistoryTooLarge`, 500 `ServerMisconfigured` / `InternalError`. `InvalidTurn` (log không bắt đầu được lượt) và lỗi provider đi trong stream (`error` + `done`).
+- `GET /api/endpoints` trả `{endpoints: [{id, label}]}` (không lộ `baseURL`) để UI hiện danh sách chọn.
+- Client có kiểu (chạy cả trình duyệt và Node): `streamTurn(request, {baseUrl?, fetch?})` trả `Stream<Frame, ClientError>`; lỗi HTTP được đổi thành frame `error` + `done` nên chỉ có một đường xử lý; stream đứt trước `done` thì `ClientError` loại `Protocol` (UI coi là lượt bị ngắt, A3); ngắt (interrupt) stream thì huỷ `fetch`. `listEndpoints({baseUrl?, fetch?})`. `packages/api` dùng tsconfig có DOM.
+
+**Server (`@kd-learn/server`, Node, hàm `Request -> Response` để host nào cũng gắn được):**
+
+- `config.ts`: `loadConfig(env)` đọc `KD_OPENAI_COMPATIBLE_ENDPOINTS` (mảng JSON `{id, baseURL, label?}`; chỉ http/https, không nhúng user/mật khẩu, id không trùng), `KD_MAX_REQUEST_BYTES` (mặc định 1 MiB, tối thiểu 1024), `KD_CORS_ORIGINS` (danh sách origin, mặc định rỗng). Cấu hình sai thì mọi route trả 500 `ServerMisconfigured` kèm một dòng log nêu tên biến (không nêu giá trị).
+- `handler.ts`: `createHandlers(env, {ai?, log?, newId?})` trả `{turns, endpoints}`. Thứ tự xử lý: đọc body có giới hạn (dừng đọc khi vượt, kể cả khi không có `content-length`) → JSON → từ chối `baseURL` tự do (mọi kiểu chữ hoa thường) → decode `TurnRequest` với `onExcessProperty: 'error'` (trường lạ bị từ chối, không bị bỏ) → tra `endpointId` trong danh sách (không có thì 400 `UnknownEndpoint`) → dựng `ModelRef` → `runTurn` / `runSideChat` với `layer` của adapter TanStack → SSE. AiPort thay được bằng layer giả khi test.
+- Huỷ: body SSE là `Stream.toReadableStream`; client ngắt (runtime huỷ body) hoặc `request.signal` abort thì fiber bị ngắt, adapter huỷ request tới provider. Log `turn.end` ghi `outcome: cancelled`.
+- Không lộ key (A7, rủi ro 19): không bao giờ log request, header hay body; log chỉ nhận trường vô hướng (`kind`, `provider`, `endpointId`, `requestBytes`, `outcome`, `events`, `durationMs`, `code`); lỗi decode chỉ nêu đường dẫn và loại, không nêu giá trị (giá trị có thể chính là key); mọi `error` frame và `TurnFailed` / `SideTurnFailed` được thay key bằng `[redacted]` thêm một lần nữa ở server; defect (exception) trả thông báo cố định, chi tiết (đã bỏ key, cắt 200 ký tự) chỉ vào log; handler bọc try/catch trả 500 cố định.
+- CORS tối thiểu: chỉ origin trong `KD_CORS_ORIGINS` được thêm header `access-control-*`; trả 204 cho preflight `OPTIONS`.
+
+**`apps/web`:** `src/routes/api.turns.ts`, `src/routes/api.endpoints.ts` (server route của TanStack Start) và `src/api-handlers.ts` (nạp `@kd-learn/server` bằng `import()` lười, dựng handler một lần từ `process.env`). Bản client và bản SPA không chứa mã server (đã grep `KD_OPENAI_COMPATIBLE_ENDPOINTS` trong `.output/public` và `dist/client`).
+
+**Bản SPA (Capacitor) chưa gọi được API:** bản SPA là tĩnh, không có route `/api`. Client phải gọi một server SSR đã triển khai qua `baseUrl` (cấu hình lúc build hoặc trong cài đặt), và server đó phải đặt `KD_CORS_ORIGINS` có origin của vỏ Capacitor (`capacitor://localhost` trên iOS, `https://localhost` hoặc `http://localhost` trên Android). Chưa có cấu hình `baseUrl` phía app; làm ở bước 7 hoặc phase 6. Bản web SSR cùng origin thì để `baseUrl` rỗng.
+
+**Quyết định và lệch so với bàn giao:**
+
+- Lỗi trước stream (decode, `HistoryTooLarge`, endpoint lạ) là HTTP 4xx, không phải frame `error` (client đổi lại thành frame); chỉ lỗi trong lượt đi bằng SSE. Lý do: từ chối sớm, không cần mở stream, và 413 có nghĩa cho proxy.
+- `GuestSettings.baseURL` của port `storage` (bước 5) đổi thành `endpointId` (khoá `endpointId` trong bảng `settings`) cho khớp A6.
+- Chưa có keep-alive định kỳ trong SSE; model nghĩ lâu có thể bị proxy ngắt kết nối nhàn rỗi. Thêm nếu gặp.
+- Chưa giới hạn tốc độ hay xác thực: khách dùng key riêng, server không có gì để bảo vệ ngoài tài nguyên tính toán. Cần trước khi triển khai công khai.
 
 ## Bước 5: DB local (2026-11-21)
 
@@ -27,7 +60,7 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | `appendEvents(sessionId, events[])` | Một lô, nguyên tử: ghi hết hoặc không ghi gì. `seq` cấp trong transaction. `id` event là duy nhất: trùng `id` thì cả lô thất bại. Trả `{ lastSeq }` |
 | `readSession(sessionId)` | `EventLog` theo thứ tự `seq`, giải mã bằng schema `DomainEvent` của `core` (dòng hỏng cho `StorageFailure`) |
 | `listSessions` | `SessionSummary` (`sessionId`, `topic`, `createdAt`, `updatedAt`, `eventCount`), mới cập nhật nhất trước |
-| `getSettings`, `saveSettings`, `deleteApiKey` | `GuestSettings` (`provider`, `model`, `baseURL?`, `apiKey?`). `saveSettings` thay cả bộ (thiếu `apiKey` thì xoá key); `deleteApiKey` chỉ xoá key (A7) |
+| `getSettings`, `saveSettings`, `deleteApiKey` | `GuestSettings` (`provider`, `model`, `endpointId?`, `apiKey?`; `endpointId` là id endpoint server cho phép, không phải URL, A6). `saveSettings` thay cả bộ (thiếu `apiKey` thì xoá key); `deleteApiKey` chỉ xoá key (A7) |
 | `changes` | `Stream` của `SessionChanged {sessionId}` / `SettingsChanged`, gồm cả commit từ tab khác (BroadcastChannel); mỗi người nghe một hàng đợi riêng |
 
 - Lỗi có kiểu (`Data.TaggedError`): `StorageUnavailable` (không mở được: không OPFS, không Worker), `StorageBusy` (quá hạn, mặc định 8 giây; với ghi thì kết quả chưa rõ, đọc lại để biết), `StorageFailure` (bị từ chối, lô không ghi gì).
@@ -173,21 +206,24 @@ Mã spike nằm ở `apps/web/src/spike/sqlite/`, route `/spike/sqlite` (`apps/w
 
 ## Bàn giao (2026-11-21)
 
-Bước 0, 1, 2, 3 xong. Bước 6 (spike Markdown + KaTeX) làm ở apps/web song song. Việc tiếp theo cho `packages/api`, `packages/server`, route trong `apps/web`: **bước 4** của [loi-day-hoc.md](../loi-day-hoc.md).
+Bước 0 đến 5 xong. Bước 6 (spike Markdown + KaTeX) làm ở apps/web song song. Việc tiếp theo: **bước 7** (UI) sau khi bước 6 xong, rồi bước 8.
 
-- **Gọi vòng turn** (`@kd-learn/agent`):
-  - Lượt chính: `runTurn({log, model, newId, maxSteps?})`; lượt side chat: `runSideChat({log, threadId, model, newId})`. Cả hai trả `Stream<AgentOutput, InvalidTurn, AiPort>`. Cung cấp `AiPort` bằng `layer` của `@kd-learn/ai/tanstack`. `newId` dùng `crypto.randomUUID`.
-  - Map sang SSE: `Delta` thành `delta {messageId, delta}`, `Event` thành `event {event}` (event đã đủ `id`, `at`), `Error` thành `error {code, message, retryable}`, `Done` thành `done {outcome}`. `InvalidTurn` (stream lỗi trước khi có output nào) thành frame `error` với mã riêng rồi `done`; log vượt giới hạn kích thước (`HistoryTooLarge`) cũng thành `error` do server tự phát trước khi gọi vòng turn.
-  - Request cần: key và model (`ModelRef`, không `baseURL` tự do, A6), event log (decode bằng `EventLog` của `core`), loại lượt (chính hay side) và `threadId` cho side chat. Server tự dựng projection; không cần `input` riêng vì lượt chính lấy input từ `TurnStarted` cuối log (nếu request vẫn có `input` thì server kiểm khớp).
-  - Client ghi các event nhận được vào DB local theo thứ tự. Sau lượt có `AssessmentRecorded` (trạng thái sang `Planning`), client tự bắt đầu ngay lượt kế với input rỗng (`needsAgentTurn(session)` của `agent`, cần `projectSession`).
-  - Huỷ khi client ngắt: ngắt (interrupt) fiber của Stream là đủ, adapter TanStack tự huỷ request tới provider; lượt ngắt không để event nào (đúng A3).
-- **Key**: `failureOf` của `agent` đã thay key bằng `[redacted]` trong lỗi của lượt, nhưng server vẫn phải tự bảo đảm log và thông báo lỗi khác (kể cả `InvalidTurn`, lỗi giải mã request) không chứa key (A7).
+- **Gọi API từ UI** (`@kd-learn/api`; thêm `"@kd-learn/api": "workspace:*"` vào `apps/web`):
+  - Mỗi lượt: ghi `TurnStarted` vào DB local (A3), gọi `streamTurn({model, turn, log}, {baseUrl?})` với `log` đọc từ `readSession`; nhận `Stream<Frame, ClientError>`.
+  - `delta` chỉ hiển thị (gộp theo `messageId`). `event` ghi vào DB local theo thứ tự nhận, tốt nhất gom cả lượt rồi ghi một lô khi nhận `done` (event của lượt vốn chỉ phát ở cuối lượt; lượt lỗi chỉ để lại `TurnFailed`). `error` hiện cho người học (`retryable` quyết định có nút thử lại). `done` kết thúc.
+  - `ClientError` (mất mạng, stream đứt trước `done`) thì không ghi gì thêm: lượt còn mở là lượt bị ngắt (A3, `findInterruptedTurn`), UI hiện nút thử lại.
+  - Mã lỗi từ server: `HistoryTooLarge` (gợi ý mở buổi học mới, A8), `InvalidRequest`, `UnknownEndpoint` (khách chọn endpoint không còn trong danh sách: bắt chọn lại), `InvalidTurn`, `ServerMisconfigured`, `InternalError`; còn lại là mã của provider (`authentication_error`, ... `retryable: false` thì gợi ý kiểm lại key).
+  - `ModelChoice` dựng từ `GuestSettings` (`provider`, `model`, `endpointId?`, `apiKey`). Danh sách endpoint lấy bằng `listEndpoints`; không có endpoint nào thì ẩn lựa chọn `openai-compatible`.
+  - Sau lượt có `AssessmentRecorded` (`needsAgentTurn(session)` của `agent`), tự bắt đầu lượt kế với input rỗng (`NO_INPUT`).
+  - Side chat: `turn: {kind: 'side', threadId}`, log kết thúc bằng `SideMessageAppended` của người học (client ghi trước).
+  - Bản SPA/Capacitor: cần `baseUrl` của server SSR; xem phần "Bản SPA chưa gọi được API" ở ghi chú bước 4.
+- **Server chạy bằng env:** `KD_OPENAI_COMPATIBLE_ENDPOINTS`, `KD_MAX_REQUEST_BYTES`, `KD_CORS_ORIGINS` (ghi chú bước 4). Dev: `pnpm --filter @kd-learn/web dev` phục vụ cả `/api/*`.
 - **Hồ sơ**: `defaultProfile` (`agent`); client tạo `SessionCreated` với hồ sơ này (đổi `language`).
 - Ranh giới import (`packages/config/eslint.js`, bảng `internalAllow`):
   - `api`: chỉ `@kd-learn/core`, không API của Node, không UI.
   - `server`: `core`, `agent`, `ai`, `api`, `search`, `storage` (cả adapter); dùng được API của Node; không UI, không `tokens`, `ui`, `web`.
   - `storage`: driver dùng được API của host, chỉ import `core`; `storage/src/port` thuần như `ai/src/port` (chỉ `effect`).
-- Port `storage` lúc đó còn trống; hình dạng đề xuất sau spike bước 1 ở phần "Bước 1" trên, đã chốt ở bước 5 (ghi chú bước 5). Rule port đã nới để cho import `@kd-learn/core`.
+- Port `storage` đã chốt ở bước 5 (ghi chú bước 5). Rule port đã nới để cho import `@kd-learn/core`.
 
 ## Lưu ý khi chạy model thật
 

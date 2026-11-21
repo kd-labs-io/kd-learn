@@ -149,7 +149,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     const all: Record<SettingsKey, string | undefined> = {
       provider: settings.provider,
       model: settings.model,
-      baseURL: settings.baseURL,
+      endpointId: settings.endpointId,
       apiKey: settings.apiKey,
     };
     const entries: Partial<Record<SettingsKey, string>> = {};
@@ -212,7 +212,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
 
     getSettings: call<Record<string, string>>({ op: 'getSettings' }).pipe(
       Effect.flatMap((stored) => {
-        const { provider, model, baseURL, apiKey } = stored;
+        const { provider, model, endpointId, apiKey } = stored;
         if (provider === undefined || model === undefined) return Effect.succeed(undefined);
         if (!providers.includes(provider as GuestProvider)) {
           return Effect.fail(
@@ -222,7 +222,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
         return Effect.succeed<GuestSettings>({
           provider: provider as GuestProvider,
           model,
-          ...(baseURL === undefined ? {} : { baseURL }),
+          ...(endpointId === undefined ? {} : { endpointId }),
           ...(apiKey === undefined ? {} : { apiKey }),
         });
       }),

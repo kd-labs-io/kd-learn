@@ -1,0 +1,164 @@
+// Typed client for the contract: `fetch` plus SSE parsing. Runs in the browser and in Node.
+// Interrupting the returned stream aborts the request, which makes the server cancel the turn
+// and the provider request (plan 3.3).
+import { Data, Effect, Schema, Stream } from 'effect';
+import {
+  ENDPOINTS_PATH,
+  EndpointsResponse,
+  ErrorBody,
+  ErrorCode,
+  Frame,
+  TURNS_PATH,
+  TurnRequest,
+} from './contract.ts';
+import type { EndpointInfo } from './contract.ts';
+import { makeSseParser } from './sse.ts';
+
+/**
+ * The request did not reach the server (`Network`) or the response is not a valid stream
+ * (`Protocol`), including a stream that ended without a `done` frame (the turn was cut off).
+ */
+export class ClientError extends Data.TaggedError('ClientError')<{
+  readonly reason: 'Network' | 'Protocol';
+  readonly message: string;
+}> {}
+
+export interface ClientOptions {
+  /** Origin of the server, e.g. `https://learn.example.com`. Empty means same origin (web build). */
+  readonly baseUrl?: string;
+  /** Custom `fetch` (tests, native HTTP). Defaults to the global one. */
+  readonly fetch?: typeof fetch;
+}
+
+const urlOf = (options: ClientOptions, path: string) =>
+  `${(options.baseUrl ?? '').replace(/\/+$/, '')}${path}`;
+
+const network = (error: unknown) =>
+  new ClientError({
+    reason: 'Network',
+    message: error instanceof Error ? error.message : 'Network request failed.',
+  });
+
+const protocol = (message: string) => new ClientError({ reason: 'Protocol', message });
+
+/** An HTTP error response as the frames a stream would have carried, so callers have one path. */
+const errorFrames = (response: Response): Effect.Effect<ReadonlyArray<Frame>, ClientError> =>
+  Effect.tryPromise({ try: () => response.json() as Promise<unknown>, catch: network }).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(ErrorBody)),
+    Effect.map(({ error }): ReadonlyArray<Frame> => [
+      { _tag: 'error', error },
+      { _tag: 'done', outcome: 'failed' },
+    ]),
+    Effect.catch(() =>
+      Effect.succeed<ReadonlyArray<Frame>>([
+        {
+          _tag: 'error',
+          error: {
+            code: ErrorCode.Internal,
+            message: `Unexpected response (HTTP ${response.status}).`,
+            retryable: response.status >= 500,
+          },
+        },
+        { _tag: 'done', outcome: 'failed' },
+      ]),
+    ),
+  );
+
+async function* messages(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const parser = makeSseParser();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      yield* parser.push(decoder.decode(value, { stream: true }));
+    }
+    yield* parser.push(`${decoder.decode()}\n\n`);
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+const decodeFrame = (data: string): Effect.Effect<Frame, ClientError> =>
+  Effect.try({
+    try: () => JSON.parse(data) as unknown,
+    catch: () => protocol('Frame is not JSON.'),
+  }).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Frame)),
+    Effect.mapError((error) =>
+      error instanceof ClientError ? error : protocol('Frame does not match the contract.'),
+    ),
+  );
+
+/**
+ * Starts a turn and streams its frames. A response that is not a stream (HTTP error) becomes an
+ * `error` frame followed by `done`, so callers handle failures in one place. The stream fails with
+ * `ClientError` only for transport problems.
+ */
+export const streamTurn = (
+  request: TurnRequest,
+  options: ClientOptions = {},
+): Stream.Stream<Frame, ClientError> =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const controller = yield* Effect.acquireRelease(
+        Effect.sync(() => new AbortController()),
+        (c) => Effect.sync(() => c.abort()),
+      );
+      const doFetch = options.fetch ?? globalThis.fetch;
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          doFetch(urlOf(options, TURNS_PATH), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+            body: JSON.stringify(Schema.encodeSync(TurnRequest)(request)),
+            signal: controller.signal,
+          }),
+        catch: network,
+      });
+      if (!response.ok || response.body === null) {
+        return response.ok
+          ? Stream.fail(protocol('The response has no body.'))
+          : Stream.fromIterableEffect(errorFrames(response));
+      }
+      let sawDone = false;
+      return Stream.fromAsyncIterable(messages(response.body), network).pipe(
+        Stream.mapEffect((message) =>
+          decodeFrame(message.data).pipe(
+            Effect.tap((frame) =>
+              Effect.sync(() => {
+                if (frame._tag === 'done') sawDone = true;
+              }),
+            ),
+          ),
+        ),
+        Stream.concat(
+          Stream.suspend(() =>
+            sawDone ? Stream.empty : Stream.fail(protocol('The stream ended before `done`.')),
+          ),
+        ),
+      );
+    }),
+  );
+
+/** `GET /api/endpoints`: the OpenAI-compatible endpoints the guest may choose from. */
+export const listEndpoints = (
+  options: ClientOptions = {},
+): Effect.Effect<ReadonlyArray<EndpointInfo>, ClientError> =>
+  Effect.gen(function* () {
+    const doFetch = options.fetch ?? globalThis.fetch;
+    const response = yield* Effect.tryPromise({
+      try: (signal) => doFetch(urlOf(options, ENDPOINTS_PATH), { signal }),
+      catch: network,
+    });
+    if (!response.ok) return yield* Effect.fail(protocol(`HTTP ${response.status}.`));
+    const json = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: network,
+    });
+    const decoded = yield* Schema.decodeUnknownEffect(EndpointsResponse)(json).pipe(
+      Effect.mapError(() => protocol('Response does not match the contract.')),
+    );
+    return decoded.endpoints;
+  });
