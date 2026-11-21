@@ -1,6 +1,6 @@
 # 8. Tiến độ phase 2
 
-**Trạng thái: đang làm.** Plan phần chính: [tai-khoan.md](../tai-khoan.md).
+**Trạng thái: xong (2026-11-21).** Cả ba tiêu chí đạt bằng Haiku thật qua UI trên stack Docker Compose, xem phần "Bước 10". Plan phần chính: [tai-khoan.md](tai-khoan.md).
 
 ## Phase 2 (cập nhật 2026-11-21)
 
@@ -16,7 +16,7 @@
 | Bước 7: ACP | Xong (2026-11-21). `packages/server/src/acp/`. Xem ghi chú bước 7 bên dưới |
 | Bước 8: UI | Xong (2026-11-21). `apps/web/src/account/`, `learn/account-lesson.ts`, `learn/source.ts`. Xem ghi chú bước 8 bên dưới |
 | Bước 9: Docker Compose | Xong (2026-11-21). `Dockerfile`, `docker-compose.yml`, `.env.example`, `docs/deploy.md`, `scripts/compose-smoke.sh`. Xem ghi chú bước 9 bên dưới |
-| Bước 10: kiểm tiêu chí phase | Chưa bắt đầu |
+| Bước 10: kiểm tiêu chí phase | Xong (2026-11-21). Đạt cả ba tiêu chí bằng Haiku thật trên stack Compose. Xem ghi chú bước 10 bên dưới |
 
 ## Bước 0: spike C1, C2 (2026-11-21)
 
@@ -359,4 +359,28 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - sao lưu, xoá DB (còn 0 buổi), khôi phục (lại có 1 buổi), đúng theo lệnh trong tài liệu;
   - mật khẩu admin không có trong log.
   - Script dùng file env, tên project và volume tạm, không in secret. Chạy local: xanh.
+
+## Bước 10: kiểm tiêu chí phase trên stack Compose (2026-11-21)
+
+- **Cách chạy:**
+  - Stack Compose dựng từ `main` sau bước 9, project và volume tạm.
+  - Env tạm:
+    - `KD_LEARN_REGISTRATION=open`;
+    - demo bật, `anthropic` / `claude-haiku-5-5`, ngân sách 4 lần gọi mỗi ngày;
+    - key Anthropic đọc từ `.env` của máy dev trong script, không in ra.
+  - Script Playwright chạy qua UI, có thêm vài lệnh gọi API để kiểm chéo. Script không commit: nó cần key thật, và phần không cần key đã có trong `e2e/accounts.e2e.ts`.
+  - Khoảng 9 lượt Haiku.
+- **Tiêu chí 2, đóng tab buổi học vẫn chạy tiếp: đạt.**
+  - Alice đăng ký, thêm kết nối Anthropic, đặt Haiku cho mọi vai, bắt đầu buổi "Photosynthesis". Lượt Prober đầu tự chạy.
+  - Alice trả lời rồi đóng tab khi lượt đang chạy: lúc đóng đang có `msg-live` và chưa có câu trả lời mới.
+  - Mở tab mới từ danh sách buổi: câu trả lời của Prober đã có, không có banner "bị ngắt".
+- **Tiêu chí 1, hai tài khoản dữ liệu riêng: đạt.**
+  - Bob đăng ký: danh sách buổi trống; mở URL buổi của Alice thì thấy "không tồn tại, hoặc thuộc tài khoản khác".
+  - Bob gọi API với buổi của Alice: snapshot, stream và bắt đầu lượt đều trả 404.
+- **Tiêu chí 3, demo dừng đúng hạn mức: đạt.**
+  - Một trình duyệt mới chọn demo, không có key.
+  - Lượt mở đầu và 3 câu trả lời dùng đủ 4 lần gọi (mỗi lượt một lần, không gọi tool).
+  - Câu trả lời thứ 4 bị từ chối với `DemoQuotaExceeded`. Admin thấy `used: 4 / limit: 4`, không vượt.
+- **Log server:** không có key Anthropic, không có mật khẩu admin.
+- **Không kiểm ở bước này:** ACP (không có trong image, C3; đã chạy thật ngoài Docker ở bước 7) và mã mời qua UI (đã kiểm tay ở bước 8).
 
