@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
+import { Route as SpikeMarkdownRouteImport } from './routes/spike.markdown'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const DevStorageRoute = DevStorageRouteImport.update({
   path: '/dev/storage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpikeMarkdownRoute = SpikeMarkdownRouteImport.update({
+  id: '/spike/markdown',
+  path: '/spike/markdown',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
+  '/spike/markdown': typeof SpikeMarkdownRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
+  '/spike/markdown': typeof SpikeMarkdownRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
+  '/spike/markdown': typeof SpikeMarkdownRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
+  fullPaths:
+    '/' | '/api/endpoints' | '/api/turns' | '/dev/storage' | '/spike/markdown'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
-  id: '__root__' | '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
+  to: '/' | '/api/endpoints' | '/api/turns' | '/dev/storage' | '/spike/markdown'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/endpoints'
+    | '/api/turns'
+    | '/dev/storage'
+    | '/spike/markdown'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   ApiEndpointsRoute: typeof ApiEndpointsRoute
   ApiTurnsRoute: typeof ApiTurnsRoute
   DevStorageRoute: typeof DevStorageRoute
+  SpikeMarkdownRoute: typeof SpikeMarkdownRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevStorageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/spike/markdown': {
+      id: '/spike/markdown'
+      path: '/spike/markdown'
+      fullPath: '/spike/markdown'
+      preLoaderRoute: typeof SpikeMarkdownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEndpointsRoute: ApiEndpointsRoute,
   ApiTurnsRoute: ApiTurnsRoute,
   DevStorageRoute: DevStorageRoute,
+  SpikeMarkdownRoute: SpikeMarkdownRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
