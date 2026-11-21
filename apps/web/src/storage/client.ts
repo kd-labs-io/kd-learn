@@ -2,9 +2,9 @@
 // The SQLite driver is loaded with a dynamic import behind `import.meta.env.SSR`: Vite replaces the
 // flag with a constant, so the server build drops the branch and its Worker and WASM never enter
 // `.output/server` (checked in CI by scripts/check-server-bundle.mjs).
-import { Effect } from 'effect';
+import { Cause, Effect } from 'effect';
 import { makeMemoryStorage } from '@kd-learn/storage/memory';
-import type { StorageError, StorageService } from '@kd-learn/storage/port';
+import { StorageUnavailable, type StorageError, type StorageService } from '@kd-learn/storage/port';
 
 let current: Promise<StorageService> | undefined;
 let listening = false;
@@ -14,8 +14,12 @@ async function openStorage(): Promise<StorageService> {
     const { openWasmStorage } = await import('@kd-learn/storage/sqlite-wasm');
     const opened = await Effect.runPromiseExit(openWasmStorage());
     if (opened._tag === 'Success') return opened.value;
-    // No OPFS (private window, some WebKit contexts): keep working in memory, the UI shows `persistent`.
-    console.warn('Local storage is not persistent in this browser context.', opened.cause);
+    const failure = Cause.squash(opened.cause);
+    // Only "this context has no OPFS" (private window, some WebKit contexts) falls back to memory;
+    // the UI shows `persistent`. A timeout or a migration error is thrown, so the learner sees an
+    // error instead of an empty list that loses new work.
+    if (!(failure instanceof StorageUnavailable)) throw failure;
+    console.warn('Local storage is not persistent in this browser context.', failure.message);
   }
   return makeMemoryStorage();
 }
@@ -29,7 +33,12 @@ export function getStorage(): Promise<StorageService> {
       if (event.persisted) current = undefined;
     });
   }
-  return (current ??= openStorage());
+  // A rejected open is not cached: the next call tries again.
+  current ??= openStorage().catch((error: unknown) => {
+    current = undefined;
+    throw error;
+  });
+  return current;
 }
 
 /** Runs one storage call. Rejects with the typed `StorageError`. */

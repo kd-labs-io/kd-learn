@@ -14,6 +14,7 @@ import {
   type GuestSettings,
   type SessionSummary,
   type StorageChange,
+  type StorageError,
   type StorageService,
 } from '../port/index.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
@@ -36,13 +37,21 @@ export interface WasmStorage extends StorageService {
 const providers: ReadonlyArray<GuestProvider> = ['anthropic', 'gemini', 'openai-compatible'];
 const decodeEvent = Schema.decodeUnknownSync(DomainEvent);
 
+/**
+ * Opens the database. Fails with `StorageUnavailable` only when this context cannot hold one (no
+ * OPFS, no Worker): that is the case where falling back to memory is right. Other failures keep their
+ * type (`StorageBusy` for an open that timed out, `StorageFailure` for a migration error or a
+ * database newer than this app) and must not be hidden behind an empty fallback store.
+ */
 export const openWasmStorage = (
   options: WasmStorageOptions = {},
-): Effect.Effect<WasmStorage, StorageUnavailable> =>
+): Effect.Effect<WasmStorage, StorageError> =>
   Effect.tryPromise({
     try: () => connect(options),
     catch: (error) =>
-      error instanceof StorageUnavailable
+      error instanceof StorageUnavailable ||
+      error instanceof StorageBusy ||
+      error instanceof StorageFailure
         ? error
         : new StorageUnavailable({
             message: error instanceof Error ? error.message : String(error),

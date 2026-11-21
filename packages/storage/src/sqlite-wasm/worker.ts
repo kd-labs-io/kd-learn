@@ -156,18 +156,25 @@ async function handleRequest(request: Request): Promise<unknown> {
   }
 }
 
-self.onmessage = async (event: MessageEvent<Request>) => {
+// One request at a time. The connection is shared and a transaction spans several awaits, so a
+// second request starting in the middle would hit "transaction within a transaction", and its
+// ROLLBACK would undo the first batch. The queue makes batch atomicity structural.
+let queue: Promise<void> = Promise.resolve();
+
+self.onmessage = (event: MessageEvent<Request>) => {
   const request = event.data;
-  let response: Response;
-  try {
-    response = { id: request.id, ok: true, result: await handleRequest(request) };
-  } catch (error) {
-    response = {
-      id: request.id,
-      ok: false,
-      kind: error instanceof Unavailable ? 'unavailable' : 'failure',
-      message: error instanceof Error ? error.message : String(error),
-    };
-  }
-  self.postMessage(response);
+  queue = queue.then(async () => {
+    let response: Response;
+    try {
+      response = { id: request.id, ok: true, result: await handleRequest(request) };
+    } catch (error) {
+      response = {
+        id: request.id,
+        ok: false,
+        kind: error instanceof Unavailable ? 'unavailable' : 'failure',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+    self.postMessage(response);
+  });
 };

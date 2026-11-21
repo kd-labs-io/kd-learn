@@ -176,3 +176,51 @@ test('a commit in one tab refreshes the other tab', async ({ context }) => {
   await expect(viewer.locator('#view-events')).toHaveText('view events: 2');
   await expect(viewer.locator('#session-count')).toHaveText('sessions: 1');
 });
+
+test('overlapping calls in one tab run one at a time: a failing batch cannot damage the others', async ({
+  page,
+}) => {
+  await openHarness(page);
+  const outcome = await page.evaluate(async () => {
+    const api = window.__kdStorage!;
+    const batch = (i: number, lastId = `b${i}-2`) =>
+      [`b${i}-0`, `b${i}-1`, lastId].map((id) => ({
+        _tag: 'TurnStarted' as const,
+        id,
+        at: i,
+        turnId: `t${i}`,
+        input: 'x',
+      }));
+    // Sent in the same tick, like a side chat message during a turn plus a settings save.
+    const calls: Promise<unknown>[] = [];
+    for (let i = 0; i < 12; i++) {
+      // Batch 5 ends with the id of an event of batch 1: it must fail as a whole.
+      calls.push(api.append('s1', batch(i, i === 5 ? 'b1-0' : undefined)));
+      if (i % 3 === 0) calls.push(api.read('s1'));
+      if (i === 4) calls.push(api.saveSettings({ provider: 'gemini', model: 'flash' }));
+    }
+    const results = await Promise.all(calls);
+    return {
+      errors: results.filter((r) => r && typeof r === 'object' && 'error' in r),
+      readSizes: results.filter(Array.isArray).map((log) => log.length),
+      log: (await api.read('s1')) as unknown as { id: string }[],
+      settings: await api.getSettings(),
+    };
+  });
+
+  expect(outcome.errors).toHaveLength(1);
+  expect(outcome.errors[0]).toMatchObject({ error: 'StorageFailure' });
+  // A read never sees half a batch.
+  for (const size of outcome.readSizes) expect(size % 3).toBe(0);
+  expect(outcome.log).toHaveLength(11 * 3);
+  expect(outcome.log.some((event) => event.id.startsWith('b5-'))).toBe(false);
+  for (let i = 0; i < outcome.log.length; i += 3) {
+    const prefix = outcome.log[i]!.id.split('-')[0];
+    expect(outcome.log.slice(i, i + 3).map((event) => event.id)).toEqual([
+      `${prefix}-0`,
+      `${prefix}-1`,
+      `${prefix}-2`,
+    ]);
+  }
+  expect(outcome.settings).toEqual({ provider: 'gemini', model: 'flash' });
+});
