@@ -14,7 +14,8 @@
 // - `hold`: streams a first chunk and waits until `POST /release/<apiKey>` (the key of the test's
 //   own connection, so parallel tests do not release each other's turns);
 // - otherwise it repeats the message.
-// `GET /calls/<apiKey>` counts the requests made with that key.
+// `GET /calls/<apiKey>` counts the requests made with that key. With `slow-extract` in the key, the
+// first structured request waits for `POST /release/<apiKey>` too (an extraction still running).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 const port = Number(process.env['FAKE_OPENAI_PORT'] ?? 4175);
@@ -130,6 +131,7 @@ const toolCall = (response: ServerResponse, name: string, input: unknown) => {
 
 const waiting = new Map<string, Array<() => void>>();
 const released = new Set<string>();
+const slowed = new Set<string>();
 
 const readBody = (request: IncomingMessage): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -211,6 +213,11 @@ const server = createServer((request, response) => {
 
     response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
     if (body.response_format?.type === 'json_schema') {
+      if (key.includes('slow-extract') && !slowed.has(key)) {
+        slowed.add(key);
+        await hold(key, response);
+        if (response.destroyed) return;
+      }
       const value = structuredAnswer(body, last);
       if (value === undefined) {
         chunk(response, { role: 'assistant', content: '{}' }, null);

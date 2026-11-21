@@ -1,18 +1,22 @@
 // `/api/account/*` (plan step 3): settings of the signed-in user. One handler routes by path, so
 // the host mounts a single catch-all route. Keys never appear in a response or a log line.
-import { Effect, Schema } from 'effect';
+import { Effect, Result, Schema } from 'effect';
 import {
   AccountSettings,
   ConnectionInfo,
   CreateConnectionRequest,
   ErrorCode,
   ExtractSessionRequest,
+  GraphView,
+  toGraphView,
   ExtractionList,
   MAX_PROFILE_BODY_BYTES,
   ProfileRequest,
   ProfileResponse,
   SetRolesRequest,
 } from '@kd-learn/api';
+import { projectKnowledge } from '@kd-learn/core';
+import { appendKnowledgeChecked } from '@kd-learn/storage/port';
 import { activeProfile } from '../profile.ts';
 import type { Handler, Logger } from '../handler.ts';
 import { SECURITY_HEADERS } from '../http.ts';
@@ -142,6 +146,57 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     }),
   );
 
+  const decodeSegment = (segment: string) => {
+    try {
+      const id = decodeURIComponent(segment);
+      return id === '' ? undefined : id;
+    } catch {
+      return undefined;
+    }
+  };
+
+  /** `GET`: the graph without exercises, so no answer leaks (phase 3 A9). */
+  const knowledge = route('account.knowledge', ['GET'], (ctx) =>
+    signedIn(ctx, async (user) => {
+      const storage = ctx.accounts.storage.forUser(user.id);
+      const projected = projectKnowledge(await Effect.runPromise(storage.readKnowledge));
+      if (Result.isFailure(projected)) {
+        return ctx.reject(500, ErrorCode.Internal, 'The knowledge graph cannot be read.');
+      }
+      return json(ctx, Schema.encodeSync(GraphView)(toGraphView(projected.success)));
+    }),
+  );
+
+  /** The learner drops a wrong proposition (`PropositionRetired`, A1). */
+  const retire = (propositionId: string) =>
+    route('account.knowledge.retire', ['POST'], (ctx) =>
+      signedIn(ctx, async (user) => {
+        const storage = ctx.accounts.storage.forUser(user.id);
+        let found = false;
+        const written = await Effect.runPromise(
+          appendKnowledgeChecked(storage, (graph) => {
+            found = graph.propositions[propositionId] !== undefined;
+            return found
+              ? [
+                  {
+                    _tag: 'PropositionRetired',
+                    id: crypto.randomUUID(),
+                    at: Date.now(),
+                    propositionId,
+                  },
+                ]
+              : [];
+          }).pipe(Effect.result),
+        );
+        if (Result.isFailure(written)) {
+          return ctx.reject(409, ErrorCode.Conflict, 'The graph changed. Try again.', true);
+        }
+        if (!found) return notFound(ctx);
+        log({ event: 'account.knowledge.retired', fields: {} });
+        return json(ctx, Schema.encodeSync(GraphView)(toGraphView(written.success.graph)));
+      }),
+    );
+
   const sessions = makeSessionsHandler(kit, log);
   const practice = makePracticeAccountHandler(kit, log);
 
@@ -156,6 +211,13 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     if (path === 'roles') return setRoles(request, context);
     if (path === 'profile') return profile(request, context);
     if (path === 'knowledge/extractions') return extractions(request, context);
+    if (path === 'knowledge') return knowledge(request, context);
+    // Any non-empty string is a proposition id (core `PropositionId`): the client encodes it.
+    const retired = /^knowledge\/propositions\/([^/]{1,512})\/retire$/.exec(path);
+    if (retired?.[1] !== undefined) {
+      const id = decodeSegment(retired[1]);
+      return id === undefined ? fallback(request, context) : retire(id)(request, context);
+    }
     const session = sessions(path);
     if (session !== undefined) return session(request, context);
     const practiced = practice(path);

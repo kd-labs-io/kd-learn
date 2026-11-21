@@ -69,6 +69,8 @@ export const keys = {
   settings: (token: string) => ['account', token, 'settings'] as const,
   profile: (token: string) => ['account', token, 'profile'] as const,
   practices: (token: string) => ['account', token, 'practices'] as const,
+  knowledge: (token: string) => ['account', token, 'knowledge'] as const,
+  extractions: (token: string) => ['account', token, 'extractions'] as const,
   endpoints: ['endpoints'] as const,
   adminConfig: (token: string) => ['account', token, 'admin', 'config'] as const,
   adminUsers: (token: string) => ['account', token, 'admin', 'users'] as const,

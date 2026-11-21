@@ -102,10 +102,11 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 
 ### A9. Màn hình graph
 
-- Hai phần: **danh sách** mệnh đề (TanStack Virtual, tìm kiếm, lọc theo chủ đề / buổi, chi tiết mệnh đề: nguồn, cạnh vào / ra, mức nắm vững, nút bỏ mệnh đề) và **hình graph** (node và cạnh, kéo / chọn node).
+- Hai phần: **danh sách** mệnh đề (tìm kiếm, lọc theo chủ đề / buổi, chi tiết mệnh đề: nguồn, cạnh vào / ra, mức nắm vững, nút bỏ mệnh đề) và **hình graph** (node và cạnh, kéo / chọn node).
 - Danh sách đủ để thấy "graph tự cập nhật"; hình graph nằm ngoài đường tiêu chí xong, nên **cắt trước** nếu thư viện không đạt.
 - Thư viện cho hình graph chốt ở spike (C1): TanStack Charts nếu đạt, không thì thư viện graph chuyên dụng. Nạp lười, chỉ chạy phía client. Màu lấy từ token Astryx qua `var(--...)`.
 - Cùng mẫu với màn học: một interface nguồn dữ liệu (`KnowledgeSource`), hai cài đặt (khách đọc DB local và nghe `KnowledgeChanged`; tài khoản dùng TanStack Query, làm mới khi extraction xong). Live query của TanStack DB: chỉ dùng nếu C3 cho thấy cần.
+- **Chốt ở bước 9 (2026-11-21):** danh sách không dùng TanStack Virtual: hiện 100 dòng mỗi lần và nút "Xem thêm" (danh sách ảo với Astryx phải tự đo dòng và đặt vị trí qua `xstyle` động; chưa đáng khi graph thật còn nhỏ). Xét lại khi graph thật có vài nghìn mệnh đề. Hình graph: sigma 4 theo C1 ([progress/phase-3.md](progress/phase-3.md) bước 9).
 
 ## B. Các bước
 
