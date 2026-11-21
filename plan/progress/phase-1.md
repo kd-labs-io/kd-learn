@@ -14,13 +14,66 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Bước 4: API, server, SSE | Xong (2026-11-21). Hợp đồng `api`, handler `server`, route `/api/turns` và `/api/endpoints` trong `apps/web`, 1 lượt Haiku qua route. Xem ghi chú bước 4 bên dưới |
 | Bước 5: DB local | Xong (2026-11-21). Port `storage` chốt, driver `wa-sqlite` trong Worker của `packages/storage`, store phía client, Playwright chính thức, mã spike đã xoá. Xem ghi chú bước 5 bên dưới |
 
-| Bước 6: spike Markdown + KaTeX | Xong (2026-11-21). Chọn `Markdown` của Astryx + KaTeX. Mã spike xoá hoặc chuyển thành component thật ở bước 7. Xem ghi chú bước 6 bên dưới |
-| Bước 7: UI | Chưa bắt đầu |
+| Bước 6: spike Markdown + KaTeX | Xong (2026-11-21). Chọn `Markdown` của Astryx + KaTeX; phần thắng đã thành `LessonMarkdown` ở bước 7, mã spike đã xoá. Xem ghi chú bước 6 bên dưới |
+| Bước 7: UI | Xong (2026-11-21). Màn danh sách buổi, cài đặt, màn học (stream, plan, thử lại, bỏ qua bước, side chat), `LessonMarkdown`, vi + en, Playwright e2e, 1 lượt Haiku qua UI. Xem ghi chú bước 7 bên dưới |
 | Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
+
+## Bước 7: UI cho khách (2026-11-21)
+
+**Màn hình** (`apps/web/src`, mọi chuỗi qua Paraglide, vi + en; bố cục `Layout` của Astryx trong `AppShell`):
+
+| Route | Có gì |
+| --- | --- |
+| `/` | Ô nhập chủ đề tạo buổi học mới (ghi `SessionCreated` với `defaultProfile` và `language` = ngôn ngữ giao diện, rồi mở màn học), danh sách buổi học, báo "thêm API key" khi chưa có key, cảnh báo khi lưu trữ không bền. Thay màn demo theme của phase 0 |
+| `/settings` | Chọn nhà cung cấp (`anthropic`, `gemini`, `openai-compatible` theo id endpoint từ `GET /api/endpoints`), model, key (`type=password`, không hiện lại; để trống khi lưu thì giữ key cũ), nút xoá key, cảnh báo lưu trữ không bền |
+| `/s/$sessionId` | Màn học: plan (cột trái từ 768 px, gập thành `Collapsible` ở khổ điện thoại), hội thoại, ô trả lời, side chat (cột phải từ 1180 px, `Drawer` ở khổ nhỏ hơn), các banner trạng thái lượt |
+| `/dev/storage` | **Giữ lại** cùng `e2e/storage.e2e.ts`: test UI không phủ được lô nguyên tử, `id` trùng, hàng đợi trong Worker |
+
+**Luồng một lượt** (`apps/web/src/learn/runner.ts`, TypeScript thuần, không React): mỗi buổi có một `SessionRunner` ở mức module nên lượt vẫn chạy khi màn hình bị huỷ; màn hình chỉ đăng ký trạng thái (`useSyncExternalStore`).
+
+1. Lấy Web Lock `kd-learn:turn:<sessionId>` (`ifAvailable`) từ trước `TurnStarted` đến sau lô cuối. Tab không lấy được khóa thì không gửi gì và hiện "đang chạy ở tab khác". Khóa tự nhả khi tải lại hay đóng tab, điều mà cờ trong DB không làm được.
+2. Thiếu key, model hay endpoint thì **không ghi gì** (lỗi `NoKey`), để lượt tự chạy không để lại `TurnStarted` treo.
+3. Ghi `TurnStarted` (A3), gọi `streamTurn`, hiện `delta`, gom `event`.
+4. Nhận `done`: ghi cả lô một lần. Frame `error` không kèm `TurnFailed` (lỗi HTTP như `HistoryTooLarge`, `UnknownEndpoint`) thì client tự thêm `TurnFailed` vào lô, nên lỗi còn nguyên sau khi tải lại.
+5. `ClientError` hay stream đứt trước `done`: không ghi gì, lượt còn mở là "bị ngắt"; nút thử lại gửi cùng input trong `TurnStarted` mới.
+6. Sau lượt xong, nếu `shouldAutoStart` (buổi mới chưa có lượt, hoặc lượt cuối `completed` và `needsAgentTurn`) thì chạy tiếp ngay. **Không bao giờ tự chạy sau lượt lỗi hay bị ngắt**, kẻo key sai làm lặp vô hạn.
+
+**Ghi an toàn:** log chỉ ghi thêm và projection chặt, nên một lần ghi sai làm hỏng buổi học mãi mãi. Trước mỗi lần ghi client chạy `projectSession([...log, ...lô])`; không qua thì bỏ, báo `InvalidLog`. Gặp `StorageBusy` (kết quả chưa rõ): đọc lại log xem lô đã vào chưa, chưa thì ghi lại.
+
+**Bỏ qua bước:** nút hiện khi `canSkipStep`. Lỗ hổng của `core`: `StepSkipped` không cần lượt, còn `SessionCompleted` đòi `turnId`, nên bỏ qua bước cuối không kết thúc được buổi. Sửa: `SessionCompleted.turnId` thành tuỳ chọn (không có = người học bỏ qua bước cuối); client ghi `StepSkipped` + `SessionCompleted` trong một lô (có test ở `core` và runner).
+
+**Side chat:** mỗi bước một luồng (`step:<stepId>`, trước khi có bước là `general`), khóa riêng `kd-learn:side:<sessionId>` nên không chặn lượt chính; lỗi sinh `SideTurnFailed`; thử lại không thêm tin người học thứ hai.
+
+**`LessonMarkdown`** (`packages/ui/components`): `Markdown` của Astryx + KaTeX nạp lười qua `components.math` (`trust: false`, `strict: 'ignore'`, `maxSize`, `maxExpand`), `memo`. Quyết định:
+
+- **Ảnh** (rủi ro 21): `components.image` chỉ hiện chữ alt, không bao giờ có `<img>` hay request (test e2e đếm request tới host lạ).
+- **Link:** chỉ link tuyệt đối `http(s)` là link (tab mới, `rel="noopener noreferrer nofollow"`, không referrer); `mailto:`, đường dẫn tương đối hiện thành chữ.
+- **Font KaTeX:** plugin Vite `kd-katex-woff2-only` cắt nguồn woff và ttf khỏi `katex.min.css`: chỉ còn 19 file woff2 (khoảng 256 kB).
+- `katex` chuyển sang `packages/ui`; `apps/web` bỏ `katex`, `@tanstack/markdown`. Mã spike, route `/spike/markdown` và script đã xoá.
+
+**Hồ sơ mặc định:** export mới `@kd-learn/agent/client` (`defaultProfile`, `needsAgentTurn`) để bundle client không kéo vòng turn.
+
+**bfcache:** khi `pageshow` với `persisted`, `getStorage()` bỏ kết nối cũ và tăng `epoch`; `useStorageQuery` phụ thuộc `epoch` nên đăng ký lại. **Chưa kiểm trên trình duyệt thật** (Playwright không mô phỏng được): để bước 8.
+
+**React #418 trên bản SPA (đã sửa):** vỏ SPA prerender ở ngôn ngữ gốc (vi) còn client chọn ngôn ngữ trình duyệt, nên lần render đầu không khớp HTML ở mọi trình duyệt có ngôn ngữ khác vi (không riêng WebKit). Sửa: ở bản SPA (`VITE_KD_SPA` trong `vite.config.ts`) cây app bọc trong `ClientOnly`. Kiểm `/`, `/settings`, `/s/abc` mở thẳng trên Chromium, Firefox, WebKit, bản SPA và SSR: không còn lỗi. Chromium headless không gửi `Accept-Language` thì SSR chọn vi, client chọn en và vẫn lệch; trình duyệt thật luôn gửi nên e2e đặt `locale: 'en-US'`.
+
+**Bản SPA gọi API:** thêm `VITE_KD_API_BASE_URL` (mặc định rỗng = cùng origin). CORS phía server và vỏ Capacitor vẫn thuộc phase 6.
+
+**Không làm:**
+
+- `deleteSession`: cần migration đổi trigger chặn DELETE, không rẻ. Danh sách chưa có nút xoá buổi.
+- Nút dừng lượt đang chạy; danh sách buổi dạng link thật.
+- e2e ở WebKit: Playwright WebKit không có OPFS, các test cần DB tự bỏ qua. CI giữ Chromium.
+
+**Test:** `apps/web/src/learn/runner.test.ts` (16 test Vitest, server giả và `makeMemoryStorage`); `packages/core` thêm 1 test bỏ qua bước cuối; `apps/web/e2e/learn.e2e.ts` (13 test, Chromium và Firefox đều đạt, server giả `e2e/fake-server.ts` chặn `**/api/turns`): toàn bộ buổi học đến `done` kèm kiểm Markdown, tải lại giữa lượt hiện "bị ngắt" và thử lại đúng một lần, tải lại sau khi xong vẫn đủ dữ liệu, mất kết nối, hai tab, `HistoryTooLarge`, `UnknownEndpoint`, không key, side chat, khổ điện thoại 390 px, cài đặt lưu/xoá key, danh sách endpoint, cảnh báo lưu trữ không bền.
+
+**Chạy thật 1 lượt Haiku qua UI** (`claude-haiku-5-5`, 0,10 / 0,50 USD mỗi triệu token): script Playwright tạm, không trace, video hay ảnh chụp. Nhập key ở cài đặt, tạo buổi "Basic fractions"; Prober tự chạy, tutor hỏi một câu hợp lý (chia pizza 4 phần). Log: `SessionCreated`, `TurnStarted`, `MessageAppended`, `UsageRecorded`, `TurnCompleted`. 1.086 token vào, 59 ra, khoảng 0,00014 USD, 1,3 giây. Key không có trong trang, log lưu trữ hay log server.
+
+**Kiểm khác:** `astryx doctor` không lỗi; `check:server-bundle` sạch; build không còn `.woff`/`.ttf` của KaTeX; boundary lint xanh.
 
 ## Bước 6: spike Markdown và KaTeX khi stream (2026-11-21)
 
-Mã spike nằm ở `apps/web/src/spike/markdown/`, route `/spike/markdown` (`apps/web/src/routes/spike.markdown.tsx`), kịch bản Playwright `apps/web/scripts/spike-markdown.mjs`. Chạy: `pnpm build && pnpm build:spa`, rồi `node scripts/spike-markdown.mjs chromium|firefox|webkit [out.json] [thư mục ảnh chụp]`. Đã chạy trên Chromium, Firefox, WebKit của Playwright (macOS). **Bước 7: xoá toàn bộ mã spike này (kể cả dependency `@tanstack/markdown`), hoặc biến phần thắng thành component thật.**
+Mã spike nằm ở `apps/web/src/spike/markdown/`, route `/spike/markdown` (`apps/web/src/routes/spike.markdown.tsx`), kịch bản Playwright `apps/web/scripts/spike-markdown.mjs`. Chạy: `pnpm build && pnpm build:spa`, rồi `node scripts/spike-markdown.mjs chromium|firefox|webkit [out.json] [thư mục ảnh chụp]`. Đã chạy trên Chromium, Firefox, WebKit của Playwright (macOS). **Đã làm ở bước 7: mã spike (kể cả `@tanstack/markdown`, route `/spike/markdown`, script) đã xoá, phần thắng thành `LessonMarkdown`.**
 
 **Ứng viên (đọc tài liệu và phiên bản hiện hành trên npm ngày 2026-11-21):**
 
@@ -52,7 +105,7 @@ Cả hai không cần `allowBuilds` (không có script cài đặt).
 
 Dùng chung: KaTeX JS 260 kB (76,6 kB gzip), CSS 30 kB (7,9 kB gzip), 19 font woff2 tổng 256 kB (trình duyệt chỉ tải font dùng tới); bản build còn chép thêm woff 303 kB và ttf 514 kB không dùng tới. Chunk chính `index-*.js` 539,5 kB trước, 554,8 kB sau (khoảng 15 kB, 4,5 kB gzip, do mã route spike; mất khi xoá spike). CPU lúc nghỉ 10 s: 0,8 ms, nên số CPU là của chính lượt stream. CPU của Astryx gấp khoảng hai lần, vẫn thoải mái so với ngân sách khung hình.
 
-**Việc cho bước 7:**
+**Việc cho bước 7 (đã làm, xem ghi chú bước 7):**
 
 - Component thật `LessonMarkdown` (đặt trong `packages/ui`): `Markdown` của Astryx với `isStreaming`, `components.math` dựa trên KaTeX nạp lười. KaTeX: `trust: false`, `strict: 'ignore'`, `maxSize`, `maxExpand`, `throwOnError: false`; bọc phần công thức bằng `memo` và cache kết quả (như `math.tsx`). Không cần `stabilize.ts` (Astryx đã giữ lại cú pháp dở dang).
 - Chặn ảnh từ model: ghi đè `components.image` (hiện chữ hoặc link, không tải), vì ảnh ngoài là kênh rò rỉ dữ liệu và theo dõi (rủi ro 21). Quyết định link: `onLinkClick`, mở ngoài kèm `rel="noopener noreferrer"`.
@@ -248,24 +301,31 @@ Mã spike nằm ở `apps/web/src/spike/sqlite/`, route `/spike/sqlite` (`apps/w
 
 ## Bàn giao (2026-11-21)
 
-Bước 0 đến 5 xong. Bước 6 (spike Markdown + KaTeX) làm ở apps/web song song. Việc tiếp theo: **bước 7** (UI) sau khi bước 6 xong, rồi bước 8.
+Bước 0 đến 7 xong. Việc tiếp theo: **bước 8**, kiểm tiêu chí phase bằng model thật rồi đóng phase 1 theo quy ước ở [README.md](../README.md).
 
-- **Gọi API từ UI** (`@kd-learn/api`; thêm `"@kd-learn/api": "workspace:*"` vào `apps/web`):
-  - Mỗi lượt: ghi `TurnStarted` vào DB local (A3), gọi `streamTurn({model, turn, log}, {baseUrl?})` với `log` đọc từ `readSession`; nhận `Stream<Frame, ClientError>`.
-  - `delta` chỉ hiển thị (gộp theo `messageId`). `event` ghi vào DB local theo thứ tự nhận, tốt nhất gom cả lượt rồi ghi một lô khi nhận `done` (event của lượt vốn chỉ phát ở cuối lượt; lượt lỗi chỉ để lại `TurnFailed`). `error` hiện cho người học (`retryable` quyết định có nút thử lại). `done` kết thúc.
-  - `ClientError` (mất mạng, stream đứt trước `done`) thì không ghi gì thêm: lượt còn mở là lượt bị ngắt (A3, `findInterruptedTurn`), UI hiện nút thử lại.
-  - Mã lỗi từ server: `HistoryTooLarge` (gợi ý mở buổi học mới, A8), `InvalidRequest`, `UnknownEndpoint` (khách chọn endpoint không còn trong danh sách: bắt chọn lại), `InvalidTurn`, `ServerMisconfigured`, `InternalError`; còn lại là mã của provider (`authentication_error`, ... `retryable: false` thì gợi ý kiểm lại key).
-  - `ModelChoice` dựng từ `GuestSettings` (`provider`, `model`, `endpointId?`, `apiKey`). Danh sách endpoint lấy bằng `listEndpoints`; không có endpoint nào thì ẩn lựa chọn `openai-compatible`.
-  - Sau lượt có `AssessmentRecorded` (`needsAgentTurn(session)` của `agent`), tự bắt đầu lượt kế với input rỗng (`NO_INPUT`).
-  - Side chat: `turn: {kind: 'side', threadId}`, log kết thúc bằng `SideMessageAppended` của người học (client ghi trước).
-  - Bản SPA/Capacitor: cần `baseUrl` của server SSR; xem phần "Bản SPA chưa gọi được API" ở ghi chú bước 4.
-- **Server chạy bằng env:** `KD_OPENAI_COMPATIBLE_ENDPOINTS`, `KD_MAX_REQUEST_BYTES`, `KD_CORS_ORIGINS` (ghi chú bước 4). Dev: `pnpm --filter @kd-learn/web dev` phục vụ cả `/api/*`.
-- **Hồ sơ**: `defaultProfile` (`agent`); client tạo `SessionCreated` với hồ sơ này (đổi `language`).
-- Ranh giới import (`packages/config/eslint.js`, bảng `internalAllow`):
-  - `api`: chỉ `@kd-learn/core`, không API của Node, không UI.
-  - `server`: `core`, `agent`, `ai`, `api`, `search`, `storage` (cả adapter); dùng được API của Node; không UI, không `tokens`, `ui`, `web`.
-  - `storage`: driver dùng được API của host, chỉ import `core`; `storage/src/port` thuần như `ai/src/port` (chỉ `effect`).
-- Port `storage` đã chốt ở bước 5 (ghi chú bước 5). Rule port đã nới để cho import `@kd-learn/core`.
+**Cách chạy:** `pnpm --filter @kd-learn/web dev` (cổng 3000, phục vụ cả `/api/*`), hoặc `pnpm build` rồi `PORT=4173 node apps/web/.output/server/index.mjs`. Server không cần key; người học nhập key ở `/settings`. Key thật ở `.env` gốc repo (`KD_LEARN_CLAUDE_API`, không commit, không in); nhập tay ở trình duyệt hoặc dùng script Playwright tạm không bật trace, video, ảnh chụp. Chạy một lượt Haiku trước, xem chi phí rồi mới học hết chủ đề.
+
+**Bước 8 làm gì:**
+
+1. Học hết một chủ đề nhỏ (3 đến 5 bước plan) bằng Haiku qua UI: probing, plan, từng bước, `done`. Ghi số lượt, token, chi phí.
+2. Tải lại giữa lượt và sau khi xong; kiểm ba tiêu chí "Xong khi" của phase 1 ([loi-day-hoc.md](../loi-day-hoc.md)).
+3. Theo dõi điểm chưa kiểm bằng nhiều lượt thật:
+   - Model gọi tool chuyển trạng thái (`submit_assessment`, `create_plan`, `complete_step`) đúng lúc không ([rủi ro 18](../05-rui-ro.md)).
+   - Markdown khi stream (công thức, bảng, code) trên điện thoại thật.
+   - Log và token vào mỗi lượt tăng thế nào; `HistoryTooLarge` có xuất hiện sớm không (A8).
+   - Nút "sang bước sau" với M = 6 có hợp lý không.
+   - Hai tab thật (Web Lock) và bfcache (Back sau khi rời trang học): Worker có sống, màn học có đọc lại không.
+   - Safari và Chrome thật trên điện thoại: bàn phím ảo che ô trả lời, `Drawer` side chat.
+4. Đóng phase 1: ghi `Trạng thái: xong (ngày)`, chuyển sang `archive/phase-1.md`, cập nhật `README.md` và mục 7 của `06-viec-mo.md`.
+
+**Còn mở sau bước 7 (có thể sang phase 2):**
+
+- `deleteSession` (migration đổi trigger), xuất và nhập dữ liệu, đồng bộ server.
+- Nút dừng lượt đang chạy; danh sách buổi dạng link thật; e2e trên WebKit có OPFS.
+- Keep-alive SSE, giới hạn tốc độ và xác thực trước khi triển khai công khai (ghi chú bước 4).
+- Sửa hồ sơ dạy học, tóm tắt lịch sử dài (mục 6), chọn model theo vai.
+- Bản SPA/Capacitor: `VITE_KD_API_BASE_URL` và CORS phía server (phase 6).
+
 
 ## Lưu ý khi chạy model thật
 

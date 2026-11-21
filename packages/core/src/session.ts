@@ -255,12 +255,13 @@ export const projectSession = (
       }
 
       case 'SessionCompleted': {
-        const turn = openTurn(event.turnId);
+        // With a turn: that turn finished the last step. Without: the learner skipped it.
+        const turn = event.turnId === undefined ? undefined : openTurn(event.turnId);
         if (typeof turn === 'string') return fail(index, turn);
         if (state._tag !== 'Teaching' || plan === undefined || !isPlanResolved(plan, resolved)) {
           return fail(index, 'SessionCompleted is only valid when every step is resolved.');
         }
-        turn.moved = true;
+        if (turn !== undefined) turn.moved = true;
         state = { _tag: 'Done' };
         break;
       }

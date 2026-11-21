@@ -5,7 +5,8 @@
   "description": "Prober, Teacher and Practitioner agents. Depends on core and ports only.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
   },
   "scripts": {
     "typecheck": "tsc",

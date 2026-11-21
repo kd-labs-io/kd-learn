@@ -106,7 +106,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi m
 - Bước 1 làm song song với bước 2 và phải xong trước bước 5, vì driver quyết định hình dạng port `storage`.
 - Bước 3 cần bước 2 xong. Bước 4 cần bước 3 xong.
 - Bước 6 làm bất kỳ lúc nào trước bước 7.
-- Bước 7 cần bước 4, 5 và 6 xong.
+- Bước 7 cần bước 4, 5 và 6 xong. Đã xong (2026-11-21), ghi chú ở [progress/phase-1.md](progress/phase-1.md).
 - Kiểm bằng trình duyệt dùng Playwright. Đã chốt ở bước 5: `apps/web/e2e`, chạy trên CI bằng Chromium ([progress/phase-1.md](progress/phase-1.md)).
 
 ## C. Câu hỏi cho hai spike

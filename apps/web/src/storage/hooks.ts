@@ -10,8 +10,8 @@ import type {
   StorageError,
   StorageService,
 } from '@kd-learn/storage/port';
-import { useEffect, useState, type DependencyList } from 'react';
-import { getStorage } from './client';
+import { useEffect, useState, useSyncExternalStore, type DependencyList } from 'react';
+import { getStorage, storageEpoch } from './client';
 
 export type StorageQuery<A> =
   | { readonly status: 'loading' }
@@ -28,6 +28,8 @@ export function useStorageQuery<A>(
   deps: DependencyList,
 ): StorageQuery<A> {
   const [state, setState] = useState<StorageQuery<A>>({ status: 'loading' });
+  // A new epoch means the connection was replaced (bfcache restore): subscribe again and re-read.
+  const epoch = useSyncExternalStore(storageEpoch.subscribe, storageEpoch.get, () => 0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,7 +55,7 @@ export function useStorageQuery<A>(
       void Effect.runPromise(load(storage), { signal }).catch(() => undefined);
     });
     return () => controller.abort();
-  }, deps);
+  }, [...deps, epoch]);
 
   return state;
 }
