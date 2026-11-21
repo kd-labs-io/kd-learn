@@ -1,0 +1,22 @@
+# kd-learn with Docker Compose. Setup and HTTPS: docs/deploy.md.
+#   cp .env.example .env   # then set KD_LEARN_SECRET_KEY and the first admin
+#   docker compose up -d --build
+services:
+  web:
+    build: .
+    image: kd-learn:latest
+    restart: unless-stopped
+    env_file:
+      - ${KD_LEARN_ENV_FILE:-.env}
+    environment:
+      # The SQLite file lives on the volume; not changeable from the env file.
+      KD_LEARN_DB_PATH: /data/kd-learn.db
+      PORT: '3000'
+    ports:
+      # Loopback only: put a reverse proxy with HTTPS in front (docs/deploy.md).
+      - '${KD_LEARN_BIND:-127.0.0.1}:${KD_LEARN_PORT:-3000}:3000'
+    volumes:
+      - kd-learn-data:/data
+
+volumes:
+  kd-learn-data:
