@@ -1,5 +1,5 @@
-// Projection of the knowledge log (plan luyen-tap-graph.md A1, A3): the graph and the extraction
-// status of each session. Pure and strict like `projectSession`: a log that breaks a rule gives a
+// Projection of the knowledge log (plan luyen-tap-graph.md A1, A3, A7): the graph, the extraction
+// status of each session, the practices and the mastery of each proposition. Pure and strict like `projectSession`: a log that breaks a rule gives a
 // `ProjectionError`, never a half-built graph. Writers project log + batch before appending, and
 // drop a batch that does not project.
 import { Result } from 'effect';
@@ -10,6 +10,15 @@ import type {
   PropositionSource,
   Relation,
 } from './knowledge-event.ts';
+import {
+  checkAnswer,
+  checkContent,
+  mergeMastery,
+  nextMastery,
+  type Exercise,
+  type Mastery,
+  type Practice,
+} from './practice.ts';
 import { ProjectionError } from './session.ts';
 
 export interface Proposition {
@@ -65,6 +74,16 @@ export interface KnowledgeGraph {
   readonly inactive: Readonly<Record<PropositionId, InactiveProposition>>;
   /** Extraction attempts by session id. */
   readonly extractions: Readonly<Record<string, SessionExtraction>>;
+  /** Practices by id (A7). */
+  readonly practices: Readonly<Record<string, Practice>>;
+  /** Exercises of every practice by id. */
+  readonly exercises: Readonly<Record<string, Exercise>>;
+  /**
+   * Mastery of the active propositions that were graded at least once. A grade counts for the
+   * propositions of its exercise as they are at grading time: through merges to the proposition
+   * kept, not at all for a retired one.
+   */
+  readonly mastery: Readonly<Record<PropositionId, Mastery>>;
 }
 
 export const emptyKnowledgeGraph: KnowledgeGraph = {
@@ -72,6 +91,9 @@ export const emptyKnowledgeGraph: KnowledgeGraph = {
   edges: {},
   inactive: {},
   extractions: {},
+  practices: {},
+  exercises: {},
+  mastery: {},
 };
 
 /** True for the relations that must stay acyclic (A1). */
@@ -182,6 +204,9 @@ export const projectKnowledge = (
     { attempts: Array<ExtractionAttempt>; extractedBy: string | undefined }
   >();
   const attemptById = new Map<string, { sessionId: string; index: number }>();
+  const practices = new Map<string, Practice>();
+  const exercises = new Map<string, Exercise>();
+  const mastery = new Map<PropositionId, Mastery>();
 
   const fail = (index: number, message: string) =>
     Result.fail(new ProjectionError({ index, message }));
@@ -282,6 +307,9 @@ export const projectKnowledge = (
         });
         propositions.delete(event.from);
         inactive.set(event.from, { _tag: 'Merged', into: event.into });
+        const merged = mergeMastery(mastery.get(event.from), mastery.get(event.into));
+        mastery.delete(event.from);
+        if (merged !== undefined) mastery.set(event.into, merged);
         // Re-point the edges of `from`. One that becomes a self-loop or repeats an edge of `into`
         // says nothing new and is dropped.
         for (const edge of [...edges.values()]) {
@@ -309,6 +337,7 @@ export const projectKnowledge = (
         if (problem !== undefined) return fail(index, problem);
         propositions.delete(event.propositionId);
         inactive.set(event.propositionId, { _tag: 'Retired' });
+        mastery.delete(event.propositionId);
         for (const edge of [...edges.values()]) {
           if (edge.from === event.propositionId || edge.to === event.propositionId) {
             removeEdge(edge);
@@ -402,6 +431,121 @@ export const projectKnowledge = (
         if (problem !== undefined) return fail(index, problem);
         break;
       }
+
+      case 'PracticeStarted': {
+        if (practices.has(event.practiceId)) {
+          return fail(index, `Practice "${event.practiceId}" already exists.`);
+        }
+        practices.set(event.practiceId, {
+          practiceId: event.practiceId,
+          startedAt: event.at,
+          exerciseIds: [],
+        });
+        break;
+      }
+
+      case 'ExerciseIssued': {
+        const practice = practices.get(event.practiceId);
+        if (practice === undefined) {
+          return fail(index, `Practice "${event.practiceId}" was never started.`);
+        }
+        if (practice.endedAt !== undefined) {
+          return fail(index, `Practice "${event.practiceId}" has ended.`);
+        }
+        if (exercises.has(event.exerciseId)) {
+          return fail(index, `Exercise "${event.exerciseId}" already exists.`);
+        }
+        const problem =
+          event.propositionIds.map(notActive).find((p) => p !== undefined) ??
+          event.edgeIds
+            .map((id) => (edges.has(id) ? undefined : `Edge "${id}" is not in the graph.`))
+            .find((p) => p !== undefined) ??
+          checkContent(event.type, event.propositionIds, event.content);
+        if (problem !== undefined) return fail(index, problem);
+        exercises.set(event.exerciseId, {
+          exerciseId: event.exerciseId,
+          practiceId: event.practiceId,
+          type: event.type,
+          propositionIds: event.propositionIds,
+          edgeIds: event.edgeIds,
+          content: event.content,
+          issuedAt: event.at,
+        });
+        practices.set(event.practiceId, {
+          ...practice,
+          exerciseIds: [...practice.exerciseIds, event.exerciseId],
+        });
+        break;
+      }
+
+      case 'AnswerSubmitted': {
+        const exercise = exercises.get(event.exerciseId);
+        if (exercise === undefined) {
+          return fail(index, `Exercise "${event.exerciseId}" was never issued.`);
+        }
+        if (practices.get(exercise.practiceId)!.endedAt !== undefined) {
+          return fail(index, `Practice "${exercise.practiceId}" has ended.`);
+        }
+        if (exercise.answer !== undefined) {
+          return fail(index, `Exercise "${event.exerciseId}" is already answered.`);
+        }
+        const problem = checkAnswer(exercise, event.answer);
+        if (problem !== undefined) return fail(index, problem);
+        exercises.set(event.exerciseId, {
+          ...exercise,
+          answer: event.answer,
+          answeredAt: event.at,
+        });
+        break;
+      }
+
+      case 'ExerciseGraded': {
+        const exercise = exercises.get(event.exerciseId);
+        if (exercise === undefined) {
+          return fail(index, `Exercise "${event.exerciseId}" was never issued.`);
+        }
+        if (exercise.answer === undefined) {
+          return fail(index, `Exercise "${event.exerciseId}" has no answer to grade.`);
+        }
+        if (exercise.grade !== undefined) {
+          return fail(index, `Exercise "${event.exerciseId}" is already graded.`);
+        }
+        exercises.set(event.exerciseId, {
+          ...exercise,
+          grade: {
+            score: event.score,
+            feedback: event.feedback,
+            ...(event.profileId === undefined ? {} : { profileId: event.profileId }),
+            gradedAt: event.at,
+          },
+        });
+        // The grade counts for each proposition as it is now (one record even if two of them
+        // were merged into one since the exercise was issued).
+        const current = new Set<PropositionId>();
+        for (const id of exercise.propositionIds) {
+          let now: PropositionId | undefined = id;
+          while (now !== undefined && !propositions.has(now)) {
+            const gone = inactive.get(now);
+            now = gone?._tag === 'Merged' ? gone.into : undefined;
+          }
+          if (now !== undefined) current.add(now);
+        }
+        for (const id of current)
+          mastery.set(id, nextMastery(mastery.get(id), event.score, event.at));
+        break;
+      }
+
+      case 'PracticeEnded': {
+        const practice = practices.get(event.practiceId);
+        if (practice === undefined) {
+          return fail(index, `Practice "${event.practiceId}" was never started.`);
+        }
+        if (practice.endedAt !== undefined) {
+          return fail(index, `Practice "${event.practiceId}" has already ended.`);
+        }
+        practices.set(event.practiceId, { ...practice, endedAt: event.at });
+        break;
+      }
     }
   }
 
@@ -410,6 +554,9 @@ export const projectKnowledge = (
     edges: Object.fromEntries(edges),
     inactive: Object.fromEntries(inactive),
     extractions: Object.fromEntries(extractions),
+    practices: Object.fromEntries(practices),
+    exercises: Object.fromEntries(exercises),
+    mastery: Object.fromEntries(mastery),
   });
 };
 

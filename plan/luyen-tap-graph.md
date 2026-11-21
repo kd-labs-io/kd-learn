@@ -83,15 +83,15 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 | Giải thích lập luận | Một cạnh hoặc đường đi ngắn A → B | Model, theo các mệnh đề và cạnh trên đường đi |
 | Sắp xếp chuỗi lập luận | Một chuỗi 3–6 mệnh đề nối theo cạnh có thứ tự | Code: chấp nhận mọi thứ tự topo hợp lệ của chuỗi, không chỉ một đáp án |
 
-- Chấm bằng model trả điểm trên thang cố định (0–1, vài mức) kèm nhận xét ngắn; output có cấu trúc. Câu trả lời của người học là dữ liệu không tin cậy trong prompt chấm (C4).
+- Chấm bằng model trả điểm trên thang cố định kèm nhận xét ngắn; output có cấu trúc. **Chốt ở bước 6:** ba mức `correct` / `partial` / `incorrect` (1 / 0,5 / 0); bài sắp xếp được dựng bằng code (không gọi model) và chấm bằng tỉ lệ ràng buộc thứ tự được giữ; bài tự đủ (mang đáp án và tham chiếu) để chấm được sau khi graph đổi. Câu trả lời của người học là dữ liệu không tin cậy trong prompt chấm (C4).
 - **Đáp án:** với tài khoản, đáp án chỉ nằm trên server cho tới khi chấm xong (API ra bài không trả đáp án). Với khách, đáp án nằm trong log local của chính người đó: chấp nhận được, đây là dữ liệu của họ.
 
 ### A7. Luyện tập là một buổi riêng trên log kiến thức
 
 - Luyện tập không phải trạng thái của buổi học: nó đọc graph chung của mọi buổi. Một **lượt luyện tập** là một bộ vài bài; event ghi thẳng vào log kiến thức: `PracticeStarted {practiceId}`, `ExerciseIssued {exerciseId, type, propositionIds, content}`, `AnswerSubmitted`, `ExerciseGraded {score, feedback, profileId}`, `PracticeEnded`. Không có hội thoại nhiều lượt: ra bài → trả lời → chấm.
 - Một log duy nhất nên kết quả chấm và mức nắm vững cập nhật nguyên tử, không phải đồng bộ hai nơi.
-- **Mức nắm vững** là projection thuần trong `core` từ các `ExerciseGraded`: điểm và hạn ôn của từng mệnh đề (lặp lại ngắt quãng đơn giản, ví dụ hộp Leitner; chốt công thức ở bước 6).
-- **Chọn bài:** hàm thuần trong `core` chọn mệnh đề đến hạn hoặc yếu nhất, rồi chọn loại bài thoả điều kiện của registry. Practitioner chỉ viết nội dung bài cho mệnh đề đã chọn (tool / output có cấu trúc theo schema của loại), không tự chọn mệnh đề.
+- **Mức nắm vững** là projection thuần trong `core` từ các `ExerciseGraded`: điểm và hạn ôn của từng mệnh đề (lặp lại ngắt quãng đơn giản, ví dụ hộp Leitner; chốt công thức ở bước 6). **Chốt ở bước 6:** hộp 1–5, hạn ôn 1 / 3 / 7 / 16 / 35 ngày; đúng (≥ 0,75) lên một hộp, một phần giữ hộp, sai (< 0,5) về hộp 1; điểm tính cho mệnh đề tại lúc chấm (qua chuỗi gộp, bỏ mệnh đề đã bỏ).
+- **Chọn bài:** hàm thuần trong `core` chọn mệnh đề đến hạn hoặc yếu nhất, rồi chọn loại bài thoả điều kiện của registry. Practitioner chỉ viết nội dung bài cho mệnh đề đã chọn (tool / output có cấu trúc theo schema của loại), không tự chọn mệnh đề. Chốt ở bước 6: đến hạn, rồi chưa chấm bao giờ, rồi yếu nhất; loại bài xoay vòng trong các loại được phép; một lần gọi viết cả bộ bài.
 - **Khách và demo:** `POST /api/practice/issue` và `POST /api/practice/grade` không trạng thái, client gửi lát cần thiết (mệnh đề đã chọn và lân cận), ghi lô trả về. Loại chấm bằng code thì client chấm local, không gọi server. **Tài khoản:** route dưới `/api/account/practice/*`, server ghi log; bài đang mở nằm trong log nên mở lại tab vẫn làm tiếp được.
 
 ### A8. Demo

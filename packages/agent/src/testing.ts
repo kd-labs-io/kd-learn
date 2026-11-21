@@ -3,6 +3,7 @@
 // failure back to the model as a tool result instead of ending the turn.
 import { Effect, Schema, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
+import { OutputInvalid } from '@kd-learn/ai/port';
 import type { AiError, FinishReason, TurnEvent, TurnRequest } from '@kd-learn/ai/port';
 import type { DomainEvent } from '@kd-learn/core';
 import type { AgentOutput } from './turn.ts';
@@ -12,6 +13,8 @@ export type Action =
   | { readonly say: string }
   | { readonly call: string; readonly input: unknown }
   | { readonly fail: AiError }
+  /** A structured result, decoded with `request.output` (a decode failure is `OutputInvalid`). */
+  | { readonly result: unknown }
   | { readonly usage: readonly [input: number, output: number] }
   | { readonly finish: FinishReason };
 
@@ -70,6 +73,24 @@ export const fakeAi = (script: ReadonlyArray<ReadonlyArray<Action>>) => {
             messageId = `msg${++message}`;
           } else if ('fail' in action) {
             events.push(Effect.fail(action.fail));
+          } else if ('result' in action) {
+            const output = request.output;
+            events.push(
+              output === undefined
+                ? Effect.fail(new OutputInvalid({ message: 'No output schema', raw: '' }))
+                : Schema.decodeUnknownEffect(output)(action.result).pipe(
+                    Effect.map((value): ReadonlyArray<TurnEvent<never>> => [
+                      { _tag: 'StructuredResult', value: value as never },
+                    ]),
+                    Effect.mapError(
+                      (error) =>
+                        new OutputInvalid({
+                          message: error.message,
+                          raw: JSON.stringify(action.result),
+                        }),
+                    ),
+                  ),
+            );
           } else if ('usage' in action) {
             usage = action.usage;
           } else {
