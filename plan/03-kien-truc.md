@@ -40,6 +40,19 @@ Port của `packages/ai` ở mức "chạy một lượt với bộ tool này, t
 - **Backend API (TanStack AI):** kd-learn điều khiển vòng tool.
 - **Backend ACP (adapter tự viết):** agent CLI điều khiển vòng tool, tool của kd-learn đưa vào qua MCP.
 
+Hình dạng đã chốt sau [spike port AI](archive/spike-port-ai.md) (2026-11-21):
+
+- **Port** (`@kd-learn/ai/port`, chỉ import `effect`): service `AiPort` với `runTurn(request): Stream<TurnEvent, ProviderError | OutputInvalid>`.
+  - `TurnRequest`: model (`ModelRef`), system prompt, lịch sử tin nhắn, tool (tên, mô tả, input là Effect Schema, hàm chạy là Effect), schema output có cấu trúc (không bắt buộc).
+  - `TurnEvent`: `TextDelta`, `ToolCall`, `ToolResult`, `StructuredResult` (đã decode bằng Effect Schema), `Usage`, `Finish`. Một lượt có thể có nhiều `Usage` (mỗi lần gọi model một cái).
+  - Tool lỗi được gửi lại cho model, lượt chạy tiếp. Output sai schema thành `OutputInvalid`.
+  - Huỷ Stream thì dừng request tới provider, hoặc gửi `session/cancel` rồi kill process agent.
+- **Adapter TanStack** (`src/tanstack`): gửi JSON Schema thuần (`Schema.toJsonSchemaDocument`) cho TanStack, decode lại bằng Effect. Schema cho tool và output dùng `Schema.Finite` thay `Schema.Number`, object có `properties` thì đóng (`additionalProperties: false`). Không dùng `@tanstack/ai-effect` (còn 0.x).
+- **Adapter ACP** (`src/acp`):
+  - Tool của kd-learn chạy trong process server, sau một MCP server (HTTP; agent không có MCP qua HTTP thì dùng cầu nối stdio).
+  - Output có cấu trúc qua tool `submit_result`, validate bằng Effect Schema, cho sửa một lần.
+  - Agent chạy cách ly: `cwd` và home là thư mục tạm rỗng, không khai báo capability `fs` và `terminal`, từ chối mọi quyền ngoài tool kd-learn, tắt tool có sẵn và không nạp cấu hình agent của user chạy server.
+
 ## 3.4 Luồng một lượt học
 
 1. Client gửi câu trả lời của người học qua API HTTP. Khách gửi kèm key và lịch sử buổi học.

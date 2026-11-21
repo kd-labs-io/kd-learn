@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 gần xong: còn merge PR #1 (Safari iOS hoãn sang phase 6). Chi tiết ở [progress/phase-0.md](progress/phase-0.md)
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)). Đang làm phase 1: spike port AI xong (2026-11-21, [archive/spike-port-ai.md](archive/spike-port-ai.md)), tiếp theo là phần chính của phase 1. Chi tiết ở [progress/phase-1.md](progress/phase-1.md)
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 

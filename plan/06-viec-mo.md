@@ -11,5 +11,4 @@
 
 ## 7. Bước tiếp theo
 
-Đóng phase 0: còn merge PR #1, sau đó vào phase 1, bắt đầu bằng spike port AI (TanStack AI + ACP).
-
+Phase 1: spike port AI xong ([archive/spike-port-ai.md](archive/spike-port-ai.md)). Tiếp theo là phần chính của phase 1 ([mục 4](04-phases.md)). Tiến độ ở [progress/phase-1.md](progress/phase-1.md).

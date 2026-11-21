@@ -179,6 +179,19 @@ export default tseslint.config(
       },
     ]),
   },
+  // ai/port is imported by agent, so it stays as pure as agent: Effect only.
+  {
+    files: ['packages/ai/src/port/**/*.{ts,tsx}'],
+    rules: {
+      ...restrict([
+        ...nodeBuiltinPatterns,
+        ...uiLibraryPatterns,
+        { group: ['@tanstack/*'], message: 'The AI port must not depend on an adapter.' },
+        internalPattern(internalAllow.core),
+      ]),
+      'no-restricted-globals': ['error', ...hostGlobals],
+    },
+  },
   {
     files: ['apps/web/**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },

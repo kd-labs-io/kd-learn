@@ -1,5 +1,7 @@
 # 8. Tiến độ phase 0
 
+Trạng thái: xong (2026-11-17). PR #1 đã merge vào `main`.
+
 ## Phase 0 (cập nhật 2026-11-17)
 
 Nhánh `phase-0-scaffold`, PR [#1](https://github.com/kd-labs-io/kd-learn/pull/1).
