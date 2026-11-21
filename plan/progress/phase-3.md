@@ -44,12 +44,13 @@
 - **`KnowledgeSource`** (`apps/web/src/graph/source.ts`), hai cài đặt:
   - khách và demo: đọc log kiến thức local (`useKnowledge`, đọc lại khi có `KnowledgeChanged`, cả từ tab khác), dựng cùng `GraphView` bằng `toGraphView`. Bỏ mệnh đề bằng checked append, **không** chờ khoá `kd-learn:knowledge` (nếu chờ thì nút bị treo suốt một lần trích); lô của extraction tự khớp với graph lúc ghi.
   - tài khoản: TanStack Query. Danh sách extraction chỉ hỏi lại (1,5 s) khi còn buổi `queued` / `running`, không hỏi khi rảnh (chi phí `list()` ghi ở bước 5); khi một buổi hết chạy thì đọc lại graph.
-- **Trạng thái trích:** buổi đang trích hiện spinner; buổi lỗi hiện banner và nút "Thử lại"; buổi khách có lần thử `started` mà tab này không chạy (tab đóng giữa chừng) và buổi tài khoản đã xong mà chưa từng trích (lúc đó chưa có model) hiện nút "Rút ngay".
-- **Danh sách** (đường chính, và là đường duy nhất cho bàn phím và trình đọc màn hình): tìm không phân biệt dấu, lọc theo chủ đề, chi tiết (nguồn theo tên buổi, cạnh ra / vào bấm được để nhảy, mức nắm vững), bỏ mệnh đề có xác nhận. **Không dùng TanStack Virtual:** Astryx không có danh sách ảo, còn danh sách ảo cần `div` và style vị trí động; thay bằng hiện 100 dòng mỗi lần và nút "Xem thêm". Xét lại khi graph thật có vài nghìn mệnh đề.
+- **Trạng thái trích:** tối đa 3 banner, phần còn lại sau một nút (tài khoản có nhiều buổi trước phase 3 chưa trích). Buổi đang trích hiện spinner; buổi lỗi hiện banner và nút "Thử lại"; buổi khách có lần thử `started` mà tab này không chạy (tab đóng giữa chừng) và buổi tài khoản đã xong mà chưa từng trích (lúc đó chưa có model) hiện nút "Rút ngay".
+- **Danh sách** (đường chính, và là đường duy nhất cho bàn phím và trình đọc màn hình): tìm không phân biệt dấu, lọc theo chủ đề và theo buổi, chi tiết (nguồn theo tên buổi, cạnh ra / vào bấm được để nhảy, mức nắm vững), bỏ mệnh đề có xác nhận. **Không dùng TanStack Virtual** (chốt vào A9): Astryx không có danh sách ảo sẵn, phải tự đo dòng và đặt vị trí qua `xstyle` động; thay bằng hiện 100 dòng mỗi lần và nút "Xem thêm". Xét lại khi graph thật có vài nghìn mệnh đề.
 - **Hình graph** (`GraphFigure.tsx`), theo kết luận C1:
   - sigma 4.0.6 + graphology 0.26.0 + ForceAtlas2 0.10.1; nạp bằng `lazy(import())` và chỉ sau khi mount, nên không chạy khi SSR; chunk riêng khoảng 111 KiB gzip.
   - bố cục ForceAtlas2 đồng bộ dưới 800 mệnh đề, từ 800 trở lên chạy trong Web Worker 3 s; giữ vị trí cũ khi graph đổi.
   - mặc định chỉ hiện lân cận 2 bước của mệnh đề đang chọn (trạng thái `isHidden`), nút "Toàn bộ graph"; màu theo chủ đề lấy từ token (`--color-accent`, `--color-info`, ...), đổi qua phần tử thăm dò và canvas 1x1 sang `rgba` vì token có thể là `light-dark()` / `oklch()`.
+  - `gestureTarget: 'shared'`: lăn chuột hay một ngón tay trên hình thì cuộn trang (hình nằm giữa trang cuộn).
   - kéo node bằng `enableNodeDrag` có sẵn của sigma 4; bấm node thì chọn trong danh sách. Cần `itemSizesReference: 'screen'`: mặc định (`positions`) làm node to theo độ trải của bố cục, với 2 node thì phủ kín khung.
   - WebGL lỗi (máy không có WebGL 2) thì hiện một dòng chữ, danh sách vẫn đủ. Hình có `aria-hidden`.
   - Đã xem bằng mắt (ảnh chụp từ Playwright Chromium): mũi tên, nhãn cạnh, node chọn to hơn. Chưa thử graph lớn thật và điện thoại.
@@ -57,7 +58,10 @@
 - **Test:**
   - server `knowledge/graph-route.test.ts` (3): không lộ gì về bài tập, mức nắm vững, cạnh; bỏ mệnh đề kéo theo cạnh, id có ký tự đặc biệt, `404`, `405`; tách người dùng, `401`.
   - Playwright `e2e/graph.e2e.ts`, cả khách và tài khoản: học hết một buổi trong trình duyệt bằng model giả, model giả **giữ** lần gọi trích đầu (key có `slow-extract`) tới khi màn graph đã mở, rồi màn tự hiện hai mệnh đề, không tải lại, không bấm. Thêm: chi tiết có cạnh `requires`, tìm thu hẹp danh sách, bỏ mệnh đề còn sau khi tải lại. Mọi kiểm tra dựa trên danh sách, không dựa trên canvas.
-- **Để lại:** khách: buổi đã xong nhưng chưa từng trích (không có key lúc xong) không hiện nút "Rút ngay" vì phải đọc log từng buổi; có thể thêm ở màn học.
+- **Flake đã giải thích:** `getByText` của tiêu đề EmptyState đôi khi khớp hai phần tử vì Astryx đọc nó qua live region ẩn; test dùng `getByRole('heading')`.
+- **Để lại:**
+  - chưa làm hai việc ghi ở bước 0: đọc lại màu khi đổi theme (màu chỉ đọc lúc dựng hình), và ở chế độ "toàn bộ" chỉ hiện nhãn cạnh trong lân cận (đang hiện mọi nhãn cạnh, sigma tự ẩn theo mật độ nhãn node).
+  - khách: buổi đã xong nhưng chưa từng trích (không có key lúc xong) không hiện nút "Rút ngay" vì phải đọc log từng buổi; có thể thêm ở màn học.
 
 ## Bước 10: màn luyện tập (2026-11-21)
 

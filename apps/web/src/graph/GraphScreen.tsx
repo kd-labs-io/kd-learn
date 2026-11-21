@@ -28,6 +28,8 @@ const GraphFigure = lazy(() => import('./GraphFigure'));
 /** Rows shown before "Show more": a long list stays cheap to render. */
 const PAGE = 100;
 const ALL_TOPICS = '';
+/** Sessions to extract shown one banner each; the rest behind a button. */
+const MAX_BANNERS = 3;
 
 const masteryText = (p: PropositionView) =>
   p.mastery === undefined ? m.graph_mastery_none() : m.graph_mastery({ box: p.mastery.box });
@@ -71,6 +73,7 @@ function ReadyGraph({
   const wide = useMediaQuery('(min-width: 980px)');
   const [query, setQuery] = useState('');
   const [topic, setTopic] = useState(ALL_TOPICS);
+  const [session, setSession] = useState(ALL_TOPICS);
   const [limit, setLimit] = useState(PAGE);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   // The figure needs WebGL and the DOM: never rendered (nor its chunk loaded) on the server.
@@ -90,14 +93,22 @@ function ReadyGraph({
       ...all.map((t) => ({ value: t, label: t })),
     ];
   }, [graph.propositions]);
+  const sessionOptions = useMemo(() => {
+    const ids = [...new Set(graph.propositions.flatMap((p) => p.sources.map((s) => s.sessionId)))];
+    return [
+      { value: ALL_TOPICS, label: m.graph_session_all() },
+      ...ids.map((id) => ({ value: id, label: topics.get(id) || m.graph_source_unknown() })),
+    ];
+  }, [graph.propositions, topics]);
   const matching = useMemo(() => {
     const needle = fold(query.trim());
     return graph.propositions.filter(
       (p) =>
         (topic === ALL_TOPICS || p.topic === topic) &&
+        (session === ALL_TOPICS || p.sources.some((s) => s.sessionId === session)) &&
         (needle === '' || fold(p.text).includes(needle)),
     );
-  }, [graph.propositions, query, topic]);
+  }, [graph.propositions, query, topic, session]);
   // A retired or merged proposition leaves the selection.
   const selected = selectedId === undefined ? undefined : byId.get(selectedId);
 
@@ -148,6 +159,16 @@ function ReadyGraph({
                 setLimit(PAGE);
               }}
               data-testid="graph-topic"
+            />
+            <Selector
+              label={m.graph_session()}
+              options={sessionOptions}
+              value={session}
+              onChange={(value) => {
+                setSession(value as string);
+                setLimit(PAGE);
+              }}
+              data-testid="graph-session"
             />
           </HStack>
           <Text type="supporting" data-testid="graph-count">
@@ -225,7 +246,10 @@ function PendingBanners({
   readonly onExtract: (sessionId: string) => Promise<void>;
 }) {
   const [error, setError] = useState<string | undefined>(undefined);
+  const [all, setAll] = useState(false);
   const running = pending.filter((p) => p.state === 'running');
+  const waiting = pending.filter((p) => p.state !== 'running');
+  const shown = all ? waiting : waiting.slice(0, MAX_BANNERS);
   const retry = (sessionId: string) => {
     setError(undefined);
     onExtract(sessionId).catch((e: unknown) =>
@@ -240,29 +264,35 @@ function PendingBanners({
           <Text type="supporting">{m.graph_extracting({ count: running.length })}</Text>
         </HStack>
       ) : null}
-      {pending
-        .filter((p) => p.state !== 'running')
-        .map((p) => (
-          <Banner
-            key={p.sessionId}
-            status={p.state === 'failed' ? 'warning' : 'info'}
-            title={
-              p.state === 'failed'
-                ? m.graph_extract_failed({ topic: p.topic, reason: p.message ?? '' })
-                : m.graph_extract_not_run({ topic: p.topic })
-            }
-            endContent={
-              <Button
-                label={p.state === 'failed' ? m.graph_extract_retry() : m.graph_extract_now()}
-                size="sm"
-                variant="secondary"
-                onClick={() => retry(p.sessionId)}
-                data-testid="graph-extract"
-              />
-            }
-            data-testid="graph-pending"
-          />
-        ))}
+      {shown.map((p) => (
+        <Banner
+          key={p.sessionId}
+          status={p.state === 'failed' ? 'warning' : 'info'}
+          title={
+            p.state === 'failed'
+              ? m.graph_extract_failed({ topic: p.topic, reason: p.message ?? '' })
+              : m.graph_extract_not_run({ topic: p.topic })
+          }
+          endContent={
+            <Button
+              label={p.state === 'failed' ? m.graph_extract_retry() : m.graph_extract_now()}
+              size="sm"
+              variant="secondary"
+              onClick={() => retry(p.sessionId)}
+              data-testid="graph-extract"
+            />
+          }
+          data-testid="graph-pending"
+        />
+      ))}
+      {waiting.length > shown.length ? (
+        <Button
+          label={m.graph_extract_more({ count: waiting.length - shown.length })}
+          variant="ghost"
+          size="sm"
+          onClick={() => setAll(true)}
+        />
+      ) : null}
       {error === undefined ? null : <Banner status="error" title={error} />}
     </>
   );

@@ -116,6 +116,9 @@ test('account: a finished session shows up on the graph screen by itself', async
   await page.getByTestId('roles-copy').click();
   await page.getByTestId('roles-save').click();
   await expect(page.getByTestId('roles-message')).toContainText('Saved');
+  // Visited before the session: the cached empty graph must not stay on screen.
+  await page.getByTestId('nav-graph').click();
+  await expect(page.getByRole('heading', { name: 'No knowledge yet' })).toBeVisible();
   await page.getByTestId('nav-home').click();
 
   await learnToTheEnd(page, 'Fractions');

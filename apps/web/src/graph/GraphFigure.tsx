@@ -152,6 +152,8 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
           labelRenderedSizeThreshold: 4,
           // Room for the labels of nodes at the edge of the layout.
           stagePadding: 80,
+          // The figure sits in a scrolling page: a plain wheel or one finger scrolls the page.
+          gestureTarget: 'shared',
           allowInvalidContainer: true,
         },
       });

@@ -320,5 +320,8 @@
   "graph_figure": "Graph",
   "graph_figure_unavailable": "The graph picture cannot be shown on this device. The list has everything.",
   "graph_figure_all": "Whole graph",
-  "graph_figure_neighbours": "Around the selected statement"
+  "graph_figure_neighbours": "Around the selected statement",
+  "graph_session": "Session",
+  "graph_session_all": "All sessions",
+  "graph_extract_more": "{count} more session(s) to extract"
 }

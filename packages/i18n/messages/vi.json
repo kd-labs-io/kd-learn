@@ -320,5 +320,8 @@
   "graph_figure": "Hình graph",
   "graph_figure_unavailable": "Thiết bị này không vẽ được hình graph. Danh sách có đủ mọi thứ.",
   "graph_figure_all": "Toàn bộ graph",
-  "graph_figure_neighbours": "Quanh mệnh đề đang chọn"
+  "graph_figure_neighbours": "Quanh mệnh đề đang chọn",
+  "graph_session": "Buổi học",
+  "graph_session_all": "Mọi buổi học",
+  "graph_extract_more": "Còn {count} buổi cần rút kiến thức"
 }

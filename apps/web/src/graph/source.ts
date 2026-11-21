@@ -81,18 +81,27 @@ export function useGuestKnowledgeSource(): KnowledgeSource {
       ),
     [sessions],
   );
+  // The graph view depends on the log alone: a new object only when the log changes, so the
+  // figure is not rebuilt when an extraction starts or a session is renamed.
+  const projected = useMemo(() => {
+    if (knowledge.status !== 'ready') return undefined;
+    const graph = knowledge.data.graph;
+    return graph._tag === 'Failure'
+      ? ({ failure: graph.failure.message } as const)
+      : ({ graph: graph.success, view: toGraphView(graph.success) } as const);
+  }, [knowledge]);
   const view = useMemo((): GraphScreenView => {
     if (knowledge.status === 'loading') return knowledge;
     if (knowledge.status === 'error') return { status: 'error', message: knowledge.error.message };
-    const graph = knowledge.data.graph;
-    if (graph._tag === 'Failure') return { status: 'error', message: graph.failure.message };
+    if (projected === undefined) return { status: 'loading' };
+    if ('failure' in projected) return { status: 'error', message: projected.failure };
     return {
       status: 'ready',
-      graph: toGraphView(graph.success),
+      graph: projected.view,
       topics,
-      pending: localPending(graph.success, running, topics),
+      pending: localPending(projected.graph, running, topics),
     };
-  }, [knowledge, running, topics]);
+  }, [knowledge, projected, running, topics]);
   return {
     view,
     // No knowledge lock: a retire must not wait for an extraction. The checked append rebuilds on
