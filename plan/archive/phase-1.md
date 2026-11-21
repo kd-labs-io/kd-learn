@@ -1,12 +1,14 @@
 # 8. Tiến độ phase 1
 
+**Trạng thái: xong (2026-11-21).** Cả ba tiêu chí đạt bằng Haiku thật qua UI, xem phần "Bước 8".
+
 ## Phase 1 (cập nhật 2026-11-21)
 
-Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần chính: [loi-day-hoc.md](../loi-day-hoc.md).
+Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần chính: [loi-day-hoc.md](loi-day-hoc.md) (quyết định nền đã chuyển vào [mục 3.5](../03-kien-truc.md)).
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Spike port AI ([spike-port-ai.md](../archive/spike-port-ai.md)) | Xong (2026-11-21). Rủi ro 1, 2 đạt |
+| Spike port AI ([spike-port-ai.md](spike-port-ai.md)) | Xong (2026-11-21). Rủi ro 1, 2 đạt |
 | Bước 0: khung `storage`, `api`, `server` | Xong (2026-11-21). Lint ranh giới cho `storage`, `api`, `server` kèm test |
 | Bước 1: spike SQLite WASM + TanStack DB | Xong (2026-11-21). Driver: `@journeyapps/wa-sqlite` + `OPFSCoopSyncVFS` trong Worker của ta; không dùng TanStack DB ở phase 1. Xem ghi chú bước 1 bên dưới |
 | Bước 2: schema, projection (`core`) | Xong (2026-11-21). Xem ghi chú bước 2 bên dưới |
@@ -16,7 +18,33 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 
 | Bước 6: spike Markdown + KaTeX | Xong (2026-11-21). Chọn `Markdown` của Astryx + KaTeX; phần thắng đã thành `LessonMarkdown` ở bước 7, mã spike đã xoá. Xem ghi chú bước 6 bên dưới |
 | Bước 7: UI | Xong (2026-11-21). Màn danh sách buổi, cài đặt, màn học (stream, plan, thử lại, bỏ qua bước, side chat), `LessonMarkdown`, vi + en, Playwright e2e, 1 lượt Haiku qua UI. Xem ghi chú bước 7 bên dưới |
-| Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
+| Bước 8: kiểm tiêu chí phase | Xong (2026-11-21). Ba tiêu chí đạt bằng Haiku thật qua UI, không phải sửa lỗi nào của app. Xem ghi chú bước 8 bên dưới |
+
+## Bước 8: kiểm tiêu chí phase bằng model thật (2026-11-21)
+
+**Cách kiểm:** `apps/web/scripts/acceptance.mjs` (giữ lại, **không chạy trong CI** vì tốn tiền). Script chạy bản build SSR, mở Chromium, nhập key ở màn cài đặt như khách, học chủ đề "Adding fractions with different denominators" bằng `claude-haiku-5-5`. Người học là một lời gọi Haiku thứ hai (vai học sinh), vì câu trả lời soạn sẵn không dùng được: Teacher từ chối `complete_step` khi người học không trả lời câu nó vừa hỏi (lần chạy đầu với câu soạn sẵn: 15 lượt dạy không xong bước nào, nút bỏ qua hiện sau 6 lượt đúng như thiết kế). Cách chạy: `pnpm build`, rồi `KD_LEARN_ENV_FILE=<đường dẫn .env> node apps/web/scripts/acceptance.mjs` (`--first-turn` chạy 1 lượt để xem model và chi phí; trần mặc định 60 lượt hoặc 0,50 USD). Script tự bật và tắt server, không in key.
+
+**Kết quả ba tiêu chí (lần chạy cuối; bốn lần chạy với người học giả lập đều tới `done`, hai lần đầu với câu soạn sẵn thì không):**
+
+| Tiêu chí | Kết quả |
+| --- | --- |
+| Khách tự nhập key | Đạt: nhập ở `/settings`, lượt đầu chạy bằng `claude-haiku-5-5` (1.091 token vào, 33 ra). Key không có trong nội dung trang |
+| Học xong 1 chủ đề | Đạt: `probing` (4 câu hỏi, đúng N = 4) → `submit_assessment` → plan 4 bước → 4 lần `complete_step` → `SessionCompleted` → `done` |
+| Tải lại không mất dữ liệu | Đạt cả hai chỗ. Giữa lượt: hiện "bị ngắt", câu trả lời còn nguyên và hiện đúng một lần, không tự gửi lại, plan còn, thử lại xong lượt. Sau `done`: số tin nhắn, trạng thái từng bước, toàn bộ chữ giống hệt trước khi tải lại (sau khi KaTeX nạp xong), buổi còn trong danh sách |
+
+**Số liệu lần chạy cuối:** 16 request (14 lượt chính, 1 side chat, 1 lượt bị ngắt rồi thử lại), 63.202 token vào, 5.806 ra, 0,0092 USD cho Tutor; người học giả lập 15.131 vào, 1.128 ra, 0,0021 USD. Mỗi lượt 1 đến 6 giây. Tổng sáu lần chạy (gồm hai lần lỗi ở script): 88 request, khoảng 0,054 USD.
+
+**Model có gọi tool đúng lúc không (rủi ro 18): có.** `submit_assessment` đúng ở câu trả lời thứ 4 (N = 4); `create_plan` ở lượt tự chạy ngay sau đó; `complete_step` chỉ khi người học trả lời đúng câu hỏi kiểm tra của bước (mỗi bước 1 đến 2 lượt); bước cuối kèm `SessionCompleted` trong cùng lượt. Khi người học chỉ nói "tôi hiểu rồi" hoặc trả lời lạc đề, model không gọi `complete_step`. Không lần nào gọi sai trạng thái hay bị `ToolError`.
+
+**Kích thước và token theo lượt (A8):** thân request tăng tuyến tính, 5,0 KB ở lượt 1 lên 25,2 KB ở lượt 16 (khoảng 1,3 KB mỗi lượt), nên giới hạn 1 MiB tới sau cỡ 750 lượt: `HistoryTooLarge` không xuất hiện sớm. Token vào tăng khoảng 150 đến 400 mỗi lượt (1,1k ở lượt 1, khoảng 4,5k ở lượt 15 với lượt không gọi tool). Lượt có gọi tool tốn gấp đôi (hai lần gọi model: tool, rồi câu trả lời): 9,9k token vào ở lượt 16. Chưa cần tóm tắt lịch sử cho buổi cỡ này.
+
+**M = 6:** hợp lý như lối thoát. Với Haiku, mỗi bước chỉ 1 đến 2 lượt nên nút không bao giờ hiện khi người học trả lời đúng; nó chỉ hiện khi người học không tiến (lần chạy đầu, sau 6 lượt). Chưa có dữ liệu với người học thật; không đổi.
+
+**Side chat:** đạt: trả lời bám bước hiện tại (có cả 3 lần chạy), không thêm tin vào luồng chính, `SideMessageAppended` mang `usage`.
+
+**Lỗi và điểm lệch:** app không có lỗi chặn tiêu chí. Ghi lại ở [06-viec-mo.md](../06-viec-mo.md): (1) sau khi `done`, panel side chat chỉ hiện luồng `general` nên các câu hỏi cũ ở luồng từng bước còn trong log nhưng không xem lại được; (2) sau tải lại, công thức hiện mã TeX thô một thoáng cho tới khi KaTeX (nạp lười) xong. Lỗi của script, không phải của app: Haiku 5.5 từ chối `temperature`, và `max_tokens` thấp có lần cho ra chuỗi rỗng (nghi suy nghĩ chiếm hết; đã tắt suy nghĩ và nâng trần).
+
+**Chưa kiểm được ở đây:** thiết bị thật (Safari/iOS, Chrome điện thoại, bfcache thật, bàn phím ảo, hai tab thật). Không thuộc tiêu chí phase 1; còn mở ở [rủi ro 5](../05-rui-ro.md) và phase 6.
 
 ## Bước 7: UI cho khách (2026-11-21)
 
@@ -301,22 +329,15 @@ Mã spike nằm ở `apps/web/src/spike/sqlite/`, route `/spike/sqlite` (`apps/w
 
 ## Bàn giao (2026-11-21)
 
-Bước 0 đến 7 xong. Việc tiếp theo: **bước 8**, kiểm tiêu chí phase bằng model thật rồi đóng phase 1 theo quy ước ở [README.md](../README.md).
+Bước 0 đến 8 xong, phase 1 đóng (2026-11-21).
 
 **Cách chạy:** `pnpm --filter @kd-learn/web dev` (cổng 3000, phục vụ cả `/api/*`), hoặc `pnpm build` rồi `PORT=4173 node apps/web/.output/server/index.mjs`. Server không cần key; người học nhập key ở `/settings`. Key thật ở `.env` gốc repo (`KD_LEARN_CLAUDE_API`, không commit, không in); nhập tay ở trình duyệt hoặc dùng script Playwright tạm không bật trace, video, ảnh chụp. Chạy một lượt Haiku trước, xem chi phí rồi mới học hết chủ đề.
 
-**Bước 8 làm gì:**
+**Việc kiểm trên thiết bị thật (không thuộc tiêu chí phase 1, sang phase 6, xem [rủi ro 5](../05-rui-ro.md)):**
 
-1. Học hết một chủ đề nhỏ (3 đến 5 bước plan) bằng Haiku qua UI: probing, plan, từng bước, `done`. Ghi số lượt, token, chi phí.
-2. Tải lại giữa lượt và sau khi xong; kiểm ba tiêu chí "Xong khi" của phase 1 ([loi-day-hoc.md](../loi-day-hoc.md)).
-3. Theo dõi điểm chưa kiểm bằng nhiều lượt thật:
-   - Model gọi tool chuyển trạng thái (`submit_assessment`, `create_plan`, `complete_step`) đúng lúc không ([rủi ro 18](../05-rui-ro.md)).
-   - Markdown khi stream (công thức, bảng, code) trên điện thoại thật.
-   - Log và token vào mỗi lượt tăng thế nào; `HistoryTooLarge` có xuất hiện sớm không (A8).
-   - Nút "sang bước sau" với M = 6 có hợp lý không.
-   - Hai tab thật (Web Lock) và bfcache (Back sau khi rời trang học): Worker có sống, màn học có đọc lại không.
-   - Safari và Chrome thật trên điện thoại: bàn phím ảo che ô trả lời, `Drawer` side chat.
-4. Đóng phase 1: ghi `Trạng thái: xong (ngày)`, chuyển sang `archive/phase-1.md`, cập nhật `README.md` và mục 7 của `06-viec-mo.md`.
+- Markdown khi stream (công thức, bảng, code) trên điện thoại thật.
+- Hai tab thật (Web Lock) và bfcache (Back sau khi rời trang học): Worker có sống, màn học có đọc lại không.
+- Safari và Chrome thật trên điện thoại: bàn phím ảo che ô trả lời, `Drawer` side chat.
 
 **Còn mở sau bước 7 (có thể sang phase 2):**
 

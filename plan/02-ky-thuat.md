@@ -8,7 +8,7 @@
 | TypeScript | 6.0, chưa lên 7: `typescript-eslint` chỉ hỗ trợ dưới 6.1, `astryx integration check` cần API của TS 6 |
 | i18n | [Paraglide JS](https://paraglidejs.com) cho chuỗi của app (`packages/i18n/messages/{vi,en}.json`, ngôn ngữ gốc `vi`). Chuỗi của component Astryx do `InternationalizationProvider` của Astryx dịch, dùng chung locale. Locale lấy theo cookie, rồi ngôn ngữ trình duyệt, rồi `vi`. Plugin của Paraglide nạp từ `node_modules`, không từ CDN |
 | Font | Tự host qua Fontsource (bản variable của Inter, Source Serif 4, JetBrains Mono) |
-| Test | Vitest. Test trình duyệt (DB local, sau này luồng UI): Playwright (`@playwright/test`, `apps/web/e2e`, đuôi `*.e2e.ts` để Vitest không nhặt), chạy trên bản build SSR; CI chỉ cài Chromium (chốt ở bước 5 phase 1, [progress/phase-1.md](progress/phase-1.md)) |
+| Test | Vitest. Test trình duyệt (DB local, sau này luồng UI): Playwright (`@playwright/test`, `apps/web/e2e`, đuôi `*.e2e.ts` để Vitest không nhặt), chạy trên bản build SSR; CI chỉ cài Chromium (chốt ở bước 5 phase 1, [archive/phase-1.md](archive/phase-1.md)) |
 | Lint | ESLint, gồm rule chặn import theo package (ranh giới ở [mục 3.2](03-kien-truc.md)) |
 | Format | Prettier |
 | CI | GitHub Actions chạy `turbo build test lint` |
@@ -17,8 +17,8 @@
 | UI | [Astryx](https://astryx.atmeta.com) (MIT, React 19, đang beta) với theme riêng dựng từ `DESIGN.md`. Component riêng của kd-learn viết bằng StyleX dùng token có kiểu, qua plugin Vite của `@astryxdesign/build`; nếu không chạy được thì lùi về CSS Modules + `var(--...)`. Không dùng Tailwind và shadcn. Hạn chế `swizzle` |
 | Biểu đồ | TanStack Charts, màu lấy từ token Astryx qua `var(--...)` |
 | DB | SQLite ở mọi nơi: SQLite trên server, SQLite WASM (OPFS) cho khách |
-| Driver SQLite khách | `@journeyapps/wa-sqlite` (ghim 2.0.x) với `OPFSCoopSyncVFS`, chạy trong Worker do `packages/storage` tự viết. Không cần COOP/COEP (không xung đột với iframe sandbox ở phase 5); nhiều tab cùng mở và ghi được; transaction chạy trọn trong Worker. Chọn sau spike bước 1 phase 1 (2026-11-21, [progress/phase-1.md](progress/phase-1.md)). Loại: VFS `opfs` của `@sqlite.org/sqlite-wasm` (cần COOP/COEP), `opfs-sahpool` (chỉ một tab mở được DB) |
-| Markdown | `Markdown` của Astryx (`isStreaming`) kèm KaTeX qua `components.math` (spike 2026-11-21, [progress/phase-1.md](progress/phase-1.md)). Escape HTML mặc định; KaTeX dùng `trust: false`, `maxExpand` giới hạn, `throwOnError: false`; ảnh trong Markdown do model sinh phải chặn hoặc cho qua danh sách cho phép (rủi ro 21). Nạp lười (KaTeX khoảng 77 kB gzip JS, 8 kB CSS, font woff2 khoảng 256 kB) |
+| Driver SQLite khách | `@journeyapps/wa-sqlite` (ghim 2.0.x) với `OPFSCoopSyncVFS`, chạy trong Worker do `packages/storage` tự viết. Không cần COOP/COEP (không xung đột với iframe sandbox ở phase 5); nhiều tab cùng mở và ghi được; transaction chạy trọn trong Worker. Chọn sau spike bước 1 phase 1 (2026-11-21, [archive/phase-1.md](archive/phase-1.md)). Loại: VFS `opfs` của `@sqlite.org/sqlite-wasm` (cần COOP/COEP), `opfs-sahpool` (chỉ một tab mở được DB) |
+| Markdown | `Markdown` của Astryx (`isStreaming`) kèm KaTeX qua `components.math` (spike 2026-11-21, [archive/phase-1.md](archive/phase-1.md)). Escape HTML mặc định; KaTeX dùng `trust: false`, `maxExpand` giới hạn, `throwOnError: false`; ảnh trong Markdown do model sinh phải chặn hoặc cho qua danh sách cho phép (rủi ro 21). Nạp lười (KaTeX khoảng 77 kB gzip JS, 8 kB CSS, font woff2 khoảng 256 kB) |
 | Lõi | Effect v4 cho service, lỗi, đồng thời, schema, job nền |
 | Model | TanStack AI cho backend API, qua adapter tự viết sang `Stream` của Effect ([mục 3.3](03-kien-truc.md)). Không dùng module AI của Effect, chưa dùng `@tanstack/ai-effect` (còn 0.x) |
 | Provider | Anthropic, OpenAI, Google Gemini, endpoint tương thích OpenAI (admin khai báo danh sách được phép) |
