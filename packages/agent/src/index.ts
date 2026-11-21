@@ -5,3 +5,11 @@ export type { AgentOutput, FailureInfo, TurnParams } from './turn.ts';
 export { runSideChat } from './side-chat.ts';
 export type { SideChatParams } from './side-chat.ts';
 export { mainSystem, sideSystem, NO_INPUT } from './context.ts';
+export { gradeExercise, writeExercises } from './practice/practitioner.ts';
+export type {
+  GradeParams,
+  GradeResult,
+  PracticeUsage,
+  WriteParams,
+  WrittenExercise,
+} from './practice/practitioner.ts';

@@ -1,6 +1,7 @@
 import { Result, Schema } from 'effect';
 import { describe, expect, it } from 'vitest';
 import {
+  emptyKnowledgeGraph,
   extractionStatus,
   projectKnowledge,
   resolveProposition,
@@ -66,7 +67,7 @@ const rejection = (events: ReadonlyArray<KnowledgeEvent>) => {
 
 describe('projectKnowledge: propositions', () => {
   it('projects an empty log to an empty graph', () => {
-    expect(project([])).toEqual({ propositions: {}, edges: {}, inactive: {}, extractions: {} });
+    expect(project([])).toEqual(emptyKnowledgeGraph);
   });
 
   it('adds, revises and sources a proposition, without repeating a source', () => {

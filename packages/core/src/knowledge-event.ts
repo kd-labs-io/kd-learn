@@ -2,7 +2,17 @@
 // holds the graph of every session and, from step 6, the practice results. Plain JSON, like the
 // session events, but a separate union: the two logs live in different tables and never mix.
 import { Schema } from 'effect';
+import {
+  ExerciseAnswer,
+  ExerciseContent,
+  ExerciseTypeId,
+  Feedback,
+  Score,
+} from './exercise-schema.ts';
+import { EdgeId, PropositionId, Relation } from './knowledge-ids.ts';
 import { StepId } from './plan.ts';
+
+export { EdgeId, PropositionId, Relation } from './knowledge-ids.ts';
 
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -12,12 +22,6 @@ const base = {
   at: NonNegativeInt,
 };
 
-export const PropositionId = Schema.NonEmptyString;
-export type PropositionId = typeof PropositionId.Type;
-
-export const EdgeId = Schema.NonEmptyString;
-export type EdgeId = typeof EdgeId.Type;
-
 /** Longest proposition text. A proposition is one claim; anything longer is not one. */
 export const maxPropositionLength = 1000;
 const PropositionText = Schema.String.check(
@@ -26,25 +30,6 @@ const PropositionText = Schema.String.check(
 );
 const Topic = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200));
 const Label = Schema.String.check(Schema.isMaxLength(200));
-
-/**
- * Relation of an edge, read as "from RELATION to" (fixed in step 1):
- * - `requires`: from needs to be understood first, so `to` comes before `from`;
- * - `implies`: from logically leads to `to`, so `from` comes before `to`;
- * - `supports`: from is evidence or a reason for `to`;
- * - `exampleOf`: from is an instance of `to`;
- * - `contrastsWith`: the two are commonly confused. Undirected: both directions are one edge.
- * `requires` and `implies` are the ordered relations: together they must stay acyclic, and a
- * reasoning chain is a path along them.
- */
-export const Relation = Schema.Literals([
-  'requires',
-  'implies',
-  'supports',
-  'exampleOf',
-  'contrastsWith',
-]);
-export type Relation = typeof Relation.Type;
 
 /** Where a proposition was taught or shown: a session, and the plan step when there was one. */
 export const PropositionSource = Schema.Struct({
@@ -140,6 +125,55 @@ export const ExtractionFailed = Schema.TaggedStruct('ExtractionFailed', {
   retryable: Schema.Boolean,
 });
 
+// Practice (A7): one practice is a set of a few exercises; issue -> answer -> grade, no dialogue.
+
+export const PracticeId = Schema.NonEmptyString;
+export const ExerciseId = Schema.NonEmptyString;
+
+export const PracticeStarted = Schema.TaggedStruct('PracticeStarted', {
+  ...base,
+  practiceId: PracticeId,
+});
+
+/**
+ * An exercise of an open practice. `propositionIds` are what it tests (and what its grade counts
+ * for); `edgeIds` the edges it is about. Both must be active when it is issued.
+ */
+export const ExerciseIssued = Schema.TaggedStruct('ExerciseIssued', {
+  ...base,
+  practiceId: PracticeId,
+  exerciseId: ExerciseId,
+  type: ExerciseTypeId,
+  propositionIds: Schema.NonEmptyArray(PropositionId),
+  edgeIds: Schema.Array(EdgeId),
+  content: ExerciseContent,
+});
+
+/** The learner's answer, once per exercise, while its practice is open. */
+export const AnswerSubmitted = Schema.TaggedStruct('AnswerSubmitted', {
+  ...base,
+  exerciseId: ExerciseId,
+  answer: ExerciseAnswer,
+});
+
+/**
+ * The grade of an answered exercise, once. `profileId` is the profile whose prompt graded it;
+ * absent for the types graded by code. May come after `PracticeEnded` (grading was in flight).
+ */
+export const ExerciseGraded = Schema.TaggedStruct('ExerciseGraded', {
+  ...base,
+  exerciseId: ExerciseId,
+  score: Score,
+  feedback: Feedback,
+  profileId: Schema.optionalKey(Schema.NonEmptyString),
+});
+
+/** The learner ended the practice. Exercises not answered stay unanswered. */
+export const PracticeEnded = Schema.TaggedStruct('PracticeEnded', {
+  ...base,
+  practiceId: PracticeId,
+});
+
 export const KnowledgeEvent = Schema.Union([
   PropositionAdded,
   PropositionSourced,
@@ -151,6 +185,11 @@ export const KnowledgeEvent = Schema.Union([
   ExtractionStarted,
   SessionExtracted,
   ExtractionFailed,
+  PracticeStarted,
+  ExerciseIssued,
+  AnswerSubmitted,
+  ExerciseGraded,
+  PracticeEnded,
 ]);
 export type KnowledgeEvent = typeof KnowledgeEvent.Type;
 
