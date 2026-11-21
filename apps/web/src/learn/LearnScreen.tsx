@@ -61,9 +61,12 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
 
   // The first Prober turn and the planning turn start without learner input (plan A4).
   const due = session !== undefined && shouldAutoStart(session);
+  // Also once the turn shown as running ends: an auto start skipped meanwhile is due again. A
+  // failure stops it, so a turn that cannot start (no key) is not retried in a loop.
+  const idle = !state.main.running && state.main.failure === undefined;
   useEffect(() => {
-    if (due) void runner.autoStart();
-  }, [due, runner]);
+    if (due && idle) void runner.autoStart();
+  }, [due, idle, runner]);
 
   if (view.status === 'loading') {
     return (
@@ -93,7 +96,12 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
         content={
           <LayoutContent padding={6}>
             <VStack gap={4} maxWidth="68ch">
-              <Banner status="warning" title={m.learn_not_found()} />
+              <Banner
+                status="warning"
+                title={
+                  view.status === 'not-found' ? m.learn_not_found_account() : m.learn_not_found()
+                }
+              />
               <Button label={m.nav_back()} onClick={home} />
             </VStack>
           </LayoutContent>
@@ -399,7 +407,10 @@ function Composer({ session, state, elsewhere, runner }: ComposerProps) {
     const input = draft.trim();
     if (input === '' || blocked) return;
     setDraft('');
-    void runner.send(input);
+    void Promise.resolve(runner.send(input)).then((kept) => {
+      // Refused before anything was saved (account mode): give the text back.
+      if (kept === false) setDraft((current) => (current === '' ? input : current));
+    });
   };
 
   return (

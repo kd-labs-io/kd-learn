@@ -58,7 +58,9 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
     const content = draft.trim();
     if (content === '' || running) return;
     setDraft('');
-    void runner.sendSide(threadId, content);
+    void Promise.resolve(runner.sendSide(threadId, content)).then((kept) => {
+      if (kept === false) setDraft((current) => (current === '' ? content : current));
+    });
   };
 
   return (
@@ -90,6 +92,13 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
         <VStack ref={endRef} />
       </VStack>
 
+      {!waitingForAnswer && !running && failure !== undefined ? (
+        <Banner
+          status="error"
+          title={m.side_error({ message: failureText(failure) })}
+          data-testid="side-failed"
+        />
+      ) : null}
       {waitingForAnswer ? (
         <Banner
           status="error"

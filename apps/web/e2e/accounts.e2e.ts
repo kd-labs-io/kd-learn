@@ -215,3 +215,43 @@ test('demo mode: no key, the server model answers, and the shared budget runs ou
 
   await request.put('/api/admin/config', { headers, data: { demoBudgetLimit: 1000 } });
 });
+
+test('a turn the server refuses keeps the answer in the box and says why', async ({ page }) => {
+  await register(page);
+  await connectFakeModel(page);
+  await startSession(page, 'Volcanoes');
+
+  // The only intercepted request in these tests: the server refuses this one start.
+  await page.route('**/api/account/sessions/*/turns', (route) =>
+    route.fulfill({
+      status: 409,
+      json: { error: { code: 'TurnInProgress', message: 'busy', retryable: true } },
+    }),
+  );
+  await answer(page, 'Magma, I think');
+  await expect(page.getByTestId('turn-failed')).toHaveAttribute('data-code', 'TurnInProgress');
+  await expect(page.getByLabel('Your answer')).toHaveValue('Magma, I think');
+
+  await page.unroute('**/api/account/sessions/*/turns');
+  await page.getByTestId('composer-send').click();
+  await expect(page.getByTestId('msg-tutor').last()).toContainText('You said: Magma, I think');
+});
+
+test('Stop cancels the running turn on the server; retry sends the same answer again', async ({
+  page,
+}) => {
+  await register(page);
+  const key = await connectFakeModel(page);
+  await startSession(page, 'Glaciers');
+
+  await answer(page, 'hold this one');
+  await expect(page.getByTestId('msg-live')).toContainText('Thinking it over');
+  await page.getByTestId('turn-stop').click();
+  await expect(page.getByTestId('turn-interrupted')).toBeVisible();
+
+  await page.getByTestId('turn-retry').click();
+  await expect(page.getByTestId('msg-live')).toContainText('Thinking it over');
+  await release(key);
+  await expect(page.getByTestId('msg-tutor').last()).toHaveText(/and here is the answer\./);
+  await expect(page.getByTestId('turn-interrupted')).toHaveCount(0);
+});

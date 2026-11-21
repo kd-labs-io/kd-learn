@@ -301,7 +301,7 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - `acpModels` (agent → danh sách model) lưu trong `server_config`, mặc định từ env `KD_LEARN_ACP_MODELS` (JSON, ví dụ `{"claude-code":["claude-haiku-5-5"]}`; mặc định rỗng, tức là không cho model nào). Admin sửa qua `PUT /api/admin/config`.
   - `PUT /api/account/roles` từ chối cả bản đồ (`409 AcpModelNotAllowed`) khi một vai ACP chọn model ngoài danh sách. Model được kiểm lại **ở mỗi lượt**, nên admin bỏ model khỏi danh sách thì lượt bị trả `409 AcpModelNotAllowed` và không ghi gì.
   - `GET /api/account/settings` trả `acpModels` của các agent đã bật, để UI chỉ cho chọn trong danh sách.
-- **Báo admin khi bản build không có ACP:** `AdminConfig.acpAvailable`, lấy bằng cách nạp thử adapter một lần (kết quả giữ cho cả process). Màn admin hiện cảnh báo khi có agent đang bật mà `acpAvailable` là `false`. Bản build chạy ngay trong repo vẫn nạp được adapter từ `apps/web/node_modules`, nên `acpAvailable` phụ thuộc nơi chạy; test e2e so với câu trả lời của server.
+- **Báo admin khi bản build không có ACP:** `AdminConfig.acpAvailable`, lấy bằng cách nạp thử adapter một lần (kết quả giữ cho cả process), và chỉ khi có agent đang bật; không agent nào bật thì trả `true` mà không nạp. Màn admin hiện cảnh báo khi có agent đang bật mà `acpAvailable` là `false`. Bản build chạy ngay trong repo vẫn nạp được adapter từ `apps/web/node_modules`, nên `acpAvailable` phụ thuộc nơi chạy; test e2e so với câu trả lời của server.
 - **`GET /api/config` thêm `accounts`:** `false` khi server không bật tài khoản (thiếu `KD_LEARN_SECRET_KEY`). UI dựa vào đó để ẩn lối đăng nhập.
 - **Client (`packages/api/src/account-client.ts`):** `accountClient({ token })` cho mọi route tài khoản, admin và cấu hình; `streamSession(id, after)` đọc SSE bằng `fetch` (EventSource không gửi được Bearer). Lỗi là `ApiError { status, failure }`, giữ nguyên mã lỗi của server; không tới được server thì `status` 0, mã `Network`.
 - **Màn học dùng chung:** `LearnScreen` chỉ nhận một `LessonSource` (`learn/source.ts`): view, `RunnerState`, các action, `elsewhere`, `persistent`.
@@ -309,6 +309,8 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Tài khoản: `AccountLessonScreen` dùng `AccountLesson` (`learn/account-lesson.ts`): đọc snapshot, rồi theo stream từ `seq` cuối. Stream kết thúc thì nối lại từ `seq` cuối; thấy `seq` nhảy cóc thì đọc lại snapshot. Frame `running` thay toàn bộ phần chữ đang chạy. "Đang chạy" lấy từ frame `running` / `turn` của server, không lấy từ việc tab này đã gửi, nên tab mở lại giữa lượt thấy lượt đang chạy chứ không thấy "bị ngắt". 401 thì đăng xuất, 404 thì báo không có buổi này.
   - Lượt Prober đầu tiên: UI tài khoản vẫn gọi `auto`; `409 TurnInProgress` / `NothingToRun` của `auto` bị bỏ qua (server đang nối lượt lập plan, hoặc đã chạy rồi). Nhờ vậy buổi kẹt ở Planning sau khi server khởi động lại cũng chạy tiếp.
   - Tài khoản có nút "Dừng" khi đang chạy (`POST .../cancel`).
+  - Server từ chối bắt đầu lượt (mạng, 409) thì không có gì được ghi: `send` / `sendSide` trả `false` và ô nhập lấy lại chữ đã gõ; side chat hiện lỗi cả khi luồng không kết thúc bằng tin của người học.
+  - Lượt tự chạy (`auto`) được thử lại khi lượt đang chạy kết thúc mà buổi vẫn cần nó; có lỗi thì dừng, để không lặp.
 - **Token và chế độ:** `localStorage` giữ token (`kd-learn.auth`) và chế độ local (`kd-learn.mode`: `guest` / `demo`). Render ở server không thấy `localStorage`, nên lần render đầu ở cả hai phía là "chưa biết" (`useSyncExternalStore` với snapshot server riêng), tránh lệch khi hydrate. Đăng nhập, đăng xuất hoặc 401 thì xoá cache Query và các store buổi học của người trước.
 - **TanStack Query** (`@tanstack/react-query` 5.108, mục 2.5): cấu hình công khai, danh sách buổi, cài đặt, màn admin. `QueryClient` tạo trong `getRouter()` (mỗi request SSR một cái). Buổi học không đi qua Query: một store theo stream, không giữ log ở hai nơi.
 - **Route:** `/` chọn màn theo người dùng: tài khoản → danh sách buổi trên server; khách / demo → danh sách buổi local; chưa chọn → màn chọn chế độ (chỉ hiện lối vào server mở). Server chỉ có chế độ khách thì vào thẳng màn khách như phase 1. `/login`, `/register` (ô mã mời khi đăng ký theo lời mời), `/a/$sessionId` (buổi tài khoản; buổi khách vẫn ở `/s/$sessionId`), `/settings` (khách: key trên máy; tài khoản: kết nối và model theo vai), `/admin`.
@@ -317,15 +319,19 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
 - **Chuỗi:** khoảng 120 chuỗi mới ở `packages/i18n/messages/{en,vi}.json`.
 - **Test:**
   - Server: 2 test mới cho danh sách model ACP (từ chối khi đặt vai, kiểm lại ở mỗi lượt) và `acpAvailable`; env `KD_LEARN_ACP_MODELS` sai thì phần tài khoản không chạy.
+  - `AccountLesson` (`learn/account-lesson.test.ts`, 6 test, server giả bằng `fetch`): nối lại từ `seq` cuối khi stream kết thúc; bỏ event trùng; `seq` nhảy cóc thì đọc lại snapshot; phần chữ đang chạy; 404; 401; lượt bị từ chối.
   - `packages/api`: 4 test cho client (Bearer, giữ mã lỗi, lỗi mạng thành status 0, stream bỏ qua `: ping`).
-  - Playwright (`e2e/accounts.e2e.ts`, 6 test): chạy trên bản build thứ hai có tài khoản, DB tạm, và model giả tương thích OpenAI (`e2e/fake-openai.ts`) khai báo qua `KD_OPENAI_COMPATIBLE_ENDPOINTS`; không chặn request nào của trang, không thêm móc test vào code chạy thật.
+  - Playwright (`e2e/accounts.e2e.ts`, 8 test): chạy trên bản build thứ hai có tài khoản, DB tạm, và model giả tương thích OpenAI (`e2e/fake-openai.ts`) khai báo qua `KD_OPENAI_COMPATIBLE_ENDPOINTS`; không chặn request nào của trang, không thêm móc test vào code chạy thật.
     - **Nghiệm thu:** đăng ký, thêm kết nối, đặt model cho các vai, học một lượt; lượt sau bị model giả giữ lại, đóng tab giữa lượt, thả model, mở tab mới: lượt đã xong, không có banner "bị ngắt".
     - Tab mở giữa lượt thấy phần chữ đã có và theo lượt tới hết.
     - Chưa đặt model cho vai: trang chủ chỉ sang cài đặt, lượt trả `RoleNotConfigured`.
     - Đăng xuất, sai mật khẩu, đăng nhập lại.
     - Màn admin: người dùng, mã mời, cảnh báo ACP theo `acpAvailable`.
     - Demo: không key, model của server trả lời, hết ngân sách thì báo `DemoQuotaExceeded`.
-  - Giới hạn đăng ký 10 lần mỗi giờ theo địa chỉ làm các test song song hỏng lẫn nhau (cùng localhost). Server e2e đặt `KD_LEARN_TRUST_PROXY=1` và mỗi test gửi `X-Forwarded-For` riêng. Chạy `--repeat-each=4` trên Chromium: 104/104 xanh.
+    - Server từ chối lượt: chữ vẫn trong ô nhập, có lỗi; gửi lại được.
+    - "Dừng" huỷ lượt trên server, banner "bị ngắt", thử lại chạy tiếp.
+  - Kiểm tay trên bản build với `KD_LEARN_REGISTRATION=invite`: màn đăng ký có ô mã mời, mã sai báo `InvalidInvite`, mã admin tạo thì đăng ký được. Xem ảnh chụp màn chọn chế độ, đăng ký, trang chủ, cài đặt, admin ở desktop và điện thoại (390 px, tiếng Việt): không tràn ngang.
+  - Giới hạn đăng ký 10 lần mỗi giờ theo địa chỉ làm các test song song hỏng lẫn nhau (cùng localhost). Server e2e đặt `KD_LEARN_TRUST_PROXY=1` và mỗi test gửi `X-Forwarded-For` riêng. Chạy `--repeat-each=3` trên Chromium: 84/84 xanh.
   - Form đăng nhập chỉ hiện sau khi hydrate: chữ gõ vào ô do server render trước khi hydrate bị mất (thấy khi chạy song song).
 - **Không kiểm bằng model thật ở bước này:** đường server đã kiểm bằng Haiku ở bước 4 và 6; bước 8 chỉ thêm UI, đã chạy qua server thật với model giả.
 

@@ -44,12 +44,18 @@ const chunk = (response: ServerResponse, delta: Record<string, unknown>, finish:
     })}\n\n`,
   );
 
-const hold = (key: string): Promise<void> => {
+/** Waits for a release of `key`. A request whose client went away (a cancelled turn) stops waiting. */
+const hold = (key: string, response: ServerResponse): Promise<void> => {
   if (released.delete(key)) return Promise.resolve();
   return new Promise((resolve) => {
     const list = waiting.get(key) ?? [];
     list.push(resolve);
     waiting.set(key, list);
+    response.on('close', () => {
+      const index = list.indexOf(resolve);
+      if (index !== -1) list.splice(index, 1);
+      resolve();
+    });
   });
 };
 
@@ -86,7 +92,8 @@ const server = createServer((request, response) => {
       chunk(response, { role: 'assistant', content: 'What do you already know?' }, null);
     } else if (last.includes('hold')) {
       chunk(response, { role: 'assistant', content: 'Thinking it over' }, null);
-      await hold(key);
+      await hold(key, response);
+      if (response.destroyed) return;
       chunk(response, { content: ', and here is the answer.' }, null);
     } else {
       chunk(response, { role: 'assistant', content: `You said: ${last}` }, null);

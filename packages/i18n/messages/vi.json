@@ -211,5 +211,6 @@
   "welcome_demo_title": "Dùng thử demo",
   "welcome_demo_body": "Không cần key: demo chạy bằng key của server, có giới hạn số lượt.",
   "welcome_demo_action": "Dùng thử",
-  "welcome_nothing": "Server này hiện chưa mở lối vào nào."
+  "welcome_nothing": "Server này hiện chưa mở lối vào nào.",
+  "learn_not_found_account": "Buổi học này không tồn tại, hoặc thuộc tài khoản khác."
 }

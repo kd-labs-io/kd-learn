@@ -445,7 +445,8 @@ export const AdminConfig = Schema.Struct({
   acpMaxConcurrent: Schema.Int,
   /**
    * False when this build does not include the ACP adapter (built without `KD_BUILD_ACP=1`):
-   * enabled agents then fail every turn with `AcpUnavailable`. Unknown until the first check.
+   * enabled agents then fail every turn with `AcpUnavailable`. Checked only while an agent is
+   * enabled (loading the adapter resolves agent binaries); `true` when none is.
    */
   acpAvailable: Schema.Boolean,
 });

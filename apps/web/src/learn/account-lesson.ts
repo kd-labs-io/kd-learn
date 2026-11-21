@@ -286,13 +286,14 @@ export class AccountLesson implements LessonActions {
 
   // --- actions ---
 
-  private async start(request: StartTurnRequest) {
+  /** True when the server accepted the turn; false when nothing was started (text not saved). */
+  private async start(request: StartTurnRequest): Promise<boolean> {
     const isSide = request.kind === 'side';
     if (isSide) {
       this.pendingSide = request.threadId;
       this.sideFailure = undefined;
     } else {
-      if (this.main !== undefined || this.pendingMain) return;
+      if (this.main !== undefined || this.pendingMain) return false;
       this.pendingMain = true;
       this.mainFailure = undefined;
     }
@@ -309,6 +310,7 @@ export class AccountLesson implements LessonActions {
         else this.pendingMain = false;
         this.emit();
       }, PENDING_MS);
+      return true;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) this.deps.onUnauthorized();
       const failure = failureOf(error);
@@ -322,12 +324,13 @@ export class AccountLesson implements LessonActions {
         }
       }
       this.emit();
+      return false;
     }
   }
 
-  autoStart = () => {
+  autoStart = async () => {
     if (this.main !== undefined || this.pendingMain || this.mainFailure !== undefined) return;
-    return this.start({ kind: 'auto' });
+    await this.start({ kind: 'auto' });
   };
   send = (input: string) => this.start({ kind: 'send', input });
   retry = () => this.start({ kind: 'retry' });

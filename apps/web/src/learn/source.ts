@@ -19,11 +19,16 @@ export type LessonView =
 export interface LessonActions {
   /** The turn that needs no input (first Prober turn, planning), when it is due. */
   autoStart(): void | Promise<void>;
-  send(input: string): void | Promise<void>;
-  retry(): void | Promise<void>;
+  /**
+   * Resolves to `false` when nothing was kept (the server refused the turn), so the screen gives
+   * the text back. The guest runner writes the input before the request and resolves to nothing.
+   */
+  send(input: string): void | Promise<void | boolean>;
+  retry(): void | Promise<void | boolean>;
   skipStep(stepId: string): void | Promise<void>;
-  sendSide(threadId: string, content: string): void | Promise<void>;
-  retrySide(threadId: string): void | Promise<void>;
+  /** Like `send`: `false` when the message was not kept. */
+  sendSide(threadId: string, content: string): void | Promise<void | boolean>;
+  retrySide(threadId: string): void | Promise<void | boolean>;
   clearFailure(): void;
   /** Stops the running main turn. Only where turns outlive the page (accounts). */
   cancel?: () => void | Promise<void>;

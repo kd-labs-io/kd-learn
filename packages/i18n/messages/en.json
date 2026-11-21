@@ -211,5 +211,6 @@
   "welcome_demo_title": "Try the demo",
   "welcome_demo_body": "No key needed: it runs on the server's key, with a limited number of turns.",
   "welcome_demo_action": "Try the demo",
-  "welcome_nothing": "This server offers no way in right now."
+  "welcome_nothing": "This server offers no way in right now.",
+  "learn_not_found_account": "This session does not exist, or belongs to another account."
 }
