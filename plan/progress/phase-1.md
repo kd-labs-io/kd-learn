@@ -13,9 +13,51 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Bước 3: vòng turn, Prober → Teacher, side chat (`agent`) | Xong (2026-11-21). A4 xác nhận bằng model thật. Xem ghi chú bước 3 bên dưới |
 | Bước 4: API, server, SSE | Xong (2026-11-21). Hợp đồng `api`, handler `server`, route `/api/turns` và `/api/endpoints` trong `apps/web`, 1 lượt Haiku qua route. Xem ghi chú bước 4 bên dưới |
 | Bước 5: DB local | Xong (2026-11-21). Port `storage` chốt, driver `wa-sqlite` trong Worker của `packages/storage`, store phía client, Playwright chính thức, mã spike đã xoá. Xem ghi chú bước 5 bên dưới |
-| Bước 6: spike Markdown + KaTeX | Chưa bắt đầu |
+
+| Bước 6: spike Markdown + KaTeX | Xong (2026-11-21). Chọn `Markdown` của Astryx + KaTeX. Mã spike xoá hoặc chuyển thành component thật ở bước 7. Xem ghi chú bước 6 bên dưới |
 | Bước 7: UI | Chưa bắt đầu |
 | Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
+
+## Bước 6: spike Markdown và KaTeX khi stream (2026-11-21)
+
+Mã spike nằm ở `apps/web/src/spike/markdown/`, route `/spike/markdown` (`apps/web/src/routes/spike.markdown.tsx`), kịch bản Playwright `apps/web/scripts/spike-markdown.mjs`. Chạy: `pnpm build && pnpm build:spa`, rồi `node scripts/spike-markdown.mjs chromium|firefox|webkit [out.json] [thư mục ảnh chụp]`. Đã chạy trên Chromium, Firefox, WebKit của Playwright (macOS). **Bước 7: xoá toàn bộ mã spike này (kể cả dependency `@tanstack/markdown`), hoặc biến phần thắng thành component thật.**
+
+**Ứng viên (đọc tài liệu và phiên bản hiện hành trên npm ngày 2026-11-21):**
+
+| Ứng viên | Phiên bản | Kết quả |
+| --- | --- | --- |
+| `@tanstack/markdown` (không phụ thuộc, có extension) | 1.2.1 | Không có cú pháp công thức. Phải tự viết extension `$...$` / `$$...$$` (khoảng 80 dòng), hàm giữ lại cú pháp dở dang khi stream (khoảng 110 dòng), CSS; chế độ stream chỉ cắt heading và list rỗng ở cuối. Không có style, không tô màu code (cần TanStack Highlight) |
+| `Markdown` của Astryx (`isStreaming`, `components.math`) + `katex` | Astryx 0.7.16, KaTeX 0.19.1 | **Chọn.** Có sẵn: parse công thức khi truyền `components.math`, giữ lại `$`/`$$`/bảng/in đậm dở dang khi stream, làm mượt chữ theo khung hình (`useStreamingText`), style theo theme, `CodeBlock` tô màu, bảng cuộn được |
+
+Cả hai không cần `allowBuilds` (không có script cài đặt).
+
+**Trả lời C2:**
+
+| Câu hỏi | Kết quả (mỗi lần: 331 chunk, 1.455 ký tự, một chunk mỗi 25 ms; chạy cả bản SSR và SPA, cả ba trình duyệt, số khớp nhau) |
+| --- | --- |
+| TanStack Markdown hiển thị công thức khi stream? | Chỉ với extension tự viết. Hiển thị đúng khi đủ cú pháp, nhưng thô thì lộ cú pháp dở dang: `$` thấy được ở 88 khung hình, `\` ở 30, `\|` ở 23, khối `$$` chưa đóng hiện chữ nguồn (66 khung hình), 2 công thức bị dựng lại, 2 lần nội dung co lại (tối đa 26 px, một lần khi mở khối code). Có hàm giữ lại phần dở dang thì hết `$`, `\`, `\|`, hết dựng lại, còn `**` lộ 14 khung hình và một lần co 26 px |
+| Astryx `Markdown` + KaTeX khi stream? | Không lộ `$`, `\`, `*`, `\|` (chỉ dấu backtick mở của code inline, 3 khung hình), không dựng lại công thức, không co nội dung, không có placeholder. Hiển thị chậm hơn chunk tới tối đa 6-7% văn bản, hết chậm lúc chunk cuối, khi kết thúc stream không nhảy (0 ký tự, 0 px). Kết quả cuối khớp bản dựng một lần (khác ở class, style, id của animation). Chữ `$5 hoặc $10` giữ nguyên là chữ |
+| Escape HTML mặc định? | Có, cả hai. Bộ thử độc hại (script, `<img onerror>`, iframe srcdoc, svg onload, `<a href=javascript:>`, link và ảnh Markdown `javascript:`/`data:`, thực thể, ô bảng, danh sách, `<style>`) hiện thành chữ, không có phần tử script/iframe/svg/style, thuộc tính `on*` hay URL `javascript:` ở khung hình nào (MutationObserver), `window.__pwned` không bị đặt, không có hộp thoại, bấm mọi link không gây gì. Link `javascript:` bị bỏ thành chữ. KaTeX với `trust: false`: `\href`, `\url`, `\htmlClass`, `\includegraphics` không hoạt động, vòng `\def` dừng nhờ `maxExpand`. **Còn lại: ảnh `![](https://...)` vẫn được tải** (Firefox ghi nhận request tới ngoài), xem rủi ro 21 |
+| Bản SSR, SPA? | Render tĩnh cả đoạn ở lần render đầu, bản SSR không lỗi hydrate (cả ba trình duyệt), số công thức, bảng, khối code khớp. Mở thẳng `/spike/markdown` trên bản SPA bị React #418 ở WebKit, y như `/spike/sqlite` ở bước 1 (không liên quan Markdown) |
+
+**Đo (Chromium; 1.455 ký tự = 331 chunk mỗi 25 ms, và 7.275 ký tự = 1.624 chunk mỗi 8 ms):**
+
+| | TanStack + extension | Astryx |
+| --- | --- | --- |
+| CPU luồng chính cả lượt (1.455 ký tự), `TaskDuration` | 791 ms (2,4 ms/chunk; script 29, layout 127) | 1.605 ms (4,8 ms/chunk; script 527, layout 132) |
+| CPU, đoạn dài 5 lần | 3.469 ms (2,1 ms/chunk) | 5.203 ms (3,2 ms/chunk) |
+| `flushSync` mỗi chunk (phần đồng bộ) | 0,7-0,8 ms (Firefox 1,2-1,7; WebKit 0,8-1,0) | 1,0-1,1 ms (Firefox 1,7-2,5; WebKit 1,2-1,6) |
+| Khung hình tối đa | 16,8-33 ms (Firefox 25-33; WebKit 28-39), không khung nào quá 33 ms ở Chromium | 16,8 ms (Firefox 17-33; WebKit 35-47), tối đa 3 khung quá 33 ms trong một lượt ở WebKit |
+| Bundle nạp lười (gzip -9) | 19,8 kB (7,6 kB), đã gồm extension | 308 kB (102 kB: `Markdown`, parser, `CodeBlock`, `Table`) |
+
+Dùng chung: KaTeX JS 260 kB (76,6 kB gzip), CSS 30 kB (7,9 kB gzip), 19 font woff2 tổng 256 kB (trình duyệt chỉ tải font dùng tới); bản build còn chép thêm woff 303 kB và ttf 514 kB không dùng tới. Chunk chính `index-*.js` 539,5 kB trước, 554,8 kB sau (khoảng 15 kB, 4,5 kB gzip, do mã route spike; mất khi xoá spike). CPU lúc nghỉ 10 s: 0,8 ms, nên số CPU là của chính lượt stream. CPU của Astryx gấp khoảng hai lần, vẫn thoải mái so với ngân sách khung hình.
+
+**Việc cho bước 7:**
+
+- Component thật `LessonMarkdown` (đặt trong `packages/ui`): `Markdown` của Astryx với `isStreaming`, `components.math` dựa trên KaTeX nạp lười. KaTeX: `trust: false`, `strict: 'ignore'`, `maxSize`, `maxExpand`, `throwOnError: false`; bọc phần công thức bằng `memo` và cache kết quả (như `math.tsx`). Không cần `stabilize.ts` (Astryx đã giữ lại cú pháp dở dang).
+- Chặn ảnh từ model: ghi đè `components.image` (hiện chữ hoặc link, không tải), vì ảnh ngoài là kênh rò rỉ dữ liệu và theo dõi (rủi ro 21). Quyết định link: `onLinkClick`, mở ngoài kèm `rel="noopener noreferrer"`.
+- Giảm KaTeX: dùng bản CSS chỉ khai báo woff2 (bản build chép thừa woff và ttf, tới 817 kB, nặng cho gói Capacitor). Chọn ngôn ngữ UI cho `aria` của công thức nếu cần.
+- Highlight và Pacer ở [mục 2.5](../02-ky-thuat.md) không cần cho bài dạy; xoá `@tanstack/markdown` khỏi `apps/web/package.json`. Lượt Teacher lỗi giữa chừng (stream bị ngắt): kiểm lại `isStreaming` trở về `false`.
 
 ## Bước 4: API và server (2026-11-21)
 

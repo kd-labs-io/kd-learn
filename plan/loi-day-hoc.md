@@ -121,7 +121,7 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 - Dung lượng bundle và thời gian mở DB lần đầu là bao nhiêu?
 - TanStack DB (RC) có nằm trên driver này được không, hay chỉ dùng như store phản ứng phía trên port?
 
-**C2. Markdown và KaTeX:**
+**C2. Markdown và KaTeX:** đã trả lời (2026-11-21), kết quả ở [progress/phase-1.md](progress/phase-1.md) (phần bước 6) và [mục 2.4](02-ky-thuat.md).
 
 - TanStack Markdown hiển thị công thức (inline và block) khi đang stream có bị nhấp nháy hay vỡ không?
 - Có giữ mặc định escape HTML không?

@@ -18,6 +18,7 @@
 | Biểu đồ | TanStack Charts, màu lấy từ token Astryx qua `var(--...)` |
 | DB | SQLite ở mọi nơi: SQLite trên server, SQLite WASM (OPFS) cho khách |
 | Driver SQLite khách | `@journeyapps/wa-sqlite` (ghim 2.0.x) với `OPFSCoopSyncVFS`, chạy trong Worker do `packages/storage` tự viết. Không cần COOP/COEP (không xung đột với iframe sandbox ở phase 5); nhiều tab cùng mở và ghi được; transaction chạy trọn trong Worker. Chọn sau spike bước 1 phase 1 (2026-11-21, [progress/phase-1.md](progress/phase-1.md)). Loại: VFS `opfs` của `@sqlite.org/sqlite-wasm` (cần COOP/COEP), `opfs-sahpool` (chỉ một tab mở được DB) |
+| Markdown | `Markdown` của Astryx (`isStreaming`) kèm KaTeX qua `components.math` (spike 2026-11-21, [progress/phase-1.md](progress/phase-1.md)). Escape HTML mặc định; KaTeX dùng `trust: false`, `maxExpand` giới hạn, `throwOnError: false`; ảnh trong Markdown do model sinh phải chặn hoặc cho qua danh sách cho phép (rủi ro 21). Nạp lười (KaTeX khoảng 77 kB gzip JS, 8 kB CSS, font woff2 khoảng 256 kB) |
 | Lõi | Effect v4 cho service, lỗi, đồng thời, schema, job nền |
 | Model | TanStack AI cho backend API, qua adapter tự viết sang `Stream` của Effect ([mục 3.3](03-kien-truc.md)). Không dùng module AI của Effect, chưa dùng `@tanstack/ai-effect` (còn 0.x) |
 | Provider | Anthropic, OpenAI, Google Gemini, endpoint tương thích OpenAI (admin khai báo danh sách được phép) |
@@ -37,10 +38,10 @@ Mỗi phase chỉ thêm thư viện khi thật sự cần. Các thư viện này
 | AI | Backend API của port AI | 1 | Chốt |
 | Query | Lấy dữ liệu từ server ở chế độ tài khoản. Stream một lượt học vẫn đi qua SSE | 1 | Chốt |
 | Form | Cài đặt, admin, chọn model theo vai, hồ sơ dạy học, nhập key. Schema lấy từ Effect Schema qua Standard Schema | 1 | Chốt |
-| Markdown | Hiển thị câu trả lời của Teacher khi đang stream (chế độ AI streaming, mặc định escape HTML) | 1 | Cần spike: công thức toán (KaTeX). Nếu không đạt thì dùng `Markdown` của Astryx. Chỉ dùng một bộ hiển thị Markdown |
-| Highlight | Đoạn code trong bài dạy, màu tô code nối với token Astryx | 1 | Chốt |
+| Markdown | Hiển thị câu trả lời của Teacher khi đang stream | 1 | Không dùng ở phase 1 (spike 2026-11-21): không có cú pháp công thức, không giữ lại cú pháp dở dang khi stream, không có style; phải tự viết extension, hàm giữ lại phần dở dang và CSS. Dùng `Markdown` của Astryx ([mục 2.4](02-ky-thuat.md)) |
+| Highlight | Đoạn code ngoài `Markdown` của Astryx, màu tô code nối với token Astryx | 1 | Bài dạy không cần: `CodeBlock` trong `Markdown` của Astryx đã tô màu. Chỉ dùng nếu cần tô code ở chỗ khác |
 | Virtual | Lịch sử buổi học dài, danh sách mệnh đề, danh sách bài luyện tập | 1 | Chốt |
-| Pacer | Chỉ phía UI: gộp các lần render khi stream, debounce ô tìm kiếm. Phía server dùng Effect | 1 | Khi cần |
+| Pacer | Chỉ phía UI: debounce ô tìm kiếm. Phía server dùng Effect | 1 | Khi cần. Gộp render khi stream đã nằm trong `Markdown` của Astryx (`useStreamingText`) |
 | DB (1.0 RC) | Store phản ứng phía client, nằm trên port `storage` cho DB local của khách | — | Không dùng ở phase 1 (spike 2026-11-21): chỉ chạy phía client (không SSR), adapter lưu bền của nó lưu JSON theo collection, không dùng chung được với driver server. Chạy được khi đặt phía trên port; xem lại ở phase 3 nếu màn hình graph cần live query |
 | Charts | Tiến độ học, mức nắm vững, lịch học, hạn mức demo; thử cho màn hình graph | 3 | Chốt |
 | Hotkeys (beta) | Phím tắt khi luyện tập | 3 | Khi cần |
