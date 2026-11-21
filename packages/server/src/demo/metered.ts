@@ -1,10 +1,8 @@
 // Wraps the AI port for one demo turn: caps model calls at the reservation and output tokens per
-// call, and counts the calls made so the turn can settle (plan tai-khoan.md A8).
-// The count assumes the tool loop is the only source of extra calls. A structured `output` with no
-// tools is one provider call (TanStack AI 1.4 skips the agent loop and makes only the structured
-// call, or harvests it from the one call in native combined mode): extraction counts one per step.
-// With tools and `output` together the structured call may come on top of `maxSteps`; nothing
-// sends that today.
+// call (the lower of the request's own cap and the limit), and counts the calls made so the turn
+// can settle (plan tai-khoan.md A8). The count assumes the tool loop is the only source of extra
+// calls. A structured `output` without tools is one call (TanStack skips the agent loop then, as
+// the Practitioner does); with tools it may add a final call outside `maxSteps`.
 import { Effect, Layer, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import type { TurnEvent, TurnRequest } from '@kd-learn/ai/port';
@@ -16,6 +14,8 @@ import type { TurnEvent, TurnRequest } from '@kd-learn/ai/port';
 export const DEMO_ROLE_OUTPUT_CAPS = {
   /** Extractor, auditor and merge: the step 4 check needed 16,384 for a Vietnamese session. */
   extractor: 16_384,
+  /** Practitioner: 8,000 to write a set (thinking counts as output); grading asks for 4,000. */
+  practitioner: 8000,
 } as const;
 
 export interface Meter {
@@ -41,7 +41,14 @@ export const meteredAi = (
           let inResults = false;
           const steps = Math.min(request.maxSteps ?? left, left);
           return port
-            .runTurn({ ...request, maxSteps: steps, maxOutputTokens: limits.maxOutputTokens })
+            .runTurn({
+              ...request,
+              maxSteps: steps,
+              maxOutputTokens: Math.min(
+                request.maxOutputTokens ?? limits.maxOutputTokens,
+                limits.maxOutputTokens,
+              ),
+            })
             .pipe(
               Stream.tap((event: TurnEvent<A>) =>
                 Effect.sync(() => {

@@ -50,7 +50,21 @@ import {
   UpdateUserRequest,
 } from './contract.ts';
 import type { Failure, RoleModels } from './contract.ts';
-import type { SavedProfile } from '@kd-learn/core';
+import {
+  ACCOUNT_PRACTICE_PATH,
+  AnswerRequest,
+  ExerciseView,
+  GradeAnswerRequest,
+  GradeAnswerResponse,
+  IssueExercisesRequest,
+  IssueExercisesResponse,
+  PRACTICE_GRADE_PATH,
+  PRACTICE_ISSUE_PATH,
+  PracticeList,
+  PracticeView,
+  StartPracticeRequest,
+} from './practice.ts';
+import type { ExerciseAnswer, SavedProfile } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
 /** Client-side codes of `ApiError` (status 0): the server never sends these. */
@@ -164,6 +178,11 @@ const bodyOf = <S extends Schema.Top>(schema: S, value: S['Type']) => ({
   value,
 });
 
+const practicePath = (practiceId: string) =>
+  `${ACCOUNT_PRACTICE_PATH}/${encodeURIComponent(practiceId)}`;
+const exercisePath = (exerciseId: string) =>
+  `${ACCOUNT_PRACTICE_PATH}/exercises/${encodeURIComponent(exerciseId)}`;
+
 const sessionPath = (sessionId: string) => `${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`;
 
 /** The account API as Effects. Build one per token. */
@@ -264,6 +283,54 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         method: 'POST',
         path: `${sessionPath(sessionId)}/skip`,
         body: bodyOf(SkipStepRequest, { stepId }),
+      }),
+
+    // Guest and demo practice (no token needed): the answer is the batch to append locally.
+    issueExercises: (input: IssueExercisesRequest) =>
+      go({
+        method: 'POST',
+        path: PRACTICE_ISSUE_PATH,
+        body: bodyOf(IssueExercisesRequest, input),
+        response: codec(IssueExercisesResponse),
+      }),
+    gradeAnswer: (input: GradeAnswerRequest) =>
+      go({
+        method: 'POST',
+        path: PRACTICE_GRADE_PATH,
+        body: bodyOf(GradeAnswerRequest, input),
+        response: codec(GradeAnswerResponse),
+      }),
+
+    // Account practice: the server writes the knowledge log.
+    practices: () =>
+      go({ method: 'GET', path: ACCOUNT_PRACTICE_PATH, response: codec(PracticeList) }),
+    practice: (practiceId: string) =>
+      go({ method: 'GET', path: practicePath(practiceId), response: codec(PracticeView) }),
+    startPractice: (input: StartPracticeRequest = {}) =>
+      go({
+        method: 'POST',
+        path: ACCOUNT_PRACTICE_PATH,
+        body: bodyOf(StartPracticeRequest, input),
+        response: codec(PracticeView),
+      }),
+    endPractice: (practiceId: string) =>
+      go({
+        method: 'POST',
+        path: `${practicePath(practiceId)}/end`,
+        response: codec(PracticeView),
+      }),
+    answerExercise: (exerciseId: string, answer: ExerciseAnswer) =>
+      go({
+        method: 'POST',
+        path: `${exercisePath(exerciseId)}/answer`,
+        body: bodyOf(AnswerRequest, { answer }),
+        response: codec(ExerciseView),
+      }),
+    gradeExercise: (exerciseId: string) =>
+      go({
+        method: 'POST',
+        path: `${exercisePath(exerciseId)}/grade`,
+        response: codec(ExerciseView),
       }),
 
     adminConfig: () => go({ method: 'GET', path: ADMIN_CONFIG_PATH, response: codec(AdminConfig) }),

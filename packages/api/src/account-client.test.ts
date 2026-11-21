@@ -45,6 +45,32 @@ describe('account client', () => {
     expect(error.failure.code).toBe('TurnInProgress');
   });
 
+  it('calls the practice paths and decodes the public exercise view', async () => {
+    const exercise = {
+      exerciseId: 'x/1',
+      practiceId: 'p1',
+      type: 'multipleChoice',
+      propositionIds: ['a'],
+      edgeIds: [],
+      content: { type: 'multipleChoice', question: 'Q?', options: ['a', 'b'] },
+      issuedAt: 1,
+    };
+    const { fetch, calls } = fakeFetch(() => Response.json(exercise));
+    const client = accountClient({ fetch, token: 'tok' });
+    const view = await Effect.runPromise(
+      client.answerExercise('x/1', { type: 'multipleChoice', choice: 1 }),
+    );
+    expect(view.content).toEqual(exercise.content);
+    expect(calls[0]?.url).toBe('/api/account/practice/exercises/x%2F1/answer');
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      answer: { type: 'multipleChoice', choice: 1 },
+    });
+    await Effect.runPromise(Effect.ignore(client.endPractice('p1')));
+    expect(calls[1]?.url).toBe('/api/account/practice/p1/end');
+    await Effect.runPromise(Effect.ignore(client.gradeExercise('x1')));
+    expect(calls[2]?.url).toBe('/api/account/practice/exercises/x1/grade');
+  });
+
   it('turns a network failure into status 0', async () => {
     const fetch = (() => Promise.reject(new TypeError('offline'))) as typeof globalThis.fetch;
     const error = await failureOf(accountClient({ fetch }).sessions());

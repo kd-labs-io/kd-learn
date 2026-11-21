@@ -26,6 +26,7 @@ import { Route as ApiAdminSplatRouteImport } from './routes/api.admin.$'
 import { Route as ApiAdminInvitesRouteImport } from './routes/api.admin.invites'
 import { Route as ApiAuthActionRouteImport } from './routes/api.auth.$action'
 import { Route as ApiKnowledgeExtractRouteImport } from './routes/api.knowledge.extract'
+import { Route as ApiPracticeSplatRouteImport } from './routes/api.practice.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -112,6 +113,11 @@ const ApiKnowledgeExtractRoute = ApiKnowledgeExtractRouteImport.update({
   path: '/api/knowledge/extract',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPracticeSplatRoute = ApiPracticeSplatRouteImport.update({
+  id: '/api/practice/$',
+  path: '/api/practice/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/practice/$': typeof ApiPracticeSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/practice/$': typeof ApiPracticeSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/practice/$': typeof ApiPracticeSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/practice/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/practice/$'
   id:
     | '__root__'
     | '/'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/practice/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -249,6 +261,7 @@ export interface RootRouteChildren {
   ApiAdminInvitesRoute: typeof ApiAdminInvitesRoute
   ApiAuthActionRoute: typeof ApiAuthActionRoute
   ApiKnowledgeExtractRoute: typeof ApiKnowledgeExtractRoute
+  ApiPracticeSplatRoute: typeof ApiPracticeSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeExtractRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/practice/$': {
+      id: '/api/practice/$'
+      path: '/api/practice/$'
+      fullPath: '/api/practice/$'
+      preLoaderRoute: typeof ApiPracticeSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminInvitesRoute: ApiAdminInvitesRoute,
   ApiAuthActionRoute: ApiAuthActionRoute,
   ApiKnowledgeExtractRoute: ApiKnowledgeExtractRoute,
+  ApiPracticeSplatRoute: ApiPracticeSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
