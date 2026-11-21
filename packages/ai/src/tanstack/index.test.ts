@@ -203,6 +203,16 @@ describe('runTurn (TanStack AI) error paths', () => {
       }).pipe(Stream.runCollect),
     );
 
+    // The demo meter (packages/server/src/demo/metered.ts) relies on this order: one `Usage` per
+    // model call, which can land between a tool call and its result.
+    expect(events.map((e) => e._tag)).toEqual([
+      'ToolCall',
+      'Usage',
+      'ToolResult',
+      'TextDelta',
+      'Usage',
+      'Finish',
+    ]);
     expect(requests).toHaveLength(2);
     const result = events.find((e) => e._tag === 'ToolResult');
     expect(result).toMatchObject({ _tag: 'ToolResult', id: 'toolu_1' });

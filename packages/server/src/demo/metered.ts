@@ -1,5 +1,7 @@
 // Wraps the AI port for one demo turn: caps model calls at the reservation and output tokens per
 // call, and counts the calls made so the turn can settle (plan tai-khoan.md A8).
+// The count assumes the tool loop is the only source of extra calls. A request with a structured
+// `output` may add a final call outside `maxSteps`; the agent sends none today. Revisit if it does.
 import { Effect, Layer, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import type { TurnEvent, TurnRequest } from '@kd-learn/ai/port';
@@ -24,20 +26,25 @@ export const meteredAi = (
           if (left <= 0) return Stream.die(new Error('The demo reservation is used up.'));
           meter.calls += 1;
           let calls = 1;
-          let inTools = false;
+          let inResults = false;
           const steps = Math.min(request.maxSteps ?? left, left);
           return port
             .runTurn({ ...request, maxSteps: steps, maxOutputTokens: limits.maxOutputTokens })
             .pipe(
               Stream.tap((event: TurnEvent<A>) =>
                 Effect.sync(() => {
-                  const tool = event._tag === 'ToolCall' || event._tag === 'ToolResult';
-                  // A round of tool calls means one more model call, unless the cap ends the loop.
-                  if (tool && !inTools && calls < steps) {
-                    calls += 1;
-                    meter.calls += 1;
+                  // A round of tool results means one more model call, unless the cap ends the
+                  // loop. The adapter sends `Usage` between a call and its result: skip it.
+                  if (event._tag === 'Usage') return;
+                  if (event._tag === 'ToolResult') {
+                    if (!inResults && calls < steps) {
+                      calls += 1;
+                      meter.calls += 1;
+                    }
+                    inResults = true;
+                  } else {
+                    inResults = false;
                   }
-                  inTools = tool;
                 }),
               ),
             );

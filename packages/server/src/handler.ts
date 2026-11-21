@@ -6,10 +6,11 @@
 // Keys (plan A7, risk 19): the request is never logged, log entries carry only whitelisted scalar
 // fields, error text is built from paths and codes (not from input values), and every outgoing
 // message is redacted against the request's key.
+import type { EventLog } from '@kd-learn/core';
 import { meteredAi, type Meter } from './demo/metered.ts';
 import type { DemoGate } from './demo/service.ts';
 import { Cause, Effect, Layer, Result, Schema, Stream } from 'effect';
-import { runSideChat, runTurn } from '@kd-learn/agent';
+import { defaultProfile, runSideChat, runTurn } from '@kd-learn/agent';
 import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
 import { AiPort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
@@ -56,6 +57,24 @@ export interface HandlerDeps {
   /** Demo mode (plan A8). Absent: closed. */
   readonly demo?: () => Promise<DemoGate>;
 }
+
+const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8}){0,3}$/;
+
+/** The log with the server's default profile in place of the client's (demo mode). */
+export const withServerProfile = (log: EventLog): EventLog =>
+  log.map((event) =>
+    event._tag === 'SessionCreated'
+      ? {
+          ...event,
+          profile: {
+            ...defaultProfile,
+            language: LANGUAGE_TAG.test(event.profile.language)
+              ? event.profile.language
+              : defaultProfile.language,
+          },
+        }
+      : event,
+  );
 
 /** A demo turn sends the whole log on the server's key: keep it much smaller than a guest's. */
 export const DEMO_MAX_REQUEST_BYTES = 256 * 1024;
@@ -197,7 +216,8 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   if (Result.isFailure(decoded)) {
     return reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure));
   }
-  const { model: choice, turn, log: eventLog } = decoded.success;
+  const { model: choice, turn } = decoded.success;
+  let eventLog = decoded.success.log;
   const misconfigured = () =>
     reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
 
@@ -238,6 +258,9 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
           'The demo has used all of its calls for now. Try again later, or use your own key.',
         );
     }
+    // The prompts come from the profile in the log, which the client sends: on the server's key,
+    // only the server's own prompts run. The learner keeps their language.
+    eventLog = withServerProfile(eventLog);
     const { reservation } = reserved;
     const meter: Meter = { calls: 0 };
     model = gate.model;

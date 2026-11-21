@@ -225,7 +225,8 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Hết ngân sách thì trả `429 DemoQuotaExceeded` và không gọi provider.
 - **Quyết toán:**
   - Khi stream kết thúc (xong, lỗi, hoặc client ngắt), phần giữ mà không dùng được trả lại.
-  - Cách đếm: lần gọi đầu tính 1. Mỗi vòng gọi tool tính thêm 1 lần cho lần gọi model sau nó, trừ khi `maxSteps` đã chặn lần gọi đó. Vì vậy số đếm có thể cao hơn thực tế, không bao giờ thấp hơn.
+  - Cách đếm: lần gọi đầu tính 1. Mỗi vòng kết quả tool (`ToolResult`) tính thêm 1 lần cho lần gọi model sau nó, trừ khi `maxSteps` đã chặn lần gọi đó. Vì vậy số đếm có thể cao hơn thực tế, không bao giờ thấp hơn. Adapter thật phát `Usage` chen giữa `ToolCall` và `ToolResult` (đã khoá thứ tự này bằng test ở adapter), nên bộ đếm bỏ qua `Usage`: một lượt có gọi tool tính đúng 2 lần.
+  - Client ngắt giữa lượt: vẫn quyết toán theo số lần đã gọi (test: giữ 4, còn 1). Response mà client không bao giờ đọc body thì có thể giữ nguyên phần đã giữ (tính cao).
   - Lượt lỗi vẫn bị tính.
   - Process chết giữa lượt thì phần đã giữ không được trả lại.
 - **Trần mỗi lượt:**
@@ -237,9 +238,11 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Demo đóng (`403 DemoModeDisabled`) khi công tắc tắt, trần bằng 0, chưa có model demo, hoặc endpoint của model không còn trong danh sách.
   - `GET /api/config` chỉ trả `demoMode: true` khi demo chạy được.
   - Không đọc được DB thì trả 500 và không gọi provider.
+- **Prompt:** prompt hệ thống lấy từ `profile` trong log, mà log do client gửi. Vì vậy với demo, server thay `profile` bằng profile mặc định của server và chỉ giữ ngôn ngữ (tag BCP 47 hợp lệ, nếu không thì dùng `en`). Client vẫn tự chọn chủ đề và lịch sử hội thoại. Phần này được chặn bởi ngân sách và trần token, xem rủi ro 29.
 - **Key:** frame và log được xoá key demo y như key của khách. Log của lượt demo ghi tên model.
 - **Test:**
-  - 13 test mới, gồm:
+  - 14 test mới, gồm:
+    - prompt trong log của client bị thay bằng prompt của server;
     - lần gọi thứ N+1 bị từ chối và AI giả không được gọi;
     - hai request đồng thời ở mép trần: đúng một request chạy;
     - nâng trần thì dùng lại được; sang ngày mới đếm lại;
