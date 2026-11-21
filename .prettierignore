@@ -9,3 +9,4 @@ plan/
 DESIGN.md
 AGENTS.md
 **/src/paraglide/
+.claude/

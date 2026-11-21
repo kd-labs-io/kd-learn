@@ -9,7 +9,7 @@
 | Plan phần chính | Xong (2026-11-21). Chốt: một graph mỗi người, demo dùng được graph và luyện tập (tính chung ngân sách), bốn loại bài tập đầu tiên |
 | Bước 0: spike hình graph (C1) | Xong (2026-11-21). TanStack Charts không có kéo node; chọn sigma 4 + graphology (WebGL, kéo 60 fps với 3.000 node). Xem ghi chú bước 0 bên dưới |
 | Bước 1: spike extraction với Haiku (C2, C3) | Xong (2026-11-21). Pipeline 3 lần gọi (extractor, auditor kiểm cả mệnh đề và cạnh, merge theo ứng viên của từng mệnh đề), chọn lát theo từ vựng K = 5 mỗi mệnh đề, giữ 5 quan hệ. Không dùng TanStack DB. Khoảng $0,007 mỗi buổi với Haiku. Xem ghi chú bước 1 bên dưới |
-| Bước 2: log kiến thức (core, storage) | Chưa bắt đầu |
+| Bước 2: log kiến thức (core, storage) | Xong (2026-11-21). Event và projection của graph trong `core`, chặn trích hai lần, hàm chọn lát hai tầng; bảng `knowledge_events` ở cả ba driver (migration khách v3, server v7), ghi có điều kiện theo `expectedLastSeq` (bắt buộc) qua `appendKnowledgeChecked`. Sự kiện luyện tập và mức nắm vững dời sang bước 6. Xem ghi chú bước 2 bên dưới |
 | Bước 3: hồ sơ dạy học v2, vai mới | Xong (2026-11-21). `TeachingProfile` thêm `name` và bốn prompt tuỳ chọn, `resolveProfile` điền từ hồ sơ mặc định; hồ sơ lưu qua port ở cả hai driver; `GET` / `PUT` / `DELETE /api/account/profile`; vai `practitioner` / `extractor` chưa đặt thì dùng model của `teacher`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: pipeline extraction (agent) | Chưa bắt đầu |
 | Bước 5: extraction trên server | Chưa bắt đầu |
@@ -34,6 +34,37 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 2: log kiến thức (2026-11-21)
+
+**Core** (`packages/core/src/knowledge-event.ts`, `knowledge.ts`, `slice.ts`):
+
+- `KnowledgeEvent` là union riêng, không mở rộng `DomainEvent`. Event: `PropositionAdded`, `PropositionSourced`, `PropositionRevised`, `PropositionsMerged {from, into}`, `PropositionRetired`, `EdgeAdded`, `EdgeRemoved`, `ExtractionStarted`, `SessionExtracted`, `ExtractionFailed`.
+  - **Thêm `PropositionSourced`** (không có trong danh sách A1): merge thấy mệnh đề mới trùng mệnh đề cũ thì cần ghi thêm nguồn cho mệnh đề cũ mà không đổi câu. `PropositionRevised` chỉ đổi câu.
+  - Giới hạn độ dài: câu mệnh đề 1.000 ký tự, chủ đề 200, nhãn cạnh 200.
+- `projectKnowledge(log)` trả `Result<KnowledgeGraph, ProjectionError>` (dùng lại `ProjectionError` của buổi học). Log rỗng là graph rỗng. Quy tắc:
+  - id mệnh đề và id cạnh không dùng lại, kể cả sau khi bỏ hay gộp;
+  - event tham chiếu mệnh đề không có, đã bỏ hay đã bị gộp thì bị từ chối (thông báo nói rõ gộp vào đâu); `resolveProposition` đi theo chuỗi gộp cho UI;
+  - bỏ mệnh đề thì bỏ luôn các cạnh của nó;
+  - gộp: nguồn chuyển sang mệnh đề giữ lại, cạnh chuyển đầu; cạnh thành vòng tự thân hoặc lặp cạnh có sẵn thì bỏ; gộp tạo chu trình thì bị từ chối;
+  - cạnh: cấm vòng tự thân, cấm lặp (cùng quan hệ, cùng hai đầu; `contrastsWith` không xét chiều);
+  - **chu trình:** `requires` và `implies` đọc về cùng một chiều "trước → sau" (`A implies B`: A trước B; `A requires B`: B trước A), rồi cấm chu trình trên hợp của hai quan hệ. Vậy `A implies B` cùng `A requires B` là mâu thuẫn và bị từ chối, còn `B implies A` cùng `A requires B` thì hợp lệ;
+  - extraction: `SessionExtracted` hay `ExtractionFailed` phải kết thúc một lần thử đã bắt đầu cho đúng buổi đó và chưa kết thúc; `SessionExtracted` thứ hai cho cùng buổi bị từ chối; sau khi buổi đã trích thì không được `ExtractionStarted` nữa. Nhiều lần thử đang mở cùng lúc thì được (lần bị ngắt vẫn mở cho tới khi runner ghi `Interrupted`).
+- `extractionStatus` (`none` / `running` / `failed` / `extracted`) và `shouldAutoExtract` (chỉ đúng khi buổi chưa có lần thử nào, A3).
+- **Lát (A4):** `tokenize` lấy từ spike bước 1 (bỏ stopword, bỏ từ một ký tự, cắt `s` / `es` số nhiều), mở rộng từ ASCII sang mọi chữ Unicode, chuẩn hoá NFC, thêm stopword tiếng Việt. `selectSessionSlice(graph, sessionQueryText(session))`: tối đa 200 mệnh đề, mặc định 96 KiB JSON; `selectCandidates(slice, text)`: K = 5. Bỏ mệnh đề không chung từ nào; hoà điểm thì xếp theo id, để khách và server chọn giống nhau. `sessionQueryText` gồm chủ đề, tên và mục tiêu các bước, tóm tắt và chỗ hổng của đánh giá (không gồm các lượt).
+
+**Storage:**
+
+- Port thêm `appendKnowledge(events, { expectedLastSeq })`, `readKnowledge` và thay đổi `KnowledgeChanged`. `expectedLastSeq` **bắt buộc** và được kiểm trong transaction ghi: log đã đi tiếp thì trả `KnowledgeConflict` (lỗi riêng của hàm này, không thêm vào `StorageError`) và không ghi gì. Bắt buộc vì log chặt và chỉ ghi thêm: một lô ghi mù không dựng được (ví dụ `ExtractionStarted` cho buổi đã trích, ghi từ một tab có dữ liệu cũ) sẽ làm hỏng vĩnh viễn cả graph của người đó.
+- `appendKnowledgeChecked(storage, build)` (`packages/storage/src/port/knowledge.ts`) là đường ghi cho bước 4–7: đọc log, dựng graph, `build(graph, log)` tạo lô, chạy projection log + lô (không hợp lệ thì `KnowledgeRejected {index, message}` với `index` tính trong lô, không ghi gì), ghi với `expectedLastSeq = log.length - 1`; gặp `KnowledgeConflict` thì đọc lại và dựng lại lô, tối đa 3 lần. Runner extraction đổi `KnowledgeRejected` thành `ExtractionFailed {code: 'Conflict'}` (A3).
+- Bảng `knowledge_events (owner, seq, id, tag, at, payload)`, khoá `(owner, seq)`, id duy nhất **theo owner** (id của người này không làm lô của người khác hỏng), trigger chặn sửa / xoá. Khách: migration v3, `owner = 'guest'`. Server: migration v7, `owner` là user id, chỉ qua `forUser`.
+- Test: bộ contract của port (đọc ghi, lô có id trùng bị bỏ cả lô, `expectedLastSeq`, thông báo) chạy trên memory và sqlite-node; driver wasm kiểm bằng Playwright qua `/dev/storage` (lưu qua tải lại, xung đột, id trùng, tab khác thấy thay đổi). Hai người dùng: không đọc, không ghi, seq và thông báo tách riêng. Nâng cấp DB server v6 → v7 giữ nguyên buổi học cũ.
+- **Tốc độ:** quan hệ "trước → sau" được giữ dần trong vòng lặp projection (không dựng lại mỗi cạnh). Projection 3.000 mệnh đề, 4.000 cạnh có thứ tự: khoảng 8 ms (bản đầu dựng lại mỗi cạnh: khoảng 300 ms). Có test giữ giới hạn.
+- **Chưa kiểm:** nâng cấp DB khách lên v3 trên trình duyệt (Playwright luôn tạo DB mới; code migration chung với server, nơi v6 → v7 có test). Chất lượng chọn lát với tiếng Việt chưa đo: K = 5 đo trên buổi tiếng Anh với bộ tách từ ASCII; bước 4 kiểm bằng model thật nên có một buổi tiếng Việt.
+- **Cho bước 4:** chủ đề của mệnh đề tối đa 200 ký tự, như chủ đề buổi của tài khoản (`packages/api/src/contract.ts`); buổi khách không giới hạn chủ đề, nên pipeline phải cắt chủ đề trước khi ghi.
+- Web: hook `useKnowledge()` (đọc log và projection, đọc lại khi có `KnowledgeChanged`) cho bước 9.
+
+**Dời sang bước 6:** sự kiện luyện tập (`PracticeStarted`, `ExerciseIssued`, …) và projection mức nắm vững. Nội dung bài phụ thuộc registry, công thức nắm vững chốt ở bước 6 (A7); thêm vào union sau không làm log cũ hỏng.
 
 ## Bước 0: spike hình graph, C1 (2026-11-21)
 
@@ -166,4 +197,4 @@ Không còn log buổi học thật từ phase 1–2 (DB khách ở OPFS của t
 **Còn mở:**
 
 - Không có màn sửa hồ sơ (bước 11). Chưa chặn id `default` cho hồ sơ đã lưu: bước 11 tự sinh id khi nhân bản.
-- Số thứ tự migration (khách v2, server v6) có thể dời sau khi bước 2 vào `main` trước; xem số cuối cùng trong `packages/storage/src/sqlite/schema.ts` và `sqlite-node/schema.ts`.
+- Số thứ tự migration giữ nguyên (khách v2, server v6): bước 3 vào `main` trước, log kiến thức của bước 2 lấy khách v3, server v7.

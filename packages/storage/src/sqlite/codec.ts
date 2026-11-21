@@ -1,7 +1,14 @@
 // Mapping between domain events and rows of the `events` table, shared by every SQLite driver.
 // Pure: no driver code here.
 import { Schema } from 'effect';
-import { DomainEvent, SavedProfile, TeachingProfile, type EventLog } from '@kd-learn/core';
+import {
+  DomainEvent,
+  KnowledgeEvent,
+  SavedProfile,
+  TeachingProfile,
+  type EventLog,
+  type KnowledgeLog,
+} from '@kd-learn/core';
 import type { SessionSummary } from '../port/index.ts';
 
 /** An event as stored: the payload is the JSON of the whole event. */
@@ -34,6 +41,19 @@ export const toEventRow = (event: DomainEvent): EventRow => ({
 /** Decodes stored payloads, oldest first. Throws on a payload that is not a valid event. */
 export const decodeLog = (payloads: ReadonlyArray<string>): EventLog =>
   payloads.map((payload) => decodeEvent(JSON.parse(payload)));
+
+const decodeKnowledgeEvent = Schema.decodeUnknownSync(KnowledgeEvent);
+
+export const toKnowledgeRow = (event: KnowledgeEvent): EventRow => ({
+  id: event.id,
+  tag: event._tag,
+  at: event.at,
+  payload: JSON.stringify(event),
+});
+
+/** Decodes stored knowledge payloads, oldest first. Throws on a payload that is not valid. */
+export const decodeKnowledgeLog = (payloads: ReadonlyArray<string>): KnowledgeLog =>
+  payloads.map((payload) => decodeKnowledgeEvent(JSON.parse(payload)));
 
 export const summarize = (row: SessionRow): SessionSummary => {
   let topic = '';

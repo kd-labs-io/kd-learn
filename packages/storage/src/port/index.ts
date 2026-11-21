@@ -1,4 +1,4 @@
-// Storage port (plan 3.2): append events, read sessions, settings.
+// Storage port (plan 3.2): append events, read sessions, the knowledge log, settings.
 // Pure: only `effect` and `@kd-learn/core` may be imported here, so `packages/agent` may depend on it.
 // Shape fixed in step 5 after the SQLite WASM spike (step 1, see plan/progress/phase-1.md).
 //
@@ -9,12 +9,30 @@
 // - Events are append-only. A driver never updates or deletes one.
 import { Context, Data } from 'effect';
 import type { Effect, Stream } from 'effect';
-import type { DomainEvent, EventLog, SavedProfile, TeachingProfile } from '@kd-learn/core';
+import type {
+  DomainEvent,
+  EventLog,
+  KnowledgeEvent,
+  KnowledgeLog,
+  SavedProfile,
+  TeachingProfile,
+} from '@kd-learn/core';
 
-/** Result of one successful `appendEvents`. */
+/** Result of one successful `appendEvents` or `appendKnowledge`. */
 export interface AppendResult {
-  /** Position (0-based, per session) of the last event of the batch. */
+  /** Position (0-based, per session or per knowledge log) of the last event of the batch. */
   readonly lastSeq: number;
+}
+
+/** Options of `appendKnowledge`. */
+export interface AppendKnowledgeOptions {
+  /**
+   * Append only if the log still ends at this seq (`-1` for an empty log): the writer projected the
+   * log it read plus the batch, and nothing may have slipped in between. Checked inside the write
+   * transaction. Required: the log is strict and append-only, so a batch written blind could make
+   * it unprojectable for good. Use `appendKnowledgeChecked` (`./knowledge.ts`) rather than this.
+   */
+  readonly expectedLastSeq: number;
 }
 
 /** One row of the session list. Built from the log. */
@@ -46,7 +64,8 @@ export interface GuestSettings {
 export type StorageChange =
   | { readonly _tag: 'SessionChanged'; readonly sessionId: string }
   | { readonly _tag: 'SettingsChanged' }
-  | { readonly _tag: 'ProfileChanged' };
+  | { readonly _tag: 'ProfileChanged' }
+  | { readonly _tag: 'KnowledgeChanged' };
 
 /** No usable storage in this context (no OPFS, no Worker). The caller may fall back to memory. */
 export class StorageUnavailable extends Data.TaggedError('StorageUnavailable')<{
@@ -64,6 +83,15 @@ export class StorageFailure extends Data.TaggedError('StorageFailure')<{
 }> {}
 
 export type StorageError = StorageUnavailable | StorageBusy | StorageFailure;
+
+/**
+ * `appendKnowledge` with `expectedLastSeq`: the log has moved on since the writer read it. Nothing
+ * was written. Read the log again, project it with the batch, and retry or give up.
+ */
+export class KnowledgeConflict extends Data.TaggedError('KnowledgeConflict')<{
+  readonly expectedLastSeq: number;
+  readonly lastSeq: number;
+}> {}
 
 export interface StorageService {
   /** False for the in-memory fallback: data is lost when the page closes. The UI should warn. */
@@ -84,6 +112,19 @@ export interface StorageService {
 
   /** All sessions, most recently updated first. */
   readonly listSessions: Effect.Effect<ReadonlyArray<SessionSummary>, StorageError>;
+
+  /**
+   * Appends to the owner's knowledge log (graph and practice, plan luyen-tap-graph.md A1) in one
+   * atomic batch, like `appendEvents`. Event ids are unique per owner. The batch is written only if
+   * the log still ends at `expectedLastSeq`; otherwise `KnowledgeConflict`.
+   */
+  readonly appendKnowledge: (
+    events: ReadonlyArray<KnowledgeEvent>,
+    options: AppendKnowledgeOptions,
+  ) => Effect.Effect<AppendResult, StorageError | KnowledgeConflict>;
+
+  /** The owner's knowledge log, oldest first. Its last seq is `length - 1`. */
+  readonly readKnowledge: Effect.Effect<KnowledgeLog, StorageError>;
 
   /** Undefined until the learner has saved provider and model. */
   readonly getSettings: Effect.Effect<GuestSettings | undefined, StorageError>;
@@ -116,3 +157,5 @@ export interface StorageService {
 export class Storage extends Context.Service<Storage, StorageService>()(
   '@kd-learn/storage/Storage',
 ) {}
+
+export { appendKnowledgeChecked, KnowledgeRejected, type CheckedAppend } from './knowledge.ts';

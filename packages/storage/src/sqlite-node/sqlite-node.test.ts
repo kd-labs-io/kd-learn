@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { StorageChange } from '../port/index.ts';
 import {
   portContract,
+  propositionAdded,
   savedProfile,
   sessionCreated,
   turnStarted,
@@ -66,6 +67,36 @@ describe('sqlite-node database', () => {
     );
     expect(() => database.db.exec("UPDATE events SET tag = 'x'")).toThrow(/append-only/);
     expect(() => database.db.exec('DELETE FROM events')).toThrow(/append-only/);
+  });
+
+  it('keeps knowledge events append-only', () => {
+    const database = open();
+    Effect.runSync(
+      makeServerStorage(database)
+        .forUser('u1')
+        .appendKnowledge([propositionAdded('a', 1)], { expectedLastSeq: -1 }),
+    );
+    expect(() => database.db.exec("UPDATE knowledge_events SET tag = 'x'")).toThrow(/append-only/);
+    expect(() => database.db.exec('DELETE FROM knowledge_events')).toThrow(/append-only/);
+  });
+
+  it('upgrades a v6 database to the knowledge log and keeps its sessions', async () => {
+    const path = join(dir, 'v6.db');
+    // A v6 server: write the rows by hand, since this build's driver expects v7.
+    const old = open(path, serverMigrations.slice(0, 6));
+    old.db.prepare("INSERT INTO sessions VALUES ('s1', 'u1', 1)").run();
+    old.db
+      .prepare("INSERT INTO events VALUES ('s1', 0, 'a', 'TurnStarted', 1, ?)")
+      .run(JSON.stringify(turnStarted('a', 1)));
+    old.close();
+    const upgraded = open(path);
+    const user = makeServerStorage(upgraded).forUser('u1');
+    expect((await Effect.runPromise(user.readSession('s1'))).map((e) => e.id)).toEqual(['a']);
+    await Effect.runPromise(
+      user.appendKnowledge([propositionAdded('k1', 2)], { expectedLastSeq: -1 }),
+    );
+    expect((await Effect.runPromise(user.readKnowledge)).map((e) => e.id)).toEqual(['k1']);
+    upgraded.close();
   });
 
   it('rolls back a transaction body that throws, and rejects an async one', () => {
@@ -143,6 +174,46 @@ describe('sqlite-node: two users', () => {
     await Effect.runPromise(bob.saveProfile({ ...savedProfile, name: 'Bob' }));
     await Effect.runPromise(bob.saveProfile(undefined));
     expect((await Effect.runPromise(alice.getProfile))?.name).toBe('Alice');
+  });
+
+  it('keeps one knowledge log per user: no reads, writes, seq or notifications across', async () => {
+    const { alice, bob } = await setup();
+    await Effect.runPromise(
+      alice.appendKnowledge([propositionAdded('a1', 1), propositionAdded('a2', 2)], {
+        expectedLastSeq: -1,
+      }),
+    );
+    // Bob's log is empty and starts at seq 0, whatever Alice wrote.
+    expect(await Effect.runPromise(bob.readKnowledge)).toEqual([]);
+    const seenByBob: StorageChange[] = [];
+    const fiber = Effect.runFork(
+      bob.changes.pipe(Stream.runForEach((change) => Effect.sync(() => seenByBob.push(change)))),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(
+      (
+        await Effect.runPromise(
+          bob.appendKnowledge([propositionAdded('b1', 3)], { expectedLastSeq: -1 }),
+        )
+      ).lastSeq,
+    ).toBe(0);
+    // Ids are unique per owner: Bob may use an id Alice used, and it changes nothing of hers.
+    await Effect.runPromise(
+      bob.appendKnowledge([propositionAdded('a1', 4)], { expectedLastSeq: 0 }),
+    );
+    // Alice's log still ends at her own seq 1: Bob's writes did not move it.
+    await Effect.runPromise(
+      alice.appendKnowledge([propositionAdded('a3', 5)], { expectedLastSeq: 1 }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(seenByBob).toEqual([{ _tag: 'KnowledgeChanged' }, { _tag: 'KnowledgeChanged' }]);
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    expect((await Effect.runPromise(alice.readKnowledge)).map((e) => e.id)).toEqual([
+      'a1',
+      'a2',
+      'a3',
+    ]);
+    expect((await Effect.runPromise(bob.readKnowledge)).map((e) => e.id)).toEqual(['b1', 'a1']);
   });
 
   it('does not store guest settings', async () => {
