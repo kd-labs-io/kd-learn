@@ -13,6 +13,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@kd-learn/ai": "workspace:*",
     "@kd-learn/core": "workspace:*",
     "effect": "catalog:"
   },
