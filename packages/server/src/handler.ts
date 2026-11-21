@@ -13,10 +13,20 @@ import { AiPort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
 import { layer as tanstackLayer } from '@kd-learn/ai/tanstack';
 import { EndpointsResponse, ErrorCode, TurnRequest, encodeFrame } from '@kd-learn/api';
-import type { ErrorBody, Failure, Frame, ModelChoice } from '@kd-learn/api';
+import type { Failure, Frame, ModelChoice } from '@kd-learn/api';
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
+import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
 import { asRecord, describeIssue, redact, scrubFrame } from './safety.ts';
+import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
+import { loadAccountConfig } from './auth/config.ts';
+import {
+  initAccounts,
+  makeAccountHandlers,
+  type AccountHandlers,
+  type Accounts,
+} from './auth/http.ts';
+import type { AuthOptions } from './auth/service.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
 export type LogFields = Readonly<Record<string, string | number | boolean>>;
@@ -38,77 +48,14 @@ export interface HandlerDeps {
   readonly newId?: () => string;
 }
 
-export type Handler = (request: Request) => Promise<Response>;
+/** What the host knows about the connection. `clientAddress` is the socket peer, not a header. */
+export interface RequestContext {
+  readonly clientAddress?: string | undefined;
+}
+
+export type Handler = (request: Request, context?: RequestContext) => Promise<Response>;
 
 const encoder = new TextEncoder();
-
-const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff' } as const;
-
-const corsHeaders = (request: Request, config: ServerConfig): Record<string, string> => {
-  if (config.corsOrigins.length === 0) return {};
-  const origin = request.headers.get('origin');
-  return origin !== null && config.corsOrigins.includes(origin)
-    ? {
-        'access-control-allow-origin': origin,
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'content-type, accept',
-        'access-control-max-age': '600',
-        vary: 'origin',
-      }
-    : { vary: 'origin' };
-};
-
-const failureResponse = (
-  status: number,
-  code: string,
-  message: string,
-  retryable: boolean,
-  headers: Record<string, string>,
-): Response => {
-  const body: ErrorBody = { error: { code, message, retryable } };
-  return Response.json(body, {
-    status,
-    headers: { ...SECURITY_HEADERS, 'cache-control': 'no-store', ...headers },
-  });
-};
-
-/** The body as text, or why it was refused. Stops reading as soon as the limit is passed. */
-const readLimited = async (
-  request: Request,
-  max: number,
-): Promise<{ readonly text: string; readonly bytes: number } | 'too-large' | 'unreadable'> => {
-  const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > max) return 'too-large';
-  if (request.body === null) return { text: '', bytes: 0 };
-  const reader = request.body.getReader();
-  const chunks: Array<Uint8Array> = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > max) {
-        await reader.cancel().catch(() => undefined);
-        return 'too-large';
-      }
-      chunks.push(value);
-    }
-  } catch {
-    return 'unreadable';
-  }
-  const all = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    all.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return { text: new TextDecoder('utf-8', { fatal: true }).decode(all), bytes: total };
-  } catch {
-    return 'unreadable';
-  }
-};
 
 const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
   Effect.callback<void>((resume) => {
@@ -320,17 +267,23 @@ export const handleEndpoints = async (request: Request, deps: HandlerDeps): Prom
   });
 };
 
-export interface Handlers {
+export interface Handlers extends AccountHandlers {
   readonly turns: Handler;
   readonly endpoints: Handler;
+}
+
+export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
+  /** Replaces the database file (tests). */
+  readonly database?: ServerDatabase;
+  readonly auth?: AuthOptions;
 }
 
 /** Wraps a handler so an unexpected throw becomes a fixed 500, never a message with request data. */
 const safely =
   (handler: Handler, log: Logger): Handler =>
-  async (request) => {
+  async (request, context) => {
     try {
-      return await handler(request);
+      return await handler(request, context);
     } catch {
       log({ event: 'request.crashed', fields: {} });
       return failureResponse(500, ErrorCode.Internal, 'Server error.', true, {});
@@ -344,30 +297,80 @@ const safely =
  */
 export const createHandlers = (
   env: Readonly<Record<string, string | undefined>>,
-  options: Omit<HandlerDeps, 'config'> = {},
+  options: CreateHandlersOptions = {},
 ): Handlers => {
   const log = options.log ?? consoleLogger;
-  let config: ServerConfig;
-  try {
-    config = loadConfig(env);
-  } catch (error) {
+  const broken: Handler = async () =>
+    failureResponse(
+      500,
+      ErrorCode.Misconfigured,
+      'The server is not configured correctly.',
+      false,
+      {},
+    );
+  const configFailed = (error: unknown) =>
     log({
       event: 'config.invalid',
       fields: { message: error instanceof Error ? error.message : 'unknown' },
     });
-    const broken: Handler = async () =>
-      failureResponse(
-        500,
-        ErrorCode.Misconfigured,
-        'The server is not configured correctly.',
-        false,
-        {},
-      );
-    return { turns: broken, endpoints: broken };
+
+  let config: ServerConfig;
+  try {
+    config = loadConfig(env);
+  } catch (error) {
+    configFailed(error);
+    return {
+      turns: broken,
+      endpoints: broken,
+      register: broken,
+      login: broken,
+      logout: broken,
+      me: broken,
+      invites: broken,
+    };
   }
   const deps: HandlerDeps = { ...options, config, log };
+
+  // Accounts are optional: a bad account variable breaks only the account routes, and the guest
+  // routes keep working. The database opens on the first account request.
+  let accountRoutes: AccountHandlers;
+  try {
+    const accountConfig = loadAccountConfig(env);
+    let ready: Promise<Accounts> | undefined;
+    const accounts = () => {
+      ready ??= initAccounts(accountConfig, {
+        log,
+        ...(options.database ? { database: options.database } : {}),
+        ...(options.auth ? { auth: options.auth } : {}),
+      }).catch((error: unknown) => {
+        log({
+          event: 'accounts.unavailable',
+          fields: { message: error instanceof Error ? error.message.slice(0, 200) : 'unknown' },
+        });
+        throw error;
+      });
+      return ready;
+    };
+    accountRoutes = makeAccountHandlers(accounts, config, accountConfig, log);
+  } catch (error) {
+    configFailed(error);
+    accountRoutes = {
+      register: broken,
+      login: broken,
+      logout: broken,
+      me: broken,
+      invites: broken,
+    };
+  }
+
+  const wrap = (handler: Handler) => safely(handler, log);
   return {
-    turns: safely((request) => handleTurns(request, deps), log),
-    endpoints: safely((request) => handleEndpoints(request, deps), log),
+    turns: wrap((request) => handleTurns(request, deps)),
+    endpoints: wrap((request) => handleEndpoints(request, deps)),
+    register: wrap(accountRoutes.register),
+    login: wrap(accountRoutes.login),
+    logout: wrap(accountRoutes.logout),
+    me: wrap(accountRoutes.me),
+    invites: wrap(accountRoutes.invites),
   };
 };

@@ -40,6 +40,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 - Đăng nhập bằng email + mật khẩu. Token opaque, lưu dạng hash trong DB, có hạn và thu hồi được (đăng xuất, admin khoá tài khoản).
 - Capacitor không dùng được cookie cùng origin, nên API nhận `Authorization: Bearer`. Bản web dùng cookie `HttpOnly` hay cũng Bearer: chốt ở spike (C2), cân nhắc XSS (rủi ro 21, phase 5) và CSRF.
 - Đăng ký theo công tắc admin: mở / theo lời mời (mã mời dùng một lần, có hạn) / đóng. Giới hạn số lần đăng nhập sai.
+- Đăng nhập không cho biết email có tồn tại không. Đăng ký thì không giấu được (chưa có xác minh email): email đã có trả `EmailTaken`, nhưng chỉ sau khi đã qua công tắc và mã mời, nên chỉ người được phép đăng ký mới dò được (bước 2, [progress/phase-2.md](progress/phase-2.md)).
 - **Admin đầu tiên (chốt 2026-11-21):** lấy từ env lúc khởi động (`KD_LEARN_ADMIN_EMAIL`, `KD_LEARN_ADMIN_PASSWORD`, đã có trong `.env`; chỉ tạo khi DB chưa có admin). Không dùng "người đăng ký đầu tiên là admin" vì server vừa mở ra Internet là ai cũng giành được.
 
 ### A5. Key mã hoá

@@ -505,6 +505,9 @@ importers:
       '@kd-learn/core':
         specifier: workspace:*
         version: link:../core
+      '@kd-learn/storage':
+        specifier: workspace:*
+        version: link:../storage
       effect:
         specifier: 'catalog:'
         version: 4.1.4

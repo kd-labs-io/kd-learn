@@ -6,6 +6,11 @@ import { DomainEvent, EventLog } from '@kd-learn/core';
 
 export const TURNS_PATH = '/api/turns';
 export const ENDPOINTS_PATH = '/api/endpoints';
+export const REGISTER_PATH = '/api/auth/register';
+export const LOGIN_PATH = '/api/auth/login';
+export const LOGOUT_PATH = '/api/auth/logout';
+export const ME_PATH = '/api/auth/me';
+export const INVITES_PATH = '/api/admin/invites';
 
 const Secret = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512));
 const ModelName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200));
@@ -76,6 +81,20 @@ export const ErrorCode = {
   UnknownEndpoint: 'UnknownEndpoint',
   InvalidTurn: 'InvalidTurn',
   MethodNotAllowed: 'MethodNotAllowed',
+  /** No valid `Authorization: Bearer` token (missing, unknown, expired, revoked, account disabled). */
+  Unauthorized: 'Unauthorized',
+  /** Signed in, but not allowed (not an admin). */
+  Forbidden: 'Forbidden',
+  /** Wrong email or password. Same answer for an unknown email (risk 23). */
+  InvalidCredentials: 'InvalidCredentials',
+  /** Too many attempts for this email or from this address. `retryable`: try again later. */
+  TooManyAttempts: 'TooManyAttempts',
+  /** Right password, but an admin disabled the account. */
+  AccountDisabled: 'AccountDisabled',
+  RegistrationClosed: 'RegistrationClosed',
+  /** Registration needs an invite, and the code is missing, used, expired or unknown. */
+  InvalidInvite: 'InvalidInvite',
+  EmailTaken: 'EmailTaken',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -111,3 +130,59 @@ export type EndpointInfo = typeof EndpointInfo.Type;
 /** `GET /api/endpoints`. */
 export const EndpointsResponse = Schema.Struct({ endpoints: Schema.Array(EndpointInfo) });
 export type EndpointsResponse = typeof EndpointsResponse.Type;
+
+// Accounts (plan tai-khoan.md A4). The token is opaque; send it as `Authorization: Bearer <token>`
+// on every account request, from the web app and from Capacitor alike (plan step 0, C2).
+
+const Email = Schema.String.check(
+  Schema.isMaxLength(254),
+  Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/),
+);
+/** Length in UTF-16 units; the server bounds it before hashing. */
+const Password = Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(256));
+const Token = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128));
+
+export const Role = Schema.Literals(['admin', 'user']);
+export type Role = typeof Role.Type;
+
+export const User = Schema.Struct({ id: Schema.NonEmptyString, email: Schema.String, role: Role });
+export type User = typeof User.Type;
+
+/** `POST /api/auth/register`. `inviteCode` is required when registration is invite-only. */
+export const RegisterRequest = Schema.Struct({
+  email: Email,
+  password: Password,
+  inviteCode: Schema.optionalKey(Token),
+});
+export type RegisterRequest = typeof RegisterRequest.Type;
+
+/** `POST /api/auth/login`. The password is not length-checked beyond the hashing bound. */
+export const LoginRequest = Schema.Struct({
+  email: Schema.String.check(Schema.isMaxLength(254)),
+  password: Schema.String.check(Schema.isMaxLength(256)),
+});
+export type LoginRequest = typeof LoginRequest.Type;
+
+/** Answer of register and login. `expiresAt` is epoch ms. */
+export const AuthResponse = Schema.Struct({
+  token: Token,
+  expiresAt: Schema.Number,
+  user: User,
+});
+export type AuthResponse = typeof AuthResponse.Type;
+
+/** `GET /api/auth/me`. */
+export const MeResponse = Schema.Struct({ user: User });
+export type MeResponse = typeof MeResponse.Type;
+
+/** `POST /api/admin/invites`. Default 72 hours, at most 30 days. */
+export const CreateInviteRequest = Schema.Struct({
+  expiresInHours: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 720 })),
+  ),
+});
+export type CreateInviteRequest = typeof CreateInviteRequest.Type;
+
+/** The code is shown once; the server keeps only its hash. */
+export const InviteResponse = Schema.Struct({ code: Token, expiresAt: Schema.Number });
+export type InviteResponse = typeof InviteResponse.Type;

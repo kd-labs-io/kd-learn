@@ -8,7 +8,7 @@
 | --- | --- |
 | Bước 0: spike driver SQLite server, auth (C1, C2) | Xong (2026-11-21). Driver: `node:sqlite` thô. Auth: tự viết tối thiểu, Bearer cho cả web và Capacitor. Xem ghi chú bước 0 bên dưới |
 | Bước 1: driver SQLite server | Xong (2026-11-21). `@kd-learn/storage/sqlite-node`: `openServerDatabase`, `makeServerStorage(db).forUser(userId)`, migration riêng của server, bảng `sessions`. Xem ghi chú bước 1 bên dưới |
-| Bước 2: auth | Chưa bắt đầu |
+| Bước 2: auth | Xong (2026-11-21). `packages/server/src/auth/`, route `/api/auth/*`, `/api/admin/invites`. Xem ghi chú bước 2 bên dưới |
 | Bước 3: key mã hoá, cài đặt theo vai | Chưa bắt đầu |
 | Bước 4: lượt chạy trên server | Chưa bắt đầu |
 | Bước 5: công tắc admin | Chưa bắt đầu |
@@ -93,4 +93,34 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Test riêng cho `sqlite-node`:
     - DB: mở lại file vẫn còn dữ liệu, ở chế độ WAL; danh sách migration dài hơn thì chỉ chạy phần mới; DB mới hơn code thì bị từ chối; `events` chỉ ghi thêm; transaction lỗi hoặc bất đồng bộ thì rollback.
     - Hai người dùng: chỉ liệt kê buổi của mình, đọc buổi người khác ra rỗng, ghi vào buổi người khác bị từ chối và log không đổi, thông báo thay đổi chỉ tới chủ buổi.
+
+## Bước 2: auth (2026-11-21)
+
+- **Bảng (migration v2 của server):** `users` (email lưu chữ thường), `auth_tokens` (SHA-256 của token), `invites` (SHA-256 của mã), `login_throttle` (đếm lần sai theo email), `server_config` (chế độ đăng ký; bước 5 thêm các công tắc khác).
+- **`packages/server/src/auth/`:**
+  - `password.ts`: Argon2id, chuỗi lưu mang theo tham số. Khi xác minh, tham số đọc từ chuỗi và bị chặn trên, nên một dòng hỏng không làm server cấp phát hàng GB. Đơn vị `memory` là KiB (đo: 262144 tốn khoảng 256 MB).
+  - `service.ts`: đăng ký, đăng nhập, token, mã mời, khoá và mở khoá, tắt tài khoản, admin đầu tiên. Argon2 là bất đồng bộ, nên mọi quyết định phải đúng (đếm lần sai, dùng mã mời, "chưa có admin", email trùng) đều nằm trong một transaction đồng bộ sau `await` cuối.
+  - `rate-limit.ts`: đếm theo cửa sổ cố định trong bộ nhớ, theo địa chỉ client. Đăng nhập sai: 30 lần / 15 phút. Đăng ký: 10 lần / giờ.
+  - `http.ts`: các route, đọc `Authorization: Bearer`.
+  - `config.ts`: biến môi trường.
+- **Chống dò email (rủi ro 23):**
+  - Đăng nhập trả `InvalidCredentials` như nhau cho email không tồn tại và sai mật khẩu; email không tồn tại vẫn băm một lần để thời gian như nhau.
+  - Khoá sau 5 lần sai trong 15 phút, tính theo chuỗi email dù có tài khoản hay không. Lần thử được đếm **trước** khi kiểm mật khẩu: 20 request song song với mật khẩu sai thì đúng 5 lần được kiểm, 15 lần bị khoá.
+  - `AccountDisabled` chỉ trả khi mật khẩu đúng.
+  - Đăng ký thì không giấu được email đã có (xem A4).
+- **Địa chỉ client:** route của `apps/web` truyền `getRequestIP()` của TanStack Start (địa chỉ socket). Đã kiểm trên bản build: 30 lần sai từ localhost thì lần thứ 31 nhận 429. `X-Forwarded-For` chỉ dùng khi `KD_LEARN_TRUST_PROXY=1`, và lấy mục **cuối** (mục do proxy thêm vào). Không biết địa chỉ thì bỏ qua giới hạn theo IP, không dồn mọi người vào một hạn mức chung.
+- **Admin đầu tiên:** tạo ở request tài khoản đầu tiên, khi DB mở ra (lười, để test và Playwright của chế độ khách không tạo file DB). Có kiểm lại "chưa có admin" trong transaction. Nếu một tài khoản thường đã đăng ký trước bằng email admin, tài khoản đó thành admin với mật khẩu lấy từ env, và mọi token cũ của nó bị thu hồi.
+- **Cấu hình sai:** biến tài khoản sai (ví dụ chỉ đặt một trong hai biến admin) thì chỉ các route tài khoản trả `500 ServerMisconfigured`; route của khách vẫn chạy. Log nêu tên biến, không nêu giá trị.
+- **Biến môi trường mới:** `KD_LEARN_DB_PATH` (mặc định `data/kd-learn.db`, đã có trong `.gitignore`), `KD_LEARN_REGISTRATION` (`open` / `invite` / `closed`, mặc định `invite`), `KD_LEARN_TRUST_PROXY`.
+- **Token:** hạn 30 ngày, không tự gia hạn. Đăng xuất thu hồi token đang dùng. Tắt tài khoản thu hồi mọi token của tài khoản đó.
+- **CORS:** thêm `authorization` vào `access-control-allow-headers` cho Capacitor; có test preflight.
+- **Test:** 30 test mới, gồm:
+  - chế độ đăng ký; mã mời chỉ dùng một lần và hết hạn; hai lượt đăng ký song song cùng một mã mời thì đúng một lượt thành công; email trùng thì mã mời được trả lại;
+  - DB chỉ chứa hash;
+  - token hết hạn, đã thu hồi, của tài khoản bị tắt đều bị từ chối;
+  - admin đầu tiên tạo một lần, kể cả khi gọi đồng thời;
+  - không phải admin thì bị 403 khi tạo mã mời;
+  - log không chứa email, mật khẩu, token, mã mời, kể cả ở các nhánh lỗi;
+  - giới hạn theo IP; `X-Forwarded-For` giả ở mục đầu không có tác dụng.
+- **Chưa làm (ở bước sau):** API admin để mở khoá, tắt tài khoản, đổi chế độ đăng ký (bước 5); UI (bước 8).
 
