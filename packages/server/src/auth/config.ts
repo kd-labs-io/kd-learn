@@ -1,6 +1,7 @@
 // Account configuration from the environment (plan tai-khoan.md A4). Messages name the variable,
 // never its value.
 import { ConfigError } from '../config.ts';
+import { loadDemoConfig, type DemoConfig } from '../demo/config.ts';
 import { loadMasterKey } from '../settings/secret-box.ts';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './password.ts';
 import { registrationModes, type RegistrationMode } from './service.ts';
@@ -24,6 +25,7 @@ export interface AccountConfig {
   readonly guestMode: boolean;
   /** Demo mode until an admin changes it (`KD_LEARN_DEMO_MODE`, default off). */
   readonly demoMode: boolean;
+  readonly demo: DemoConfig;
 }
 
 /** `on`/`off`, `true`/`false`, `1`/`0`; empty gives `fallback`. */
@@ -82,6 +84,7 @@ export const loadAccountConfig = (
     masterKey: loadMasterKey(env),
     guestMode: switchFrom('KD_LEARN_GUEST_MODE', env.KD_LEARN_GUEST_MODE, true),
     demoMode: switchFrom('KD_LEARN_DEMO_MODE', env.KD_LEARN_DEMO_MODE, false),
+    demo: loadDemoConfig(env),
   };
 };
 

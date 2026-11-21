@@ -21,6 +21,8 @@ import {
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
+import { makeDemoBudget } from '../demo/budget.ts';
+import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
 import { makeSettings, type SettingsService } from '../settings/service.ts';
@@ -39,6 +41,8 @@ export interface Accounts {
   readonly settings: SettingsService;
   readonly sessions: SessionRunner;
   readonly admin: AdminService;
+  /** Checked on every demo request: the admin may change the switch or the budget. */
+  readonly demo: () => DemoGate;
 }
 
 /**
@@ -75,12 +79,16 @@ export const initAccounts = async (
     log: options.log,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
-  const admin = makeAdmin(database, auth, {
-    registration: config.registration,
-    guestMode: config.guestMode,
-    demoMode: config.demoMode,
-  });
-  return { database, auth, settings, sessions, admin };
+  const budget = makeDemoBudget(database, config.demo);
+  const demoModel = () => resolveDemoModel(config.demo.model, options.endpoints());
+  const admin = makeAdmin(
+    database,
+    auth,
+    { registration: config.registration, guestMode: config.guestMode, demoMode: config.demoMode },
+    { budget, model: demoModel },
+  );
+  const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
+  return { database, auth, settings, sessions, admin, demo };
 };
 
 export interface AccountHandlers {

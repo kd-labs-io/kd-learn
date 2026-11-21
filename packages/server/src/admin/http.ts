@@ -43,6 +43,8 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
           registration: next.registration,
           guestMode: next.guestMode,
           demoMode: next.demoMode,
+          demoBudgetLimit: next.demoBudget.limit,
+          demoBudgetPeriod: next.demoBudget.period,
         },
       });
       return json(ctx, Schema.encodeSync(AdminConfig)(next));
@@ -92,8 +94,7 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
   };
 
   const publicConfig = route('config', ['GET'], (ctx) => {
-    const { registration, guestMode, demoMode } = ctx.accounts.admin.config();
-    return json(ctx, Schema.encodeSync(PublicConfig)({ registration, guestMode, demoMode }));
+    return json(ctx, Schema.encodeSync(PublicConfig)(ctx.accounts.admin.publicConfig()));
   });
 
   return { admin, config: publicConfig };

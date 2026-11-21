@@ -6,8 +6,11 @@
 // Keys (plan A7, risk 19): the request is never logged, log entries carry only whitelisted scalar
 // fields, error text is built from paths and codes (not from input values), and every outgoing
 // message is redacted against the request's key.
+import type { EventLog } from '@kd-learn/core';
+import { meteredAi, type Meter } from './demo/metered.ts';
+import type { DemoGate } from './demo/service.ts';
 import { Cause, Effect, Layer, Result, Schema, Stream } from 'effect';
-import { runSideChat, runTurn } from '@kd-learn/agent';
+import { defaultProfile, runSideChat, runTurn } from '@kd-learn/agent';
 import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
 import { AiPort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
@@ -51,7 +54,34 @@ export interface HandlerDeps {
   readonly newId?: () => string;
   /** False when an admin turned guest mode off (plan A7). Absent: allowed. */
   readonly guestAllowed?: () => Promise<boolean>;
+  /** Demo mode (plan A8). Absent: closed. */
+  readonly demo?: () => Promise<DemoGate>;
 }
+
+const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8}){0,3}$/;
+
+/** The log with the server's default profile in place of the client's (demo mode). */
+export const withServerProfile = (log: EventLog): EventLog =>
+  log.map((event) =>
+    event._tag === 'SessionCreated'
+      ? {
+          ...event,
+          profile: {
+            ...defaultProfile,
+            language: LANGUAGE_TAG.test(event.profile.language)
+              ? event.profile.language
+              : defaultProfile.language,
+          },
+        }
+      : event,
+  );
+
+/** A demo turn sends the whole log on the server's key: keep it much smaller than a guest's. */
+export const DEMO_MAX_REQUEST_BYTES = 256 * 1024;
+/** Model calls a demo main turn may make (a tool call and the answer after it is two). */
+export const DEMO_MAX_STEPS = 4;
+/** Output tokens per model call in demo mode. */
+export const DEMO_MAX_OUTPUT_TOKENS = 2048;
 
 /** What the host knows about the connection. `clientAddress` is the socket peer, not a header. */
 export interface RequestContext {
@@ -70,7 +100,10 @@ const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
     return Effect.sync(() => signal.removeEventListener('abort', onAbort));
   });
 
-const toModelRef = (choice: ModelChoice, config: ServerConfig): ModelRef | undefined => {
+const toModelRef = (
+  choice: Exclude<ModelChoice, { provider: 'demo' }>,
+  config: ServerConfig,
+): ModelRef | undefined => {
   if (choice.provider !== 'openai-compatible') {
     return { provider: choice.provider, model: choice.model, apiKey: choice.apiKey };
   }
@@ -149,15 +182,6 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   if (request.method !== 'POST') {
     return reject(405, ErrorCode.MethodNotAllowed, 'Use POST.');
   }
-  let allowed: boolean;
-  try {
-    allowed = deps.guestAllowed === undefined ? true : await deps.guestAllowed();
-  } catch {
-    return reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
-  }
-  if (!allowed) {
-    return reject(403, ErrorCode.GuestModeDisabled, 'Guest mode is turned off on this server.');
-  }
 
   const body = await readLimited(request, config.maxRequestBytes);
   if (body === 'too-large') {
@@ -192,17 +216,87 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   if (Result.isFailure(decoded)) {
     return reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure));
   }
-  const { model: choice, turn, log: eventLog } = decoded.success;
-  const key = choice.apiKey;
+  const { model: choice, turn } = decoded.success;
+  let eventLog = decoded.success.log;
+  const misconfigured = () =>
+    reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
 
-  const model = toModelRef(choice, config);
-  if (model === undefined) {
-    return reject(
-      400,
-      ErrorCode.UnknownEndpoint,
-      'This endpoint id is not allowed on this server.',
+  // The guest and demo switches are separate (plan 2.2). Either one fails closed: when it cannot
+  // be read, the turn is refused before any provider call.
+  let model: ModelRef;
+  let ai = deps.ai ?? tanstackLayer();
+  let settle: (() => void) | undefined;
+  if (choice.provider === 'demo') {
+    if (body.bytes > DEMO_MAX_REQUEST_BYTES) {
+      return reject(
+        413,
+        ErrorCode.HistoryTooLarge,
+        `A demo request is limited to ${DEMO_MAX_REQUEST_BYTES} bytes. Start a new session.`,
+      );
+    }
+    let gate: DemoGate;
+    try {
+      gate = deps.demo === undefined ? { _tag: 'Disabled' } : await deps.demo();
+    } catch {
+      return misconfigured();
+    }
+    if (gate._tag === 'Disabled') {
+      return reject(403, ErrorCode.DemoModeDisabled, 'Demo mode is not available on this server.');
+    }
+    const reserved = gate.budget.reserve(turn.kind === 'main' ? DEMO_MAX_STEPS : 1);
+    switch (reserved._tag) {
+      case 'Closed':
+        return reject(
+          403,
+          ErrorCode.DemoModeDisabled,
+          'Demo mode is not available on this server.',
+        );
+      case 'Exceeded':
+        return reject(
+          429,
+          ErrorCode.DemoQuotaExceeded,
+          'The demo has used all of its calls for now. Try again later, or use your own key.',
+        );
+    }
+    // The prompts come from the profile in the log, which the client sends: on the server's key,
+    // only the server's own prompts run. The learner keeps their language.
+    eventLog = withServerProfile(eventLog);
+    const { reservation } = reserved;
+    const meter: Meter = { calls: 0 };
+    model = gate.model;
+    ai = meteredAi(
+      ai,
+      { calls: reservation.calls, maxOutputTokens: DEMO_MAX_OUTPUT_TOKENS },
+      meter,
     );
+    let settled = false;
+    settle = () => {
+      if (settled) return;
+      settled = true;
+      gate.budget.settle(reservation, meter.calls);
+    };
+  } else {
+    let allowed: boolean;
+    try {
+      allowed = deps.guestAllowed === undefined ? true : await deps.guestAllowed();
+    } catch {
+      return misconfigured();
+    }
+    if (!allowed) {
+      return reject(403, ErrorCode.GuestModeDisabled, 'Guest mode is turned off on this server.');
+    }
+    const resolved = toModelRef(choice, config);
+    if (resolved === undefined) {
+      return reject(
+        400,
+        ErrorCode.UnknownEndpoint,
+        'This endpoint id is not allowed on this server.',
+      );
+    }
+    model = resolved;
   }
+  // The key to scrub from every frame: the guest's own, or the server's demo key.
+  const key = model.provider === 'acp' ? '' : model.apiKey;
 
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const outputs =
@@ -216,6 +310,7 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
     kind: turn.kind,
     provider: choice.provider,
     ...(choice.provider === 'openai-compatible' ? { endpointId: choice.endpointId } : {}),
+    ...(settle === undefined ? {} : { model: model.provider === 'acp' ? '' : model.model }),
     requestBytes: body.bytes,
     ...extra,
   });
@@ -233,7 +328,8 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
       }),
     ),
     Stream.ensuring(
-      Effect.sync(() =>
+      Effect.sync(() => {
+        settle?.();
         log({
           event: 'turn.end',
           fields: fields({
@@ -242,10 +338,10 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
             durationMs: Date.now() - startedAt,
             ...(stats.code === '' ? {} : { code: stats.code }),
           }),
-        }),
-      ),
+        });
+      }),
     ),
-    Stream.provide(deps.ai ?? tanstackLayer()),
+    Stream.provide(ai),
     // The runtime also cancels the response body on disconnect; this covers hosts that only abort the signal.
     Stream.interruptWhen(whenAborted(request.signal)),
     Stream.map((frame) => encoder.encode(encodeFrame(frame))),
@@ -359,6 +455,7 @@ export const createHandlers = (
   let accountRoutes: Omit<Handlers, 'turns' | 'endpoints' | 'config'> = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
+  let demo: (() => Promise<DemoGate>) | undefined;
   try {
     const accountConfig = loadAccountConfig(env);
     let ready: Promise<Accounts> | undefined;
@@ -389,7 +486,8 @@ export const createHandlers = (
     publicConfig = adminRoutes.config;
     // The admin switch lives in the database. If it cannot be read, guest turns are refused
     // (fail closed) rather than ignoring a switch the admin turned off.
-    guestAllowed = () => accounts().then((ready) => ready.admin.config().guestMode);
+    guestAllowed = () => accounts().then((ready) => ready.admin.switches().guestMode);
+    demo = () => accounts().then((ready) => ready.demo());
   } catch (error) {
     configFailed(error);
     const guestMode = (() => {
@@ -412,7 +510,13 @@ export const createHandlers = (
         },
       );
   }
-  const deps: HandlerDeps = { ...options, config, log, guestAllowed };
+  const deps: HandlerDeps = {
+    ...options,
+    config,
+    log,
+    guestAllowed,
+    ...(demo === undefined ? {} : { demo }),
+  };
 
   const wrap = (handler: Handler) => safely(handler, log);
   return {

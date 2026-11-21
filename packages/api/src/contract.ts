@@ -48,6 +48,8 @@ export const ModelChoice = Schema.Union([
     model: ModelName,
     apiKey: Secret,
   }),
+  /** Demo mode (plan A8): the server picks provider, model and key, and counts the calls. */
+  Schema.Struct({ provider: Schema.Literal('demo') }),
 ]);
 export type ModelChoice = typeof ModelChoice.Type;
 
@@ -118,6 +120,10 @@ export const ErrorCode = {
   GuestModeDisabled: 'GuestModeDisabled',
   /** The change would lock the admin out (disabling their own account). */
   Conflict: 'Conflict',
+  /** Demo mode is off, its budget is 0, or the server has no demo model (plan A8). */
+  DemoModeDisabled: 'DemoModeDisabled',
+  /** The shared demo budget of this period is used up (plan A8). */
+  DemoQuotaExceeded: 'DemoQuotaExceeded',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -380,15 +386,39 @@ export const PublicConfig = Schema.Struct({
 });
 export type PublicConfig = typeof PublicConfig.Type;
 
-/** `GET /api/admin/config`. Step 6 adds the demo budget, step 7 the ACP agents. */
-export const AdminConfig = PublicConfig;
-export type AdminConfig = PublicConfig;
+export const DemoBudgetPeriod = Schema.Literals(['day', 'month', 'none']);
+export type DemoBudgetPeriod = typeof DemoBudgetPeriod.Type;
+
+/** Model calls for every demo user together (plan A8). Periods are UTC days or months. */
+export const DemoBudget = Schema.Struct({
+  /** 0 closes demo mode. */
+  limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  period: DemoBudgetPeriod,
+  /** Calls used in the current period, reservations of running turns included. */
+  used: Schema.Int,
+});
+export type DemoBudget = typeof DemoBudget.Type;
+
+/** `GET /api/admin/config`. Step 7 adds the ACP agents. */
+export const AdminConfig = Schema.Struct({
+  registration: RegistrationMode,
+  guestMode: Schema.Boolean,
+  demoMode: Schema.Boolean,
+  demoBudget: DemoBudget,
+  /** The demo model from the environment, without its key; absent when none is set. */
+  demoModel: Schema.optionalKey(Schema.String),
+});
+export type AdminConfig = typeof AdminConfig.Type;
 
 /** `PUT /api/admin/config`: only the fields given change. */
 export const UpdateAdminConfigRequest = Schema.Struct({
   registration: Schema.optionalKey(RegistrationMode),
   guestMode: Schema.optionalKey(Schema.Boolean),
   demoMode: Schema.optionalKey(Schema.Boolean),
+  demoBudgetLimit: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000_000)),
+  ),
+  demoBudgetPeriod: Schema.optionalKey(DemoBudgetPeriod),
 });
 export type UpdateAdminConfigRequest = typeof UpdateAdminConfigRequest.Type;
 

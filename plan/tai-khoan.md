@@ -70,6 +70,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 - **Đơn vị:** số lần gọi model (một lượt có gọi tool tốn hai lần, xem [archive/phase-1.md](archive/phase-1.md) bước 8), cộng trần token cho mỗi lượt. Side chat tính chung. Không cần định danh người dùng demo.
 - Bộ đếm lưu bền trong DB server. Giữ chỗ nguyên tử **trước** khi gọi provider; hết ngân sách thì trả `DemoQuotaExceeded` và không gọi provider; UI báo demo đã hết lượt. Số lần gọi thực tế quyết toán cuối lượt.
 - UI admin hiện đã dùng bao nhiêu trên trần trong chu kỳ hiện tại.
+- **Model demo (chốt ở bước 6, 2026-11-21):** provider, model, key lấy từ env (`KD_LEARN_DEMO_PROVIDER`, `KD_LEARN_DEMO_MODEL`, `KD_LEARN_DEMO_API_KEY`, `KD_LEARN_DEMO_ENDPOINT`). UI admin chỉ đặt công tắc và ngân sách. Công tắc khách và demo độc lập. Chi tiết giữ chỗ và quyết toán ở [progress/phase-2.md](progress/phase-2.md) bước 6.
 
 ### A9. Backend ACP
 

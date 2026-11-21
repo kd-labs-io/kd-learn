@@ -12,7 +12,7 @@
 | Bước 3: key mã hoá, cài đặt theo vai | Xong (2026-11-21). `packages/server/src/settings/`, route `/api/account/*`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: lượt chạy trên server | Xong (2026-11-21). `packages/server/src/sessions/`, route `/api/account/sessions/*`. Xem ghi chú bước 4 bên dưới |
 | Bước 5: công tắc admin | Xong (2026-11-21). `packages/server/src/admin/`, route `/api/admin/*`, `/api/config`. Xem ghi chú bước 5 bên dưới |
-| Bước 6: demo, ngân sách chung | Chưa bắt đầu |
+| Bước 6: demo với ngân sách chung | Xong (2026-11-21). `packages/server/src/demo/`. Xem ghi chú bước 6 bên dưới |
 | Bước 7: ACP | Chưa bắt đầu |
 | Bước 8: UI | Chưa bắt đầu |
 | Bước 9: Docker Compose | Chưa bắt đầu |
@@ -209,4 +209,49 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - server không có tài khoản thì theo env;
   - tắt tài khoản thu hồi token; mở khoá đăng nhập; không tự tắt mình được; người dùng không tồn tại trả 404.
   - Chạy thật trên bản build bằng `curl`: tắt khách thì `/api/turns` trả 403.
+
+## Bước 6: demo với ngân sách chung (2026-11-21)
+
+- **Request:** `POST /api/turns` với `model: { provider: 'demo' }`, không có trường nào khác: gửi kèm `model` hay `apiKey` đều bị trả 400.
+- **Model demo:** provider, model và key lấy từ env: `KD_LEARN_DEMO_PROVIDER`, `KD_LEARN_DEMO_MODEL`, `KD_LEARN_DEMO_API_KEY`, thêm `KD_LEARN_DEMO_ENDPOINT` cho `openai-compatible`. Phải đặt cả ba biến hoặc không đặt biến nào. UI admin chỉ đặt công tắc và ngân sách; trang cấu hình admin hiện `demoModel` dạng `anthropic:claude-haiku-5-5`, không kèm key.
+- **Ngân sách:**
+  - Đặt bằng `KD_LEARN_DEMO_BUDGET` (số lần gọi model, mặc định 0, tức là đóng) và `KD_LEARN_DEMO_BUDGET_PERIOD` (`day`, mặc định, / `month` / `none`, tính theo UTC).
+  - Admin đổi bằng `PUT /api/admin/config` với `demoBudgetLimit` và `demoBudgetPeriod`.
+  - `GET /api/admin/config` trả `demoBudget: { limit, period, used }`.
+  - Bộ đếm nằm ở bảng `demo_usage` (migration v4), khoá theo chu kỳ (`day:2026-11-21`), nên sang chu kỳ mới thì tự đếm lại từ 0.
+- **Giữ chỗ:**
+  - Trong một transaction đồng bộ, **trước** khi gọi provider: lượt chính giữ tối đa 4 lần gọi, side chat giữ 1. Ngân sách còn ít hơn số cần giữ thì chỉ giữ phần còn lại, ít nhất 1 lần.
+  - Số đã giữ được truyền làm `maxSteps`, nên một lượt không bao giờ gọi model nhiều hơn số đã giữ, và tổng không vượt trần.
+  - Hết ngân sách thì trả `429 DemoQuotaExceeded` và không gọi provider.
+- **Quyết toán:**
+  - Khi stream kết thúc (xong, lỗi, hoặc client ngắt), phần giữ mà không dùng được trả lại.
+  - Cách đếm: lần gọi đầu tính 1. Mỗi vòng kết quả tool (`ToolResult`) tính thêm 1 lần cho lần gọi model sau nó, trừ khi `maxSteps` đã chặn lần gọi đó. Vì vậy số đếm có thể cao hơn thực tế, không bao giờ thấp hơn. Adapter thật phát `Usage` chen giữa `ToolCall` và `ToolResult` (đã khoá thứ tự này bằng test ở adapter), nên bộ đếm bỏ qua `Usage`: một lượt có gọi tool tính đúng 2 lần.
+  - Client ngắt giữa lượt: vẫn quyết toán theo số lần đã gọi (test: giữ 4, còn 1). Response mà client không bao giờ đọc body thì có thể giữ nguyên phần đã giữ (tính cao).
+  - Lượt lỗi vẫn bị tính.
+  - Process chết giữa lượt thì phần đã giữ không được trả lại.
+- **Trần mỗi lượt:**
+  - Mỗi lần gọi tối đa 2.048 token ra (`maxOutputTokens` mới trong `TurnRequest` của `AiPort`).
+  - Adapter TanStack đặt trần này vào `modelOptions` theo tên khoá của từng provider: `max_tokens` cho Anthropic và cho chat-completions, `maxOutputTokens` cho Gemini. Đã có test kiểm trần đi tới request Anthropic.
+  - Thân request demo tối đa 256 KiB (khách là 1 MiB), vì client gửi cả log mà key là của server.
+- **Công tắc:**
+  - Công tắc khách và công tắc demo tách riêng (mục 2.2): tắt khách không chặn demo, và ngược lại.
+  - Demo đóng (`403 DemoModeDisabled`) khi công tắc tắt, trần bằng 0, chưa có model demo, hoặc endpoint của model không còn trong danh sách.
+  - `GET /api/config` chỉ trả `demoMode: true` khi demo chạy được.
+  - Không đọc được DB thì trả 500 và không gọi provider.
+- **Prompt:** prompt hệ thống lấy từ `profile` trong log, mà log do client gửi. Vì vậy với demo, server thay `profile` bằng profile mặc định của server và chỉ giữ ngôn ngữ (tag BCP 47 hợp lệ, nếu không thì dùng `en`). Client vẫn tự chọn chủ đề và lịch sử hội thoại. Phần này được chặn bởi ngân sách và trần token, xem rủi ro 29.
+- **Key:** frame và log được xoá key demo y như key của khách. Log của lượt demo ghi tên model.
+- **Test:**
+  - 14 test mới, gồm:
+    - prompt trong log của client bị thay bằng prompt của server;
+    - lần gọi thứ N+1 bị từ chối và AI giả không được gọi;
+    - hai request đồng thời ở mép trần: đúng một request chạy;
+    - nâng trần thì dùng lại được; sang ngày mới đếm lại;
+    - lượt lỗi vẫn bị tính và key không lộ;
+    - trả lại phần giữ thừa; client ngắt thì không đếm thiếu;
+    - đóng khi công tắc tắt, trần 0 hoặc chưa có model; hai công tắc độc lập;
+    - từ chối `model`, `apiKey` và lịch sử quá lớn; biến env sai;
+    - đếm vòng gọi tool; `maxSteps` bị chặn ở mức đã giữ.
+  - 1 test ở adapter: trần token đi tới request Anthropic.
+  - Chạy thật trên bản build với Haiku, trần 2: hai lượt xong, lượt thứ ba trả `429 DemoQuotaExceeded`; key không có trong phản hồi hay log.
+- **Chưa làm:** đặt key demo từ UI admin (phải mã hoá bằng secret box như key của tài khoản). Ghi ở 06-viec-mo.
 

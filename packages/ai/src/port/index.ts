@@ -48,6 +48,8 @@ export interface TurnRequest<A = never> {
   readonly output?: Schema.Codec<A, unknown>;
   /** Upper bound on model calls in the tool loop. */
   readonly maxSteps?: number;
+  /** Upper bound on output tokens of each model call. */
+  readonly maxOutputTokens?: number;
 }
 
 export type FinishReason = 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'unknown';
