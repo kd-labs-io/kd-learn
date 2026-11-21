@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)). Đang làm phase 1: spike port AI xong (2026-11-21, [archive/spike-port-ai.md](archive/spike-port-ai.md)), đang làm phần chính ([loi-day-hoc.md](loi-day-hoc.md)), xong bước 0 và 2. Chi tiết ở [progress/phase-1.md](progress/phase-1.md)
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)). Đang làm phase 1: spike port AI xong (2026-11-21, [archive/spike-port-ai.md](archive/spike-port-ai.md)), đang làm phần chính ([loi-day-hoc.md](loi-day-hoc.md)), xong bước 0, 1 và 2. Chi tiết ở [progress/phase-1.md](progress/phase-1.md)
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 
