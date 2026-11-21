@@ -16,6 +16,7 @@
 | Mobile | Capacitor bọc bản build SPA của web. Dùng chung một bộ UI với web, không dùng Expo |
 | UI | [Astryx](https://astryx.atmeta.com) (MIT, React 19, đang beta) với theme riêng dựng từ `DESIGN.md`. Component riêng của kd-learn viết bằng StyleX dùng token có kiểu, qua plugin Vite của `@astryxdesign/build`; nếu không chạy được thì lùi về CSS Modules + `var(--...)`. Không dùng Tailwind và shadcn. Hạn chế `swizzle` |
 | Biểu đồ | TanStack Charts, màu lấy từ token Astryx qua `var(--...)` |
+| Hình graph | [sigma](https://www.sigmajs.org) 4 + graphology (MIT, WebGL), bố cục ForceAtlas2 (`graphology-layout-forceatlas2`) chạy trong Web Worker. Nạp lười, chỉ phía client; màu đọc từ token Astryx bằng `getComputedStyle`. Chọn sau spike bước 0 phase 3 (2026-11-21, [progress/phase-3.md](progress/phase-3.md)). Loại: TanStack Charts (không có kéo node), cytoscape (bố cục `cose` 48 s với 3.000 node), `@xyflow/react` (node là phần tử DOM, nhắm tới editor) |
 | DB | SQLite ở mọi nơi: SQLite trên server, SQLite WASM (OPFS) cho khách |
 | Driver SQLite khách | `@journeyapps/wa-sqlite` (ghim 2.0.x) với `OPFSCoopSyncVFS`, chạy trong Worker do `packages/storage` tự viết. Không cần COOP/COEP (không xung đột với iframe sandbox ở phase 5); nhiều tab cùng mở và ghi được; transaction chạy trọn trong Worker. Chọn sau spike bước 1 phase 1 (2026-11-21, [archive/phase-1.md](archive/phase-1.md)). Loại: VFS `opfs` của `@sqlite.org/sqlite-wasm` (cần COOP/COEP), `opfs-sahpool` (chỉ một tab mở được DB) |
 | Driver SQLite server | `node:sqlite` có sẵn trong Node 26 (lớp `Database`), gọi trực tiếp, một kết nối, WAL. Không addon native, chạy trong bản build Nitro và image `node:26-slim`/`-alpine`. Chọn sau spike bước 0 phase 2 (2026-11-21, [progress/phase-2.md](archive/phase-2.md)). Loại: `better-sqlite3` (addon native), `@effect/sql-sqlite-node` (unstable) |
@@ -45,7 +46,7 @@ Mỗi phase chỉ thêm thư viện khi thật sự cần. Các thư viện này
 | Virtual | Lịch sử buổi học dài, danh sách mệnh đề, danh sách bài luyện tập | 1 | Chốt |
 | Pacer | Chỉ phía UI: debounce ô tìm kiếm. Phía server dùng Effect | 1 | Khi cần. Gộp render khi stream đã nằm trong `Markdown` của Astryx (`useStreamingText`) |
 | DB (1.0 RC) | Store phản ứng phía client, nằm trên port `storage` cho DB local của khách | — | Không dùng ở phase 1 (spike 2026-11-21): chỉ chạy phía client (không SSR), adapter lưu bền của nó lưu JSON theo collection, không dùng chung được với driver server. Chạy được khi đặt phía trên port; xem lại ở phase 3 nếu màn hình graph cần live query |
-| Charts | Tiến độ học, mức nắm vững, lịch học, hạn mức demo; thử cho màn hình graph | 3 | Chốt |
+| Charts | Tiến độ học, mức nắm vững, lịch học, hạn mức demo. Không dùng cho hình graph (spike bước 0 phase 3, 2026-11-21): không có kéo node, tự kéo bằng cách dựng lại scene tốn 50 ms mỗi lần di với 3.000 node | 3 | Chốt |
 | Hotkeys (beta) | Phím tắt khi luyện tập | 3 | Khi cần |
 | Table | Duyệt mệnh đề của graph nếu cần lọc và sắp xếp phức tạp; còn lại dùng `Table` của Astryx | 3 | Khi cần |
 | Devtools, CLI, Config, Intent | Công cụ phát triển và phát hành; Intent cho `@kd-learn/ui` khi mở mã nguồn | — | Để sau |

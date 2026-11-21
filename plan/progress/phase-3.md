@@ -7,7 +7,7 @@
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Plan phần chính | Xong (2026-11-21). Chốt: một graph mỗi người, demo dùng được graph và luyện tập (tính chung ngân sách), bốn loại bài tập đầu tiên |
-| Bước 0: spike hình graph (C1) | Chưa bắt đầu |
+| Bước 0: spike hình graph (C1) | Xong (2026-11-21). TanStack Charts không có kéo node; chọn sigma 4 + graphology (WebGL, kéo 60 fps với 3.000 node). Xem ghi chú bước 0 bên dưới |
 | Bước 1: spike extraction với Haiku (C2, C3) | Xong (2026-11-21). Pipeline 3 lần gọi (extractor, auditor kiểm cả mệnh đề và cạnh, merge theo ứng viên của từng mệnh đề), chọn lát theo từ vựng K = 5 mỗi mệnh đề, giữ 5 quan hệ. Không dùng TanStack DB. Khoảng $0,007 mỗi buổi với Haiku. Xem ghi chú bước 1 bên dưới |
 | Bước 2: log kiến thức (core, storage) | Chưa bắt đầu |
 | Bước 3: hồ sơ dạy học v2, vai mới | Chưa bắt đầu |
@@ -34,6 +34,45 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 0: spike hình graph, C1 (2026-11-21)
+
+Thử nghiệm bằng prototype tạm (thư mục scratch ngoài repo, không giữ, không thêm dependency vào repo) trên macOS, Chromium của Playwright 1.65.1. Graph giả: 3.000 node, 4.000 cạnh có hướng có nhãn, 30 cụm (85 % cạnh trong cụm), seed cố định. Kéo node: Playwright giữ chuột trên một node và di 60 bước; đếm `requestAnimationFrame` trong lúc kéo (trang trống đo được 61 fps). CPU chậm: CDP `Emulation.setCPUThrottlingRate` 4x. Bundle: esbuild, minify, gzip.
+
+### Tài liệu hiện hành (tra ngày 2026-11-21, từ npm và tài liệu đóng gói trong package)
+
+| Thư viện | Phiên bản | Giấy phép | Ghi chú |
+| --- | --- | --- | --- |
+| `@tanstack/charts` | 1.5.0 (đã qua 1.0, theo hợp đồng tương thích của bản 1.x trong `docs/compatibility.md` của package) | MIT | Có trang "Networks and Hierarchies": `forceLayout` (`@tanstack/charts/network/force`) chạy mô phỏng D3 force **tĩnh, đồng bộ**, trả hàng dữ liệu cho mark thường (`dot`, `arrow`, `text`, `link`). Có Sankey, tree, Delaunay. Renderer SVG (mặc định) và Canvas 2D. Có focus, chọn (`selection`), bàn phím, pan / zoom. **Không có kéo node**: tài liệu chỉ có kéo cho brush / pan, kéo dữ liệu là việc của ứng dụng (tự xử lý pointer rồi dựng lại definition) |
+| `sigma` + `graphology` | 4.0.6 + 0.26.0 | MIT | WebGL, "graphs of thousands of nodes and edges" ([sigmajs.org](https://www.sigmajs.org)). Mũi tên qua `primitives.edges.extremities: [extremityArrow()]` (`sigma/rendering`), nhãn cạnh qua `renderEdgeLabels`. Sự kiện `downNode` / `moveBody` / `upStage` để kéo; có `MouseCaptor`, `TouchCaptor`; trạng thái `hidden`, `highlighted` theo node để chỉ hiện lân cận. Không có xử lý bàn phím (không có `keydown` trong bundle). Màu là chuỗi trong thuộc tính node, không đọc `var(--...)`: phải đọc token bằng `getComputedStyle` và gán lại khi đổi theme |
+| `graphology-layout-forceatlas2` | 0.10.1 | MIT | Bố cục ForceAtlas2, có bản chạy trong Web Worker (`worker.js`) |
+| `@react-sigma/core` | 6.0.0 | MIT | Binding React cho sigma 4 (peer `react ^18 \|\| ^19`). Không cần cho spike |
+| `cytoscape` | 3.35.0 | MIT | Canvas 2D. Mũi tên, nhãn cạnh, kéo node có sẵn. Không có xử lý bàn phím |
+| `@xyflow/react` | 13.0.2 | MIT | "Library for building node-based editors": mỗi node là phần tử DOM React. Không đo: nhắm tới editor vài chục tới vài trăm node, không hợp vài nghìn |
+| `reagraph` | 4.32.0 | Apache-2.0 | Không xét thêm (WebGL qua three.js, giấy phép khác MIT) |
+
+### Kết quả đo (3.000 node, 4.000 cạnh)
+
+| | Bundle (gzip) | Bố cục | Render đầu | Kéo node | Heap JS |
+| --- | --- | --- | --- | --- | --- |
+| TanStack Charts (Canvas, `forceLayout` 300 vòng) | 42 KiB | 2,1 s (4x: 8,6 s) | 69 ms | Không có sẵn; tự kéo = dựng lại definition: **50 ms mỗi lần di** (4x: 200 ms), tức tối đa khoảng 20 fps (4x: 5 fps) chưa tính vẽ | 87 MiB |
+| sigma 4 + graphology (WebGL, ForceAtlas2 100 vòng, Barnes-Hut) | 116 KiB | 0,8 s (4x: 3,3 s) | 1,0 s lần đầu có GPU (gồm tạo context WebGL) | **61 fps** (4x: 62 fps) với GPU thật; 11 fps khi WebGL chạy phần mềm (SwiftShader) | 58 MiB |
+| cytoscape (Canvas, bố cục `cose` 300 vòng) | 142 KiB | **48 s** (4x: 195 s) | — | 45 fps (4x: 12 fps) | 104 MiB |
+
+- Bố cục của cả ba chạy trên luồng chính trong prototype. TanStack `forceLayout` đo riêng trong Node: 0,76 s với 100 vòng, 2,3 s với 300 vòng.
+- WebGL chạy phần mềm (máy không có GPU, một số VM) làm sigma tụt còn 11 fps khi kéo; điện thoại thật đều có GPU, nhưng chưa thử trên máy thật (phase 6).
+
+### Kết luận C1
+
+- **TanStack Charts không đạt cho hình graph:** có bố cục force và mark mũi tên / chữ, nhưng không có kéo node; tự kéo bằng cách dựng lại cả scene tốn 50 ms mỗi lần di trên máy tính, 200 ms khi CPU chậm 4x. Vẫn dùng TanStack Charts cho các biểu đồ khác (tiến độ, mức nắm vững, hạn mức demo).
+- **Cytoscape loại:** bố cục `cose` mất 48 s với 3.000 node.
+- **Chọn sigma 4 + graphology** (+ ForceAtlas2): MIT, WebGL, kéo 60 fps cả khi CPU chậm 4x, bố cục 0,8 s (3,3 s khi chậm 4x). Ở bước 9:
+  - chạy ForceAtlas2 trong Web Worker (bản `worker` của package), không chặn luồng chính;
+  - nạp lười bằng `import()` chỉ phía client (sigma cần `WebGL` và DOM, không chạy khi SSR); chưa thử trong TanStack Start, kiểm ở bước 9;
+  - màu: đọc token Astryx bằng `getComputedStyle` rồi gán vào thuộc tính node / cạnh, gán lại khi đổi theme;
+  - bàn phím: canvas không có; đường cho bàn phím và trình đọc màn hình là danh sách mệnh đề (A9). Chọn node trong danh sách thì hình graph chọn theo;
+  - kiểm bằng mắt mũi tên và nhãn cạnh ở bước 9 (spike chỉ xác nhận cấu hình chạy không lỗi).
+- **Hiện graph lớn cho đọc được:** mặc định hiện **lân cận 1–2 bước của mệnh đề đang chọn** (hoặc các mệnh đề của một chủ đề đang lọc), ẩn phần còn lại bằng trạng thái `hidden`. Chế độ "toàn bộ" chỉ để nhìn cụm: tô màu theo chủ đề, nhãn node chỉ hiện khi đủ chỗ hoặc khi hover / chọn, nhãn cạnh chỉ hiện trong lân cận. Vị trí bố cục là dữ liệu hiển thị, không ghi vào log kiến thức.
 
 ## Bước 1: spike extraction với Haiku (C2, C3) (2026-11-21)
 
