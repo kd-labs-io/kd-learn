@@ -4,6 +4,7 @@
 - Chat: reply in the conversation's language.
 - Code, names, comments: English.
 - `plan/**`, `proble/**` : using language in the file.
+- MVP, solo developer: when a PR's CI is green and you are confident in the change, merge it into `main` without asking.
 
 ## Directories
 
