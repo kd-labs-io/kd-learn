@@ -10,4 +10,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0 (spike C1, C2) xong; bước hiện tại: bước 1, driver SQLite server. Tiến độ ở [progress/phase-2.md](progress/phase-2.md).
+Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0, 1 xong; bước hiện tại: bước 2 (auth) và bước 3 (key mã hoá, cài đặt theo vai). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).

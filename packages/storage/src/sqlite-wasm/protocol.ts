@@ -1,22 +1,12 @@
 // Messages between the page (index.ts) and the Worker (worker.ts). Structured-clone values only.
+import type { EventRow, SessionRow } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 
-/** An event as stored: the payload is the JSON of the whole event. */
-export interface WireEvent {
-  readonly id: string;
-  readonly tag: string;
-  readonly at: number;
-  readonly payload: string;
-}
+/** An event as stored. */
+export type WireEvent = EventRow;
 
-export interface WireSession {
-  readonly sessionId: string;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  readonly eventCount: number;
-  /** Payload of the `SessionCreated` event, when the session has one. */
-  readonly created: string | undefined;
-}
+/** One row of the session list. */
+export type WireSession = SessionRow;
 
 export type Operation =
   | { readonly op: 'open'; readonly name: string }

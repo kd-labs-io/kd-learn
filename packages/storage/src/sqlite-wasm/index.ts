@@ -3,8 +3,8 @@
 // and the WASM file are part of its module graph, so apps must load it through a dynamic import
 // guarded by `import.meta.env.SSR` (see apps/web/src/storage/client.ts). Then the server bundle
 // never contains it.
-import { Effect, Queue, Schema, Stream } from 'effect';
-import { DomainEvent, type EventLog } from '@kd-learn/core';
+import { Effect, Queue, Stream } from 'effect';
+import type { EventLog } from '@kd-learn/core';
 import {
   StorageBusy,
   StorageFailure,
@@ -12,11 +12,11 @@ import {
   type AppendResult,
   type GuestProvider,
   type GuestSettings,
-  type SessionSummary,
   type StorageChange,
   type StorageError,
   type StorageService,
 } from '../port/index.ts';
+import { decodeLog as decodePayloads, summarize, toEventRow } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 import type { AppendReply, Operation, Response, WireSession } from './protocol.ts';
 
@@ -35,7 +35,6 @@ export interface WasmStorage extends StorageService {
 }
 
 const providers: ReadonlyArray<GuestProvider> = ['anthropic', 'gemini', 'openai-compatible'];
-const decodeEvent = Schema.decodeUnknownSync(DomainEvent);
 
 /**
  * Opens the database. Fails with `StorageUnavailable` only when this context cannot hold one (no
@@ -138,7 +137,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
 
   const decodeLog = (payloads: ReadonlyArray<string>) =>
     Effect.try({
-      try: (): EventLog => payloads.map((payload) => decodeEvent(JSON.parse(payload))),
+      try: (): EventLog => decodePayloads(payloads),
       catch: (error) =>
         new StorageFailure({
           message: `Stored event is not valid: ${error instanceof Error ? error.message : String(error)}`,
@@ -162,25 +161,6 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     return { entries, remove };
   };
 
-  const summarize = (row: WireSession): SessionSummary => {
-    let topic = '';
-    if (row.created !== undefined) {
-      try {
-        const event = decodeEvent(JSON.parse(row.created));
-        if (event._tag === 'SessionCreated') topic = event.topic;
-      } catch {
-        // A damaged SessionCreated must not hide the session from the list.
-      }
-    }
-    return {
-      sessionId: row.sessionId,
-      topic,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      eventCount: row.eventCount,
-    };
-  };
-
   return {
     persistent: true,
 
@@ -193,12 +173,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
         : call<AppendReply>({
             op: 'append',
             sessionId,
-            events: events.map((event) => ({
-              id: event.id,
-              tag: event._tag,
-              at: event.at,
-              payload: JSON.stringify(event),
-            })),
+            events: events.map(toEventRow),
           }).pipe(
             Effect.tap(() => Effect.sync(() => committed({ _tag: 'SessionChanged', sessionId }))),
           ),

@@ -1,4 +1,6 @@
 {
   "extends": "@kd-learn/config/tsconfig/dom.json",
+  "//": "DOM for the sqlite-wasm driver, Node for the sqlite-node driver.",
+  "compilerOptions": { "types": ["node"] },
   "include": ["src"]
 }

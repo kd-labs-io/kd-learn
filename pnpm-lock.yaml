@@ -537,6 +537,9 @@ importers:
       '@kd-learn/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
