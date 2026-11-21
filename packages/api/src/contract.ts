@@ -11,6 +11,9 @@ export const LOGIN_PATH = '/api/auth/login';
 export const LOGOUT_PATH = '/api/auth/logout';
 export const ME_PATH = '/api/auth/me';
 export const INVITES_PATH = '/api/admin/invites';
+export const ACCOUNT_SETTINGS_PATH = '/api/account/settings';
+export const CONNECTIONS_PATH = '/api/account/connections';
+export const ROLES_PATH = '/api/account/roles';
 
 const Secret = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512));
 const ModelName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200));
@@ -95,6 +98,12 @@ export const ErrorCode = {
   /** Registration needs an invite, and the code is missing, used, expired or unknown. */
   InvalidInvite: 'InvalidInvite',
   EmailTaken: 'EmailTaken',
+  /** The resource does not exist, or belongs to another account (same answer, plan A3). */
+  NotFound: 'NotFound',
+  /** No connection and model set for this role yet (account settings). */
+  RoleNotConfigured: 'RoleNotConfigured',
+  /** A stored key cannot be decrypted (the master key changed). Enter the key again. */
+  KeyUnreadable: 'KeyUnreadable',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -186,3 +195,59 @@ export type CreateInviteRequest = typeof CreateInviteRequest.Type;
 /** The code is shown once; the server keeps only its hash. */
 export const InviteResponse = Schema.Struct({ code: Token, expiresAt: Schema.Number });
 export type InviteResponse = typeof InviteResponse.Type;
+
+// Account settings (plan tai-khoan.md A5, A6). A key goes in once and never comes back out:
+// responses carry only `hasKey` and the last 4 characters.
+
+/** Roles that pick their own model. Phase 3 adds more keys without changing the shape. */
+export const ModelRole = Schema.Literals(['prober', 'teacher', 'sideChat']);
+export type ModelRole = typeof ModelRole.Type;
+
+const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80));
+
+/** `POST /api/account/connections`. ACP connections come with step 7. */
+export const CreateConnectionRequest = Schema.Union([
+  Schema.Struct({ label: Label, provider: Schema.Literal('anthropic'), apiKey: Secret }),
+  Schema.Struct({ label: Label, provider: Schema.Literal('gemini'), apiKey: Secret }),
+  Schema.Struct({
+    label: Label,
+    provider: Schema.Literal('openai-compatible'),
+    endpointId: EndpointId,
+    apiKey: Secret,
+  }),
+]);
+export type CreateConnectionRequest = typeof CreateConnectionRequest.Type;
+
+export const ConnectionInfo = Schema.Struct({
+  id: Schema.NonEmptyString,
+  label: Schema.String,
+  provider: Schema.Literals(['anthropic', 'gemini', 'openai-compatible']),
+  endpointId: Schema.optionalKey(EndpointId),
+  hasKey: Schema.Boolean,
+  /** Last 4 characters of the key, to tell keys apart. */
+  keyLast4: Schema.optionalKey(Schema.String),
+  createdAt: Schema.Number,
+});
+export type ConnectionInfo = typeof ConnectionInfo.Type;
+
+export const RoleModel = Schema.Struct({ connectionId: Schema.NonEmptyString, model: ModelName });
+export type RoleModel = typeof RoleModel.Type;
+
+/** Role → connection and model. A missing role is not configured. */
+export const RoleModels = Schema.Struct({
+  prober: Schema.optionalKey(RoleModel),
+  teacher: Schema.optionalKey(RoleModel),
+  sideChat: Schema.optionalKey(RoleModel),
+});
+export type RoleModels = typeof RoleModels.Type;
+
+/** `PUT /api/account/roles`: replaces the whole map. */
+export const SetRolesRequest = Schema.Struct({ roles: RoleModels });
+export type SetRolesRequest = typeof SetRolesRequest.Type;
+
+/** `GET /api/account/settings`. */
+export const AccountSettings = Schema.Struct({
+  connections: Schema.Array(ConnectionInfo),
+  roles: RoleModels,
+});
+export type AccountSettings = typeof AccountSettings.Type;

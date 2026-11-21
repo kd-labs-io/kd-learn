@@ -9,7 +9,7 @@
 | Bước 0: spike driver SQLite server, auth (C1, C2) | Xong (2026-11-21). Driver: `node:sqlite` thô. Auth: tự viết tối thiểu, Bearer cho cả web và Capacitor. Xem ghi chú bước 0 bên dưới |
 | Bước 1: driver SQLite server | Xong (2026-11-21). `@kd-learn/storage/sqlite-node`: `openServerDatabase`, `makeServerStorage(db).forUser(userId)`, migration riêng của server, bảng `sessions`. Xem ghi chú bước 1 bên dưới |
 | Bước 2: auth | Xong (2026-11-21). `packages/server/src/auth/`, route `/api/auth/*`, `/api/admin/invites`. Xem ghi chú bước 2 bên dưới |
-| Bước 3: key mã hoá, cài đặt theo vai | Chưa bắt đầu |
+| Bước 3: key mã hoá, cài đặt theo vai | Xong (2026-11-21). `packages/server/src/settings/`, route `/api/account/*`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: lượt chạy trên server | Chưa bắt đầu |
 | Bước 5: công tắc admin | Chưa bắt đầu |
 | Bước 6: demo, ngân sách chung | Chưa bắt đầu |
@@ -123,4 +123,34 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - log không chứa email, mật khẩu, token, mã mời, kể cả ở các nhánh lỗi;
   - giới hạn theo IP; `X-Forwarded-For` giả ở mục đầu không có tác dụng.
 - **Chưa làm (ở bước sau):** API admin để mở khoá, tắt tài khoản, đổi chế độ đăng ký (bước 5); UI (bước 8).
+
+## Bước 3: key mã hoá và cài đặt theo vai (2026-11-21)
+
+- **Bảng (migration v3):**
+  - `connections`: provider, `endpoint_id`, key đã mã hoá, `key_version`, 4 ký tự cuối.
+  - `role_models`: khoá chính `(user_id, role)`; xoá kết nối thì vai dùng nó tự bỏ đặt (`ON DELETE CASCADE`).
+- **`settings/secret-box.ts`:** AES-256-GCM, IV 12 byte ngẫu nhiên mỗi bản ghi, lưu dạng `iv.ciphertext.tag` (base64).
+  - Dữ liệu xác thực kèm (AAD) là `connection:<userId>:<connectionId>`. Ciphertext chép sang dòng khác hay tài khoản khác thì không giải mã được (có test).
+  - Bảng key theo phiên bản (`Map<version, key>`), nên đổi master key sau này mở được bản ghi cũ. Phase 2 chỉ có phiên bản 1.
+- **`settings/service.ts`:** mọi truy vấn lọc theo chủ sở hữu.
+  - `resolveModel(userId, role)` là chỗ duy nhất giải mã key, trả `ModelRef` cho lượt chạy.
+  - Các kết quả lỗi: `RoleNotConfigured`; `UnknownEndpoint` (endpoint không còn trong danh sách cho phép của server); `KeyUnreadable` (master key đã đổi hoặc dòng bị sửa: người dùng nhập lại key).
+  - Bước 4 sẽ dùng hàm này cho từng vai.
+  - Kết nối ACP để tới bước 7. Schema hợp đồng đã chừa chỗ, vì `provider` là một union.
+- **API:** đi qua một handler `account` định tuyến theo đường dẫn, gắn vào route catch-all `/api/account/$`.
+  - `GET /api/account/settings`.
+  - `POST /api/account/connections`. Không nhận `baseURL`: tham số dư bị từ chối, giống rủi ro 6.
+  - `DELETE /api/account/connections/:id`.
+  - `PUT /api/account/roles`: thay cả bản đồ.
+  - Phản hồi chỉ có `hasKey` và `keyLast4`. `keyLast4` chỉ có khi key dài từ 12 ký tự, để key ngắn không lộ gần hết.
+  - Kết nối của người khác trả 404 như kết nối không tồn tại.
+  - CORS thêm `PUT`, `DELETE`.
+- **`KD_LEARN_SECRET_KEY`:** bắt buộc cho tài khoản. Thiếu hoặc sai thì route tài khoản trả 500, còn route khách vẫn chạy (A5 đã sửa theo). Key đã thêm vào `.env` của máy dev.
+- **Test (14 mới):**
+  - mã hoá: khứ hồi; sai ngữ cảnh, sai phiên bản, sai key, bản ghi bị sửa đều bị từ chối; mở được bản ghi cũ sau khi đổi key;
+  - DB chỉ chứa ciphertext; phản hồi và log không có key;
+  - tách người dùng: kết nối của người khác thì không gán vào vai được, không xoá được, không thấy;
+  - thiếu master key thì route tài khoản trả 500, route khách vẫn 200.
+  - Chạy thật trên bản build bằng `curl`: tạo kết nối, đặt vai, xoá; key không có trong log và trong các file DB.
+- **Dọn code:** các helper route dùng chung (kiểm method, chờ tài khoản sẵn sàng, đọc JSON, lấy người dùng hiện tại) chuyển sang `src/routes.ts`; helper HTTP sang `src/http.ts`.
 

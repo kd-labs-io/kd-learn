@@ -15,6 +15,7 @@ import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
 import { Route as SSessionIdRouteImport } from './routes/s.$sessionId'
+import { Route as ApiAccountSplatRouteImport } from './routes/api.account.$'
 import { Route as ApiAdminInvitesRouteImport } from './routes/api.admin.invites'
 import { Route as ApiAuthActionRouteImport } from './routes/api.auth.$action'
 
@@ -48,6 +49,11 @@ const SSessionIdRoute = SSessionIdRouteImport.update({
   path: '/s/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAccountSplatRoute = ApiAccountSplatRouteImport.update({
+  id: '/api/account/$',
+  path: '/api/account/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminInvitesRoute = ApiAdminInvitesRouteImport.update({
   id: '/api/admin/invites',
   path: '/api/admin/invites',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/account/$': typeof ApiAccountSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/account/$': typeof ApiAccountSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/account/$': typeof ApiAccountSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/account/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/account/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/account/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   ApiTurnsRoute: typeof ApiTurnsRoute
   DevStorageRoute: typeof DevStorageRoute
   SSessionIdRoute: typeof SSessionIdRoute
+  ApiAccountSplatRoute: typeof ApiAccountSplatRoute
   ApiAdminInvitesRoute: typeof ApiAdminInvitesRoute
   ApiAuthActionRoute: typeof ApiAuthActionRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/account/$': {
+      id: '/api/account/$'
+      path: '/api/account/$'
+      fullPath: '/api/account/$'
+      preLoaderRoute: typeof ApiAccountSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/invites': {
       id: '/api/admin/invites'
       path: '/api/admin/invites'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTurnsRoute: ApiTurnsRoute,
   DevStorageRoute: DevStorageRoute,
   SSessionIdRoute: SSessionIdRoute,
+  ApiAccountSplatRoute: ApiAccountSplatRoute,
   ApiAdminInvitesRoute: ApiAdminInvitesRoute,
   ApiAuthActionRoute: ApiAuthActionRoute,
 }

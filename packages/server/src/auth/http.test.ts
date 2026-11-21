@@ -1,29 +1,6 @@
-import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { openServerDatabase } from '@kd-learn/storage/sqlite-node';
-import { createHandlers } from '../index.ts';
-import type { Handlers, LogEntry, RequestContext } from '../index.ts';
-
-const ADMIN = { email: 'root@kd.test', password: 'admin-password-1' };
-const USER = { email: 'learner@kd.test', password: 'learner-password-1' };
-
-const make = (env: Record<string, string> = {}) => {
-  const logs: LogEntry[] = [];
-  const handlers = createHandlers(
-    {
-      KD_LEARN_ADMIN_EMAIL: ADMIN.email,
-      KD_LEARN_ADMIN_PASSWORD: ADMIN.password,
-      KD_LEARN_REGISTRATION: 'open',
-      KD_CORS_ORIGINS: 'capacitor://localhost',
-      ...env,
-    },
-    {
-      log: (entry) => logs.push(entry),
-      database: Effect.runSync(openServerDatabase({ path: ':memory:' })),
-    },
-  );
-  return { handlers, logs };
-};
+import { ADMIN, USER, make } from './test-support.ts';
+import type { Handlers, RequestContext } from '../index.ts';
 
 const post = (
   handler: Handlers[keyof Handlers],

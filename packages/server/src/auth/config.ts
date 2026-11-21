@@ -1,6 +1,7 @@
 // Account configuration from the environment (plan tai-khoan.md A4). Messages name the variable,
 // never its value.
 import { ConfigError } from '../config.ts';
+import { loadMasterKey } from '../settings/secret-box.ts';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './password.ts';
 import { registrationModes, type RegistrationMode } from './service.ts';
 
@@ -17,6 +18,8 @@ export interface AccountConfig {
    * can send it.
    */
   readonly trustProxy: boolean;
+  /** `KD_LEARN_SECRET_KEY`: encrypts provider keys (plan A5). Required for accounts. */
+  readonly masterKey: Buffer;
 }
 
 export const DEFAULT_DB_PATH = 'data/kd-learn.db';
@@ -28,6 +31,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * - `KD_LEARN_ADMIN_EMAIL`, `KD_LEARN_ADMIN_PASSWORD`: the first admin.
  * - `KD_LEARN_REGISTRATION`: `open`, `invite` (default) or `closed`.
  * - `KD_LEARN_TRUST_PROXY`: `1` or `true` behind a reverse proxy.
+ * - `KD_LEARN_SECRET_KEY`: required, 32 bytes in base64. Without it the account routes refuse to
+ *   run (guest mode does not need it).
  */
 export const loadAccountConfig = (
   env: Readonly<Record<string, string | undefined>>,
@@ -60,6 +65,7 @@ export const loadAccountConfig = (
     admin: email === '' ? undefined : { email, password },
     registration,
     trustProxy: trust === '1' || trust === 'true',
+    masterKey: loadMasterKey(env),
   };
 };
 

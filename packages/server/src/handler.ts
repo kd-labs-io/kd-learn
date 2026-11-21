@@ -27,6 +27,8 @@ import {
   type Accounts,
 } from './auth/http.ts';
 import type { AuthOptions } from './auth/service.ts';
+import { makeRouteKit } from './routes.ts';
+import { makeSettingsHandler } from './settings/http.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
 export type LogFields = Readonly<Record<string, string | number | boolean>>;
@@ -270,6 +272,8 @@ export const handleEndpoints = async (request: Request, deps: HandlerDeps): Prom
 export interface Handlers extends AccountHandlers {
   readonly turns: Handler;
   readonly endpoints: Handler;
+  /** Everything under `/api/account/` (settings, connections, roles). */
+  readonly account: Handler;
 }
 
 export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
@@ -327,6 +331,7 @@ export const createHandlers = (
       logout: broken,
       me: broken,
       invites: broken,
+      account: broken,
     };
   }
   const deps: HandlerDeps = { ...options, config, log };
@@ -334,12 +339,14 @@ export const createHandlers = (
   // Accounts are optional: a bad account variable breaks only the account routes, and the guest
   // routes keep working. The database opens on the first account request.
   let accountRoutes: AccountHandlers;
+  let account: Handler;
   try {
     const accountConfig = loadAccountConfig(env);
     let ready: Promise<Accounts> | undefined;
     const accounts = () => {
       ready ??= initAccounts(accountConfig, {
         log,
+        endpoints: () => config.endpoints,
         ...(options.database ? { database: options.database } : {}),
         ...(options.auth ? { auth: options.auth } : {}),
       }).catch((error: unknown) => {
@@ -352,6 +359,7 @@ export const createHandlers = (
       return ready;
     };
     accountRoutes = makeAccountHandlers(accounts, config, accountConfig, log);
+    account = makeSettingsHandler(makeRouteKit({ accounts, config, accountConfig, log }), log);
   } catch (error) {
     configFailed(error);
     accountRoutes = {
@@ -361,6 +369,7 @@ export const createHandlers = (
       me: broken,
       invites: broken,
     };
+    account = broken;
   }
 
   const wrap = (handler: Handler) => safely(handler, log);
@@ -372,5 +381,6 @@ export const createHandlers = (
     logout: wrap(accountRoutes.logout),
     me: wrap(accountRoutes.me),
     invites: wrap(accountRoutes.invites),
+    account: wrap(account),
   };
 };
