@@ -11,4 +11,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): bước đầu là lập plan phần chính của phase 2 (`plan/tai-khoan.md`, theo mẫu plan phase 1 ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)), mở bằng một spike chọn thư viện auth và driver SQLite server sau khi đọc tài liệu hiện hành (mục 6). Khi bắt đầu làm thì tạo `progress/phase-2.md`.
+Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Ba quyết định sản phẩm đã chốt (A4, A6, A8). Bước 0 là spike chọn driver SQLite server và thư viện auth (C1, C2). Khi bắt đầu làm thì tạo `progress/phase-2.md`.
