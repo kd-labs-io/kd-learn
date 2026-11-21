@@ -115,10 +115,14 @@ export const StepSkipped = Schema.TaggedStruct('StepSkipped', {
   stepId: StepId,
 });
 
-/** Written in the same transaction as the event that resolved the last step. */
+/**
+ * Written in the same transaction as the event that resolved the last step. `turnId` is the turn
+ * whose tool completed the step; absent when the learner skipped the last step (`StepSkipped` has
+ * no turn, so neither has the event that follows it).
+ */
 export const SessionCompleted = Schema.TaggedStruct('SessionCompleted', {
   ...base,
-  turnId: TurnId,
+  turnId: Schema.optionalKey(TurnId),
 });
 
 /** Side chat (A5): own thread, never part of the main history, never changes session state. */

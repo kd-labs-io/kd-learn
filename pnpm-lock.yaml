@@ -262,6 +262,12 @@ importers:
       '@fontsource-variable/source-serif-4':
         specifier: ^5.3.1
         version: 5.3.1
+      '@kd-learn/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@kd-learn/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@kd-learn/core':
         specifier: workspace:*
         version: link:../../packages/core

@@ -189,6 +189,22 @@ describe('projectSession', () => {
     expect(afterB.state).toEqual({ _tag: 'Teaching', stepId: undefined, turnsInStep: 0 });
   });
 
+  it('lets the learner skip the last step: SessionCompleted without a turn', () => {
+    const noTurn = (): DomainEvent => ({ _tag: 'SessionCompleted', ...meta() });
+    const full = project(
+      ...teachingLog(),
+      stepSkipped('a'),
+      stepSkipped('b'),
+      noTurn(),
+    );
+    expect(full.state).toEqual({ _tag: 'Done' });
+    expect(full.skippedSteps).toEqual(['a', 'b']);
+    // Still checked: not valid while a step is left.
+    expect(errorOf(...teachingLog(), stepSkipped('a'), noTurn()).index).toBe(
+      teachingLog().length + 1,
+    );
+  });
+
   it('counts turns on a step and allows skipping after M of them', () => {
     const base = teachingLog();
     const one = project(...base, started('t4'), done('t4'));
