@@ -2,7 +2,14 @@
 // Plain data, no IO: the server decodes requests and encodes frames with these schemas, the
 // client does the opposite, and neither side hand-writes JSON shapes.
 import { Schema } from 'effect';
-import { DomainEvent, EventLog, SavedProfile, TeachingProfile } from '@kd-learn/core';
+import {
+  DomainEvent,
+  EventLog,
+  GraphSlice,
+  KnowledgeEvent,
+  SavedProfile,
+  TeachingProfile,
+} from '@kd-learn/core';
 
 export const TURNS_PATH = '/api/turns';
 export const ENDPOINTS_PATH = '/api/endpoints';
@@ -16,6 +23,8 @@ export const CONNECTIONS_PATH = '/api/account/connections';
 export const ROLES_PATH = '/api/account/roles';
 export const PROFILE_PATH = '/api/account/profile';
 export const SESSIONS_PATH = '/api/account/sessions';
+export const EXTRACT_PATH = '/api/knowledge/extract';
+export const EXTRACTIONS_PATH = '/api/account/knowledge/extractions';
 export const CONFIG_PATH = '/api/config';
 export const ADMIN_CONFIG_PATH = '/api/admin/config';
 export const ADMIN_USERS_PATH = '/api/admin/users';
@@ -119,7 +128,10 @@ export const ErrorCode = {
   TurnTimeout: 'TurnTimeout',
   /** The admin turned guest mode off: `POST /api/turns` is closed (plan A7). */
   GuestModeDisabled: 'GuestModeDisabled',
-  /** The change would lock the admin out (disabling their own account). */
+  /**
+   * The change would lock the admin out (disabling their own account), or the result of an
+   * extraction no longer fits the knowledge log (phase 3 A3, retryable).
+   */
   Conflict: 'Conflict',
   /** Demo mode is off, its budget is 0, or the server has no demo model (plan A8). */
   DemoModeDisabled: 'DemoModeDisabled',
@@ -131,6 +143,8 @@ export const ErrorCode = {
   AcpModelNotAllowed: 'AcpModelNotAllowed',
   /** Every ACP agent slot of the server is in use (plan A9). Retryable. */
   AcpBusy: 'AcpBusy',
+  /** The session is already being extracted, or waits in the queue (phase 3 A3). */
+  ExtractionInProgress: 'ExtractionInProgress',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -530,3 +544,58 @@ export const UpdateUserRequest = Schema.Struct({
   unlock: Schema.optionalKey(Schema.Literal(true)),
 });
 export type UpdateUserRequest = typeof UpdateUserRequest.Type;
+
+// Knowledge (phase 3 A3). Guest and demo: the client writes `ExtractionStarted`, sends the session
+// log and its graph slice, and writes the batch it gets back. The server keeps nothing.
+
+/** `POST /api/knowledge/extract`. Decode with `onExcessProperty: 'error'`. */
+export const ExtractRequest = Schema.Struct({
+  model: ModelChoice,
+  /** Id of the attempt the client wrote as `ExtractionStarted`. */
+  extractionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  /** The whole log of the session to extract. */
+  log: EventLog,
+  /** Propositions close to the session (A4), picked by the client from its knowledge log. */
+  slice: GraphSlice,
+  /** The profile in use (A2). Absent: the default. Ignored in demo mode. */
+  profile: Schema.optionalKey(SavedProfile),
+});
+export type ExtractRequest = typeof ExtractRequest.Type;
+
+/** The batch to write: graph events, then `SessionExtracted`. Fit it to the graph before writing. */
+export const ExtractResultFrame = Schema.TaggedStruct('result', {
+  events: Schema.Array(KnowledgeEvent),
+});
+
+/** Frames of `POST /api/knowledge/extract`: `result` or `error`, then `done`. */
+export const ExtractFrame = Schema.Union([ExtractResultFrame, ErrorFrame, DoneFrame]);
+export type ExtractFrame = typeof ExtractFrame.Type;
+
+/** Status of one session's extraction in an account (A3). `queued`: waits for another one. */
+export const ExtractionState = Schema.Literals([
+  'none',
+  'queued',
+  'running',
+  'failed',
+  'extracted',
+]);
+export type ExtractionState = typeof ExtractionState.Type;
+
+export const SessionExtraction = Schema.Struct({
+  sessionId: Schema.NonEmptyString,
+  topic: Schema.String,
+  /** The session reached `SessionCompleted`. Only those are extracted by themselves. */
+  completed: Schema.Boolean,
+  state: ExtractionState,
+  /** The last failure, when `state` is `failed`. */
+  failure: Schema.optionalKey(Failure),
+});
+export type SessionExtraction = typeof SessionExtraction.Type;
+
+/** `GET /api/account/knowledge/extractions`: every session of the account, newest first. */
+export const ExtractionList = Schema.Struct({ sessions: Schema.Array(SessionExtraction) });
+export type ExtractionList = typeof ExtractionList.Type;
+
+/** `POST /api/account/knowledge/extractions`: extract now, or retry (202, then the list changes). */
+export const ExtractSessionRequest = Schema.Struct({ sessionId: Schema.NonEmptyString });
+export type ExtractSessionRequest = typeof ExtractSessionRequest.Type;

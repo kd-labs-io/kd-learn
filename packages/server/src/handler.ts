@@ -33,6 +33,7 @@ import {
 import type { AuthOptions } from './auth/service.ts';
 import { makeRouteKit } from './routes.ts';
 import { makeSettingsHandler } from './settings/http.ts';
+import { handleExtract } from './knowledge/extract-route.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
 export type LogFields = Readonly<Record<string, string | number | boolean>>;
@@ -92,7 +93,7 @@ export type Handler = (request: Request, context?: RequestContext) => Promise<Re
 
 const encoder = new TextEncoder();
 
-const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
+export const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
   Effect.callback<void>((resume) => {
     if (signal.aborted) return resume(Effect.void);
     const onAbort = () => resume(Effect.void);
@@ -100,7 +101,7 @@ const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
     return Effect.sync(() => signal.removeEventListener('abort', onAbort));
   });
 
-const toModelRef = (
+export const toModelRef = (
   choice: Exclude<ModelChoice, { provider: 'demo' }>,
   config: ServerConfig,
 ): ModelRef | undefined => {
@@ -379,6 +380,8 @@ export const handleEndpoints = async (request: Request, deps: HandlerDeps): Prom
 
 export interface Handlers extends AccountHandlers {
   readonly turns: Handler;
+  /** `POST /api/knowledge/extract` (guest and demo extraction, phase 3 A3). */
+  readonly extract: Handler;
   readonly endpoints: Handler;
   /** Everything under `/api/account/` (settings, connections, roles, sessions). */
   readonly account: Handler;
@@ -448,13 +451,19 @@ export const createHandlers = (
     config = loadConfig(env);
   } catch (error) {
     configFailed(error);
-    return { turns: broken, endpoints: broken, config: broken, ...accountsBroken };
+    return {
+      turns: broken,
+      extract: broken,
+      endpoints: broken,
+      config: broken,
+      ...accountsBroken,
+    };
   }
 
   // Accounts are optional: a bad account variable breaks only the account routes, and the guest
   // routes keep working with the environment defaults. The database opens on the first request
   // that needs it.
-  let accountRoutes: Omit<Handlers, 'turns' | 'endpoints' | 'config'> = accountsBroken;
+  let accountRoutes: Omit<Handlers, 'turns' | 'extract' | 'endpoints' | 'config'> = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
   let demo: (() => Promise<DemoGate>) | undefined;
@@ -524,6 +533,7 @@ export const createHandlers = (
   const wrap = (handler: Handler) => safely(handler, log);
   return {
     turns: wrap((request) => handleTurns(request, deps)),
+    extract: wrap((request) => handleExtract(request, deps)),
     endpoints: wrap((request) => handleEndpoints(request, deps)),
     config: wrap(publicConfig),
     register: wrap(accountRoutes.register),

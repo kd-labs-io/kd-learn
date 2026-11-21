@@ -6,6 +6,8 @@ import {
   ConnectionInfo,
   CreateConnectionRequest,
   ErrorCode,
+  ExtractSessionRequest,
+  ExtractionList,
   MAX_PROFILE_BODY_BYTES,
   ProfileRequest,
   ProfileResponse,
@@ -16,7 +18,7 @@ import type { Handler, Logger } from '../handler.ts';
 import { SECURITY_HEADERS } from '../http.ts';
 import type { Ctx, makeRouteKit } from '../routes.ts';
 import type { CurrentUser } from '../auth/service.ts';
-import { makeSessionsHandler } from '../sessions/http.ts';
+import { makeSessionsHandler, modelUnavailable } from '../sessions/http.ts';
 
 type Kit = ReturnType<typeof makeRouteKit>;
 
@@ -108,6 +110,37 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     }),
   );
 
+  /** `GET`: extraction state of every session. `POST`: extract now, or retry (phase 3 A3). */
+  const extractions = route('account.extractions', ['GET', 'POST'], (ctx) =>
+    signedIn(ctx, async (user) => {
+      const jobs = ctx.accounts.extractions;
+      if (ctx.request.method === 'POST') {
+        const input = await decode(ctx, ExtractSessionRequest);
+        if (input instanceof Response) return input;
+        const result = jobs.request(user.id, input.sessionId);
+        switch (result._tag) {
+          case 'NotFound':
+            return notFound(ctx);
+          case 'InProgress':
+            return ctx.reject(
+              409,
+              ErrorCode.ExtractionInProgress,
+              'This session is already being extracted.',
+              true,
+            );
+          case 'NothingToRun':
+            return ctx.reject(409, ErrorCode.NothingToRun, result.message);
+          case 'ModelUnavailable':
+            return modelUnavailable(ctx, result.result);
+          case 'Ok':
+            break;
+        }
+        return json(ctx, Schema.encodeSync(ExtractionList)({ sessions: jobs.list(user.id) }), 202);
+      }
+      return json(ctx, Schema.encodeSync(ExtractionList)({ sessions: jobs.list(user.id) }));
+    }),
+  );
+
   const sessions = makeSessionsHandler(kit, log);
 
   const fallback = route('account', ['GET', 'POST', 'PUT', 'DELETE'], notFound);
@@ -120,6 +153,7 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     if (one?.[1] !== undefined) return deleteConnection(one[1])(request, context);
     if (path === 'roles') return setRoles(request, context);
     if (path === 'profile') return profile(request, context);
+    if (path === 'knowledge/extractions') return extractions(request, context);
     const session = sessions(path);
     if (session !== undefined) return session(request, context);
     return fallback(request, context);

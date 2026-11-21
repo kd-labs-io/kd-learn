@@ -93,6 +93,8 @@ export interface RunnerDeps {
   readonly now?: () => number;
   /** Upper bound on one turn (model calls and tools). Default 3 minutes. */
   readonly turnTimeoutMs?: number;
+  /** Called after a batch with `SessionCompleted` is written, by a turn or a skip (phase 3 A3). */
+  readonly onSessionCompleted?: (userId: string, sessionId: string) => void;
 }
 
 interface Live {
@@ -154,11 +156,19 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
 
   const readSync = (storage: StorageService, sessionId: string): EventLog =>
     Effect.runSync(storage.readSession(sessionId));
+  /** Every write of a session goes through here, so the end of a session is seen in one place. */
   const appendSync = (
     storage: StorageService,
+    userId: string,
     sessionId: string,
     events: ReadonlyArray<DomainEvent>,
-  ) => Effect.runSync(storage.appendEvents(sessionId, events));
+  ) => {
+    const result = Effect.runSync(storage.appendEvents(sessionId, events));
+    if (events.some((event) => event._tag === 'SessionCompleted')) {
+      deps.onSessionCompleted?.(userId, sessionId);
+    }
+    return result;
+  };
 
   const runningOf = (entry: Entry | undefined): ReadonlyArray<RunningTurn> =>
     [entry?.main, entry?.side].flatMap((live) =>
@@ -259,6 +269,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
    */
   const commit = (
     storage: StorageService,
+    userId: string,
     sessionId: string,
     collected: Collected,
     closing: (failure: Failure) => DomainEvent,
@@ -279,7 +290,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       };
       batch = [closing(error)];
     }
-    if (batch.length > 0) appendSync(storage, sessionId, batch);
+    if (batch.length > 0) appendSync(storage, userId, sessionId, batch);
     return error;
   };
 
@@ -330,7 +341,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     if (Result.isFailure(projectSession(withStarted))) {
       return { _tag: 'InvalidLog', message: 'The turn cannot start here.' };
     }
-    appendSync(storage, sessionId, [started]);
+    appendSync(storage, userId, sessionId, [started]);
     return { _tag: 'Ok', turnId, log: withStarted, model: resolved.model };
   };
 
@@ -367,6 +378,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
         const turnId = current.turnId;
         const error = commit(
           storage,
+          userId,
           sessionId,
           collected,
           (failure) => ({ _tag: 'TurnFailed', id: newId(), at: now(), turnId, ...failure }),
@@ -451,7 +463,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       if (Result.isFailure(projectSession(outgoing))) {
         return fail({ _tag: 'InvalidLog', message: 'The message cannot be sent here.' });
       }
-      appendSync(storage, sessionId, [message]);
+      appendSync(storage, userId, sessionId, [message]);
     }
     const live: Live = {
       turnId: newId(),
@@ -481,6 +493,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       );
       const error = commit(
         storage,
+        userId,
         sessionId,
         collected,
         (failure) => ({ _tag: 'SideTurnFailed', id: newId(), at: now(), threadId, ...failure }),
@@ -550,7 +563,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
         topic,
         profile: { ...profile, language },
       };
-      appendSync(storage, sessionId, [event]);
+      appendSync(storage, userId, sessionId, [event]);
       return sessionId;
     },
 
@@ -600,7 +613,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       if (Result.isFailure(projectSession([...log, ...batch]))) {
         return { _tag: 'NothingToRun', message: 'This step cannot be skipped now.' };
       }
-      appendSync(storage, sessionId, batch);
+      appendSync(storage, userId, sessionId, batch);
       const entry = entries.get(keyOf(userId, sessionId));
       if (entry) publish(entry, { _tag: 'commit' });
       return { _tag: 'Ok' };

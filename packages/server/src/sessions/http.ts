@@ -19,6 +19,7 @@ import { SECURITY_HEADERS } from '../http.ts';
 import type { Ctx, makeRouteKit } from '../routes.ts';
 import type { CurrentUser } from '../auth/service.ts';
 import type { SessionSignal, StartResult } from './runner.ts';
+import type { ResolveResult } from '../settings/service.ts';
 
 type Kit = ReturnType<typeof makeRouteKit>;
 
@@ -29,6 +30,42 @@ const HEARTBEAT_MS = 15_000;
 
 const sequenced = (log: EventLog, after: number) =>
   log.slice(after + 1).map((event, i) => ({ seq: after + 1 + i, event }));
+
+/** 409 for a role whose model cannot be used now (turns, extraction, practice). */
+export const modelUnavailable = (ctx: Ctx, result: Exclude<ResolveResult, { _tag: 'Ok' }>) => {
+  switch (result._tag) {
+    case 'RoleNotConfigured':
+      return ctx.reject(
+        409,
+        ErrorCode.RoleNotConfigured,
+        `No connection and model set for the role ${result.role}.`,
+      );
+    case 'KeyUnreadable':
+      return ctx.reject(
+        409,
+        ErrorCode.KeyUnreadable,
+        'The saved key cannot be read any more. Enter it again.',
+      );
+    case 'AgentDisabled':
+      return ctx.reject(
+        409,
+        ErrorCode.AcpAgentDisabled,
+        'The agent of this connection is not enabled on this server any more.',
+      );
+    case 'ModelNotAllowed':
+      return ctx.reject(
+        409,
+        ErrorCode.AcpModelNotAllowed,
+        `The admin no longer allows the model of the role ${result.role}.`,
+      );
+    case 'UnknownEndpoint':
+      return ctx.reject(
+        409,
+        ErrorCode.UnknownEndpoint,
+        'The endpoint of this connection is no longer allowed on this server.',
+      );
+  }
+};
 
 export const makeSessionsHandler = (kit: Kit, log: Logger) => {
   const { route, json, decode, currentUser, unauthorized } = kit;
@@ -52,38 +89,7 @@ export const makeSessionsHandler = (kit: Kit, log: Logger) => {
       case 'InvalidLog':
         return ctx.reject(500, ErrorCode.InvalidTurn, result.message);
       case 'ModelUnavailable':
-        switch (result.result._tag) {
-          case 'RoleNotConfigured':
-            return ctx.reject(
-              409,
-              ErrorCode.RoleNotConfigured,
-              `No connection and model set for the role ${result.result.role}.`,
-            );
-          case 'KeyUnreadable':
-            return ctx.reject(
-              409,
-              ErrorCode.KeyUnreadable,
-              'The saved key cannot be read any more. Enter it again.',
-            );
-          case 'AgentDisabled':
-            return ctx.reject(
-              409,
-              ErrorCode.AcpAgentDisabled,
-              'The agent of this connection is not enabled on this server any more.',
-            );
-          case 'ModelNotAllowed':
-            return ctx.reject(
-              409,
-              ErrorCode.AcpModelNotAllowed,
-              `The admin no longer allows the model of the role ${result.result.role}.`,
-            );
-          case 'UnknownEndpoint':
-            return ctx.reject(
-              409,
-              ErrorCode.UnknownEndpoint,
-              'The endpoint of this connection is no longer allowed on this server.',
-            );
-        }
+        return modelUnavailable(ctx, result.result);
     }
   };
 

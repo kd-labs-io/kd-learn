@@ -50,6 +50,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
   - Vai `extractor` chưa đặt model thì dùng model của `teacher`; cả hai chưa đặt thì không ghi `ExtractionStarted` (không tính là lần thử), màn graph báo cần đặt model và có nút trích.
   - Server khởi động lại giữa chừng thì lần thử thành "bị ngắt" (lúc khởi động ghi `ExtractionFailed {code: 'Interrupted', retryable: true}`), không tự chạy lại. Job sống sót khi khởi động lại thuộc phase 4.
 - **Khách và demo:** client ghi `ExtractionStarted` rồi gọi `POST /api/knowledge/extract` (server không trạng thái). Server trả lô event qua SSE như `/api/turns`; client ghi lô trong một transaction. Đóng tab giữa chừng thì lần thử thành "bị ngắt", như lượt. Web Lock `kd-learn:knowledge` để hai tab không cùng trích.
+- **Chốt ở bước 5 (2026-11-21):** tài khoản ghi `ExtractionStarted` ngay lúc xếp hàng, nên buổi đang chờ cũng là một lần thử (khởi động lại thì thành `Interrupted`). Khách lấy Web Lock có chờ (các buổi xếp hàng, không bị từ chối); người giữ lock đóng các lần thử còn mở thành `Interrupted` trước khi bắt đầu. Stream đứt thì client ghi `ExtractionFailed {code: 'Network'}` thay vì để mở.
 - **Kiểm lại lúc ghi:** trong lúc trích, log kiến thức có thể đã có event mới (luyện tập, bỏ mệnh đề, buổi khác). Lô kết quả được chạy projection trên log **hiện tại** trước khi ghi; không hợp lệ (ví dụ gộp vào mệnh đề vừa bị bỏ) thì ghi `ExtractionFailed {code: 'Conflict', retryable: true}`.
 
 ### A4. Lát graph gửi theo request
@@ -97,7 +98,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 ### A8. Demo
 
 - **Demo dùng được graph và luyện tập (chốt 2026-11-21)**, tính chung ngân sách demo (A8 phase 2): extraction tốn 3 lần gọi (bước 1), ra bài một lần, chấm bằng model một lần, chấm bằng code không tốn.
-- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Trần 2.048 token ra không đủ cho extraction (đo được tới 4,4k, phần lớn là thinking): vai `extractor` có trần riêng, làm ở bước 5. Bước 4 đo với buổi tiếng Việt: auditor vượt 8.192 token ra khi còn chép lại câu cho mệnh đề giữ nguyên; sau khi rút gọn output thì chạy được với trần 16.384. Trần đề xuất cho vai `extractor`: 16.384. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
+- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Trần 2.048 token ra không đủ cho extraction (đo được tới 4,4k, phần lớn là thinking): vai `extractor` có trần riêng, làm ở bước 5. Bước 4 đo với buổi tiếng Việt: auditor vượt 8.192 token ra khi còn chép lại câu cho mệnh đề giữ nguyên; sau khi rút gọn output thì chạy được với trần 16.384. Trần của vai `extractor`: 16.384 (làm ở bước 5). Extraction giữ chỗ 3 lần gọi; còn ít hơn 3 thì từ chối ngay, không gọi provider. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
 
 ### A9. Màn hình graph
 

@@ -38,6 +38,23 @@ export const callTool =
       }),
     );
 
+/** A structured result (extraction, practice), as the adapter emits it after decoding. */
+export const structured =
+  (value: unknown): Program =>
+  () =>
+    Stream.fromIterable<TurnEvent<never>>([
+      { _tag: 'StructuredResult', value } as unknown as TurnEvent<never>,
+      ...end,
+    ]);
+
+/** Waits for `release()` before running `program` (to hold a job mid-call). */
+export const held = (program: Program) => {
+  const gate = Effect.runSync(Deferred.make<void>());
+  const wrapped: Program = (request) =>
+    Stream.unwrap(Deferred.await(gate).pipe(Effect.map(() => program(request))));
+  return { program: wrapped, release: () => Effect.runSync(Deferred.succeed(gate, undefined)) };
+};
+
 export const failWith =
   (message: string): Program =>
   () =>

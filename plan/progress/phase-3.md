@@ -12,7 +12,7 @@
 | Bước 2: log kiến thức (core, storage) | Xong (2026-11-21). Event và projection của graph trong `core`, chặn trích hai lần, hàm chọn lát hai tầng; bảng `knowledge_events` ở cả ba driver (migration khách v3, server v7), ghi có điều kiện theo `expectedLastSeq` (bắt buộc) qua `appendKnowledgeChecked`. Sự kiện luyện tập và mức nắm vững dời sang bước 6. Xem ghi chú bước 2 bên dưới |
 | Bước 3: hồ sơ dạy học v2, vai mới | Xong (2026-11-21). `TeachingProfile` thêm `name` và bốn prompt tuỳ chọn, `resolveProfile` điền từ hồ sơ mặc định; hồ sơ lưu qua port ở cả hai driver; `GET` / `PUT` / `DELETE /api/account/profile`; vai `practitioner` / `extractor` chưa đặt thì dùng model của `teacher`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: pipeline extraction (agent) | Xong (2026-11-21). `runExtraction` trong `agent` (3 lần gọi, bỏ merge khi không có ứng viên), `fitKnowledgeBatch` trong `core` để khớp lô với graph lúc ghi; kiểm bằng Haiku thật trên 2 buổi tiếng Việt: khoảng $0,009 mỗi buổi, merge gộp đúng 3 mệnh đề trùng. Xem ghi chú bước 4 bên dưới |
-| Bước 5: extraction trên server | Chưa bắt đầu |
+| Bước 5: extraction trên server | Xong (2026-11-21). Route khách / demo `POST /api/knowledge/extract` (SSE, không trạng thái), job tài khoản móc vào chỗ ghi lô của runner (cả lượt lẫn bỏ bước cuối), hàng đợi theo người dùng, `Interrupted` lúc khởi động, `GET` / `POST /api/account/knowledge/extractions`; client khách tự trích một lần dưới Web Lock `kd-learn:knowledge`. Demo: giữ 3 lần gọi, trần 16.384 token ra. Xem ghi chú bước 5 bên dưới |
 | Bước 6: registry bài tập, Practitioner | Xong (2026-11-21). Sự kiện luyện tập trong log kiến thức, mức nắm vững theo hộp Leitner, registry bốn loại, hàm chọn bài, Practitioner (một lần gọi ra cả bộ bài, chấm theo ba mức). C4 với Haiku: chấm ổn định 21/21, không bị đánh lừa 9/9, khoảng $0,004 cả lần kiểm. Xem ghi chú bước 6 bên dưới |
 | Bước 7: luyện tập trên server | Chưa bắt đầu |
 | Bước 8: model giả trả tool call | Chưa bắt đầu |
@@ -34,6 +34,34 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 5: extraction trên server (2026-11-21)
+
+**Khách và demo** (`packages/server/src/knowledge/extract-route.ts`, `apps/web/src/knowledge/guest-extractor.ts`):
+
+- `POST /api/knowledge/extract` nhận `ExtractRequest {model, extractionId, log, slice, profile?}` (decode chặt, không nhận `baseURL`), trả SSE: `result {events}` hoặc `error`, rồi `done`; comment `: ping` mỗi 15 s để proxy không cắt. Đóng kết nối thì ngắt lần gọi provider. Log chỉ có số và mã; key bị xoá khỏi mọi thông báo.
+- Demo: luôn dùng hồ sơ của server, giữ chỗ 3 lần gọi trước khi gọi, quyết toán theo số lần gọi thật (2 khi bỏ merge). Còn ít hơn 3 lần thì trả `429` ngay, không gọi provider (tránh dừng giữa chừng). Trần token ra mỗi lần gọi: `DEMO_ROLE_OUTPUT_CAPS.extractor = 16.384` (`packages/server/src/demo/metered.ts`; bước 7 thêm `practitioner` vào cùng bảng). Khách cũng dùng trần 16.384 (`EXTRACTION_MAX_OUTPUT_TOKENS` trong `agent`).
+- Client (`guestExtractor`, mức module): runner của buổi học gọi `onSessionCompleted` khi một lô có `SessionCompleted` được ghi (mọi lần ghi của runner đi qua một hàm `append`, nên cả lượt và bỏ bước cuối đều kích hoạt). Lấy Web Lock `kd-learn:knowledge` **có chờ** (các buổi xếp hàng giữa các tab, không bị từ chối), trong lock: bỏ qua nếu đã trích hoặc (tự chạy) đã từng thử; không có key thì không ghi gì; đóng các lần thử còn mở thành `Interrupted` (đang giữ lock nên không ai khác chạy); ghi `ExtractionStarted`; chọn lát tầng 1; gọi route; ghi lô đã khớp bằng `appendKnowledgeChecked` + `fitKnowledgeBatch`. Lỗi từ server ghi `ExtractionFailed` với mã của server; stream đứt ghi `Network` (retryable); lô không còn hợp lệ ghi `Conflict`.
+- `extract(sessionId)` cho nút "trích ngay" / thử lại (bước 9), `running()` / `subscribe` để màn graph hiện trạng thái.
+
+**Tài khoản** (`packages/server/src/knowledge/jobs.ts`):
+
+- `SessionRunner` nhận `onSessionCompleted(userId, sessionId)`; mọi lần ghi log buổi học đi qua `appendSync`, nên một chỗ móc phủ cả lượt (`complete_step`) và bỏ bước cuối.
+- `ExtractionStarted` ghi ngay lúc xếp hàng (lần thử tồn tại từ đó), rồi job chạy trong fiber tách khỏi request. Một job mỗi người; buổi khác xong thì xếp hàng (`queued`). Model: `resolveModel(userId, 'extractor')` (rơi về `teacher`); không có model thì không ghi gì, "trích ngay" trả `409 RoleNotConfigured`. Hồ sơ đang dùng lúc chạy; lát và ứng viên chọn trên DB.
+- Lỗi: provider (mã của provider, key đã xoá), `InvalidRequest`, `TurnTimeout` (10 phút), `Conflict`, `InternalError`. Không tự chạy lại sau lỗi.
+- Khởi động: `recoverInterrupted` ghi `ExtractionFailed {code: 'Interrupted', retryable: true}` cho mọi lần thử còn mở (người có lần thử lấy qua `ServerStorage.extractionOwners()`, chỉ trả id; dữ liệu vẫn đọc qua `forUser`). Hàng đợi chưa chạy cũng mất khi khởi động lại, nhưng lần thử của chúng đã có `ExtractionStarted` nên thành `Interrupted` và có nút thử lại.
+- `GET /api/account/knowledge/extractions`: mọi buổi kèm `completed` và `state` (`none` / `queued` / `running` / `failed` / `extracted`, kèm `failure`); lần thử mở mà không có job thì báo `failed` + `Interrupted`. `POST` cùng đường (`{sessionId}`): trích ngay hay thử lại, `202`; `409 ExtractionInProgress` khi đang chạy / chờ, `409 NothingToRun` khi đã trích hay chưa có lượt nào xong, `404` cho buổi của người khác. Client: `extractions()`, `extractSession(sessionId)`.
+- Không có route trả nguyên log kiến thức cho tài khoản: log có đáp án bài tập (bước 6). Màn graph (bước 9) cần một route đọc graph đã bỏ đáp án.
+
+**Test:** server 13 test mới (bỏ bước cuối và lượt `complete_step` đều được trích; đóng request job vẫn xong; hai buổi xong cùng lúc chạy lần lượt; lỗi không tự chạy lại, thử lại được, không lộ key; không có model thì không ghi gì; buổi xong trước phase 3 không tự trích; 404 người khác; khởi động lại thành `Interrupted`; route khách: hồ sơ khách, merge chỉ vào lát, lỗi không lộ key, từ chối `baseURL` / trường lạ; demo: hồ sơ server, trần, trừ ngân sách đúng số lần gọi, thiếu ngân sách không gọi provider). Web 5 test cho `guestExtractor` và 1 cho móc ở runner. E2E của luồng khách cần model giả trả structured output: bước 8.
+
+- **Đếm lần gọi ở demo:** structured output không có tool là đúng một lần gọi provider (TanStack AI 1.4 bỏ vòng agent và chỉ gọi structured output, hoặc lấy kết quả từ chính lần gọi ở chế độ gộp), nên meter đếm đúng một lần cho mỗi bước của extraction.
+- Event của lô cũng được xoá key (`scrubDeep`) trước khi ghi ở tài khoản và trước khi gửi ở route khách, như lượt.
+- Demo chọn lát tối đa 32 KiB (khách 96 KiB) để log cộng lát vừa 256 KiB.
+
+**Để lại cho bước 9:** `GET .../extractions` đọc log của mọi buổi và dựng lại log kiến thức mỗi lần gọi: ổn bây giờ, chậm nếu màn graph hỏi liên tục (nên dựa vào thay đổi hoặc thêm cache). Màn graph tài khoản cần route đọc graph đã bỏ đáp án bài tập.
+
+**Không kiểm bằng model thật:** pipeline đã kiểm ở bước 4; bước này chỉ thêm đường ống.
 
 ## Bước 11: màn sửa hồ sơ dạy học (2026-11-21)
 

@@ -32,6 +32,9 @@ import {
   PublicConfig,
   REGISTER_PATH,
   PROFILE_PATH,
+  EXTRACTIONS_PATH,
+  ExtractSessionRequest,
+  ExtractionList,
   ProfileRequest,
   ProfileResponse,
   ROLES_PATH,
@@ -222,6 +225,17 @@ export const accountClient = (options: AccountClientOptions = {}) => {
       }),
     resetProfile: () =>
       go({ method: 'DELETE', path: PROFILE_PATH, response: codec(ProfileResponse) }),
+    /** Extraction state of every session (phase 3 A3). */
+    extractions: () =>
+      go({ method: 'GET', path: EXTRACTIONS_PATH, response: codec(ExtractionList) }),
+    /** Extract a session now, or retry a failed one. The job runs on the server. */
+    extractSession: (sessionId: string) =>
+      go({
+        method: 'POST',
+        path: EXTRACTIONS_PATH,
+        body: bodyOf(ExtractSessionRequest, { sessionId }),
+        response: codec(ExtractionList),
+      }),
 
     sessions: () => go({ method: 'GET', path: SESSIONS_PATH, response: codec(SessionList) }),
     createSession: (input: CreateSessionRequest) =>
