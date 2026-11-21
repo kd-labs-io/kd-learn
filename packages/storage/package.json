@@ -5,7 +5,9 @@
   "description": "Storage port (append events, read sessions, settings) and its drivers: sqlite-wasm (guest), sqlite-node (server).",
   "type": "module",
   "exports": {
-    "./port": "./src/port/index.ts"
+    "./port": "./src/port/index.ts",
+    "./memory": "./src/memory/index.ts",
+    "./sqlite-wasm": "./src/sqlite-wasm/index.ts"
   },
   "scripts": {
     "typecheck": "tsc",
@@ -13,6 +15,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@journeyapps/wa-sqlite": "2.0.10",
+    "@kd-learn/core": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

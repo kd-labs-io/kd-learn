@@ -107,7 +107,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi m
 - Bước 3 cần bước 2 xong. Bước 4 cần bước 3 xong.
 - Bước 6 làm bất kỳ lúc nào trước bước 7.
 - Bước 7 cần bước 4, 5 và 6 xong.
-- Kiểm bằng trình duyệt dùng Playwright. Chốt ở bước 5.
+- Kiểm bằng trình duyệt dùng Playwright. Đã chốt ở bước 5: `apps/web/e2e`, chạy trên CI bằng Chromium ([progress/phase-1.md](progress/phase-1.md)).
 
 ## C. Câu hỏi cho hai spike
 

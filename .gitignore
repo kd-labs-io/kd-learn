@@ -55,3 +55,7 @@ Thumbs.db
 
 # Brainstorm notes (local only)
 probe/
+
+# Playwright
+test-results/
+playwright-report/

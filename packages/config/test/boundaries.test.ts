@@ -116,10 +116,28 @@ describe('package boundaries', () => {
 
   it.each([
     ["import { readFileSync } from 'node:fs';\nexport const y = readFileSync;"],
-    ["import { x } from '@kd-learn/core';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/ai/port';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/storage/sqlite-wasm';\nexport const y = x;"],
+    ["import { useState } from 'react';\nexport const y = useState;"],
     ['export const y = indexedDB;'],
   ])('storage port stays pure: rejects %s', async (code) => {
     expect(await ruleIds('packages/storage/src/port/fixture.ts', code)).not.toEqual([]);
+  });
+
+  it('storage port may import effect and the core domain types', async () => {
+    const code = [
+      "import { Effect } from 'effect';",
+      "import type { DomainEvent } from '@kd-learn/core';",
+      'export type All = [Effect.Effect<void>, DomainEvent];',
+    ].join('\n');
+    expect(await ruleIds('packages/storage/src/port/fixture.ts', code)).toEqual([]);
+  });
+
+  it('ai port still imports no other package', async () => {
+    const code = "import type { DomainEvent } from '@kd-learn/core';\nexport type E = DomainEvent;";
+    expect(await ruleIds('packages/ai/src/port/fixture.ts', code)).toContain(
+      'no-restricted-imports',
+    );
   });
 
   it('storage drivers may use host APIs but not UI', async () => {

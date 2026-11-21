@@ -12,10 +12,56 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Bước 2: schema, projection (`core`) | Xong (2026-11-21). Xem ghi chú bước 2 bên dưới |
 | Bước 3: vòng turn, Prober → Teacher, side chat (`agent`) | Xong (2026-11-21). A4 xác nhận bằng model thật. Xem ghi chú bước 3 bên dưới |
 | Bước 4: API, server, SSE | Chưa bắt đầu |
-| Bước 5: DB local | Chưa bắt đầu |
+| Bước 5: DB local | Xong (2026-11-21). Port `storage` chốt, driver `wa-sqlite` trong Worker của `packages/storage`, store phía client, Playwright chính thức, mã spike đã xoá. Xem ghi chú bước 5 bên dưới |
 | Bước 6: spike Markdown + KaTeX | Chưa bắt đầu |
 | Bước 7: UI | Chưa bắt đầu |
 | Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
+
+## Bước 5: DB local (2026-11-21)
+
+**Port `storage`** (`@kd-learn/storage/port`, chỉ import `effect` và kiểu từ `@kd-learn/core`). Dịch vụ `Storage` (`Context.Service`) có:
+
+| Thành phần | Ý nghĩa |
+| --- | --- |
+| `persistent` | `false` với driver bộ nhớ (lùi khi không có OPFS); UI nên cảnh báo |
+| `appendEvents(sessionId, events[])` | Một lô, nguyên tử: ghi hết hoặc không ghi gì. `seq` cấp trong transaction. `id` event là duy nhất: trùng `id` thì cả lô thất bại. Trả `{ lastSeq }` |
+| `readSession(sessionId)` | `EventLog` theo thứ tự `seq`, giải mã bằng schema `DomainEvent` của `core` (dòng hỏng cho `StorageFailure`) |
+| `listSessions` | `SessionSummary` (`sessionId`, `topic`, `createdAt`, `updatedAt`, `eventCount`), mới cập nhật nhất trước |
+| `getSettings`, `saveSettings`, `deleteApiKey` | `GuestSettings` (`provider`, `model`, `baseURL?`, `apiKey?`). `saveSettings` thay cả bộ (thiếu `apiKey` thì xoá key); `deleteApiKey` chỉ xoá key (A7) |
+| `changes` | `Stream` của `SessionChanged {sessionId}` / `SettingsChanged`, gồm cả commit từ tab khác (BroadcastChannel); mỗi người nghe một hàng đợi riêng |
+
+- Lỗi có kiểu (`Data.TaggedError`): `StorageUnavailable` (không mở được: không OPFS, không Worker), `StorageBusy` (quá hạn, mặc định 8 giây; với ghi thì kết quả chưa rõ, đọc lại để biết), `StorageFailure` (bị từ chối, lô không ghi gì).
+- Không có transaction tương tác. Không có xoá hay sửa event; bảng `events` còn có trigger chặn UPDATE và DELETE.
+- Lệch so với đề xuất ở bước 1: không có `open`/`close` trong port (đó là việc của driver: `openWasmStorage()` trả `StorageService & { close }`); thêm `appendEvents` trả `lastSeq`.
+
+- Worker xử lý **từng yêu cầu một** (hàng đợi `queue.then`): kết nối dùng chung và một transaction trải qua nhiều `await`, nên nếu hai yêu cầu chồng nhau thì `BEGIN` thứ hai lỗi và `ROLLBACK` của nó huỷ lô thứ nhất (đã tái hiện bằng test). Thứ tự xử lý là thứ tự gửi.
+
+**Cấu trúc code (`packages/storage`):**
+
+| Đường dẫn | Việc |
+| --- | --- |
+| `src/port/` | Port thuần ở trên |
+| `src/sqlite/schema.ts` | Schema và migration (`PRAGMA user_version`, mỗi migration chạy một lần trong `BEGIN IMMEDIATE`, đọc lại version trong transaction nên hai tab mở DB mới cùng lúc vẫn đúng). Dùng chung cho `sqlite-node` ở phase 2. Bảng `events (session_id, seq, id UNIQUE, tag, at, payload JSON)` và `settings (key, value)`. DB mới hơn code thì từ chối mở |
+| `src/sqlite-wasm/worker.ts` | Worker giữ DB (wa-sqlite + `OPFSCoopSyncVFS`); mỗi thao tác là một lệnh cấp cao, lô ghi chạy trọn trong Worker |
+| `src/sqlite-wasm/index.ts` | `openWasmStorage(options)`: bọc Worker thành `StorageService`, timeout, giải mã, BroadcastChannel. Export `@kd-learn/storage/sqlite-wasm` |
+| `src/memory/` | `makeMemoryStorage()`: test và đường lùi khi không có OPFS |
+
+`@journeyapps/wa-sqlite` ghim `2.0.10` trong `packages/storage` (`allowBuilds` vẫn tắt).
+
+**Bundle server sạch:** `apps/web/src/storage/client.ts` chỉ nạp driver bằng `import()` bên trong `if (!import.meta.env.SSR)`. Vite thay cờ bằng hằng nên bản server bỏ hẳn nhánh đó, Worker và `.wasm` chỉ nằm ở `.output/public`. `apps/web/scripts/check-server-bundle.mjs` (chạy trong CI sau build) báo lỗi nếu `.output/server` có file `.wasm` hay mã của driver. Đã kiểm trên bản build thật: sạch. (Với bản SPA không có server nên không áp dụng.)
+
+**Store phía client (`apps/web/src/storage`):** `getStorage()` mở một lần cho mỗi trang, chỉ lùi về bộ nhớ kèm `console.warn` khi `StorageUnavailable` (không có OPFS hay Worker); `StorageBusy` (mở quá 15 giây) và `StorageFailure` (migration lỗi, DB mới hơn code) được ném ra, không lưu vào bộ nhớ đệm của trang, lần gọi sau mở lại, đặt lại kết nối sau `pageshow` với `persisted`. `runStorage(f)` chạy một lời gọi. Hook `useStorageQuery` (đọc, rồi đọc lại khi `changes` có thay đổi liên quan), `useSessionList`, `useSession(id)` (trả `log` và `projectSession(log)`), `useGuestSettings`. React và Effect thuần, không thư viện query. Route `/dev/storage` là bàn thử cho Playwright (gắn `window.__kdStorage`), không nối vào app; bỏ khi UI bước 7 test trực tiếp được.
+
+**Playwright (chốt ở bước 5):** dùng `@playwright/test` trong `apps/web` (`playwright.config.ts`, `e2e/*.e2e.ts`, `pnpm --filter @kd-learn/web exec playwright test`), chạy trên bản build SSR (`.output/server`, cổng 4173). Bảy test: ghi, tải lại, đọc lại (kèm projection bằng `core`); lô lỗi không để lại gì và `seq` không bị hổng; `id` trùng bị từ chối; cài đặt và xoá riêng key; hai tab ghi đồng thời 2 x 20 lô vào một buổi (đủ 80 event, không trùng, mỗi lô nằm liền nhau); commit ở tab này làm hook ở tab kia cập nhật; nhiều lời gọi chồng nhau trong một tab (12 lô, một lô cố ý lỗi, kèm đọc và lưu cài đặt cùng lúc) vẫn chạy lần lượt, lô lỗi không ảnh hưởng lô khác và lần đọc nào cũng thấy trọn lô. Test cuối này đã kiểm: bỏ hàng đợi trong Worker thì nó đỏ. **CI cài Chromium** (`playwright install --with-deps chromium`) và chạy `--project=chromium`; Firefox chạy được ở máy local (đạt cả bảy); WebKit của Playwright dùng context tạm không có OPFS, storage lùi về bộ nhớ nên test tự bỏ qua (riêng Chromium thì bắt buộc có OPFS, không được bỏ qua). Thiếu: Safari và WebView iOS thật (rủi ro 5).
+
+**Lệch và việc còn mở cho bước 7:**
+
+- Chưa có cách xoá một buổi học (port chưa có `deleteSession`; trigger chặn DELETE). Nếu UI cần, thêm thao tác này kèm migration đổi trigger khi làm bước 7.
+- Chưa có cách xuất hay nhập dữ liệu, và chưa có đồng bộ lên server (phase 2).
+- bfcache mới nối một nửa: `pageshow` chỉ đặt lại `getStorage()`, còn hook đang gắn vẫn giữ kết nối và đăng ký `changes` cũ, và chưa kiểm là Worker có thật sự chết khi trang vào bfcache. Bước 7 (hoặc bước 8) cần kiểm bằng trình duyệt và cho hook đăng ký lại.
+- `SessionSummary.topic` đọc từ `SessionCreated`; buổi chưa có event này cho `topic` rỗng.
+- Cảnh báo `persistent: false` (UI) và việc ghi `TurnStarted` trước request, ghi cả lô cuối lượt, do bước 7 nối với store này (hiện store chỉ có ghi và đọc, chưa gắn vào vòng turn).
+- Cạnh tranh giữa hai tab cùng ghi một buổi: `seq` không hổng và không trùng, nhưng UI chưa chặn hai tab cùng gửi một lượt; lượt "mở cuối cùng" theo `seq` thắng (A3).
 
 ## Bước 3: vòng turn trong `agent` (2026-11-21)
 
@@ -72,7 +118,7 @@ Trong `packages/core`, test đơn vị phủ projection, DAG có chu trình, ch�
 
 ## Bước 1: spike SQLite WASM và TanStack DB (2026-11-21)
 
-Mã spike nằm ở `apps/web/src/spike/sqlite/`, route `/spike/sqlite` (`apps/web/src/routes/spike.sqlite.tsx`), kịch bản Playwright `apps/web/scripts/spike-sqlite.mjs` (kèm `spike-serve.mjs` để thêm header COOP/COEP). Chạy: `pnpm build && pnpm build:spa && pnpm exec playwright install chromium firefox webkit`, rồi `node scripts/spike-sqlite.mjs chromium|firefox|webkit`. Đã chạy trên Chromium, Firefox, WebKit của Playwright (trên máy macOS; chưa thử Safari hay WebView iOS thật, xem rủi ro 5). Xoá toàn bộ phần spike khi làm bước 5.
+Mã spike nằm ở `apps/web/src/spike/sqlite/`, route `/spike/sqlite` (`apps/web/src/routes/spike.sqlite.tsx`), kịch bản Playwright `apps/web/scripts/spike-sqlite.mjs` (kèm `spike-serve.mjs` để thêm header COOP/COEP). Chạy: `pnpm build && pnpm build:spa && pnpm exec playwright install chromium firefox webkit`, rồi `node scripts/spike-sqlite.mjs chromium|firefox|webkit`. Đã chạy trên Chromium, Firefox, WebKit của Playwright (trên máy macOS; chưa thử Safari hay WebView iOS thật, xem rủi ro 5). Phần spike đã xoá ở bước 5.
 
 **Ứng viên (đọc tài liệu và phiên bản hiện hành trên npm ngày 2026-11-21):**
 
@@ -141,7 +187,7 @@ Bước 0, 1, 2, 3 xong. Bước 6 (spike Markdown + KaTeX) làm ở apps/web so
   - `api`: chỉ `@kd-learn/core`, không API của Node, không UI.
   - `server`: `core`, `agent`, `ai`, `api`, `search`, `storage` (cả adapter); dùng được API của Node; không UI, không `tokens`, `ui`, `web`.
   - `storage`: driver dùng được API của host, chỉ import `core`; `storage/src/port` thuần như `ai/src/port` (chỉ `effect`).
-- Port `storage` hiện còn trống; hình dạng đề xuất sau spike bước 1 ở phần "Bước 1" trên, chốt ở bước 5. Nếu port cần kiểu event từ `core`, nới rule port trong `eslint.js` và test tương ứng.
+- Port `storage` lúc đó còn trống; hình dạng đề xuất sau spike bước 1 ở phần "Bước 1" trên, đã chốt ở bước 5 (ghi chú bước 5). Rule port đã nới để cho import `@kd-learn/core`.
 
 ## Lưu ý khi chạy model thật
 

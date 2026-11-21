@@ -18,5 +18,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm exec turbo build test lint typecheck
+      # The browser-only SQLite driver must not end up in the server bundle (plan step 5).
+      - run: pnpm --filter @kd-learn/web check:server-bundle
+      # Browser tests of the local DB against the SSR build above. Chromium only in CI; Firefox
+      # runs locally, Playwright's WebKit has no OPFS (see plan/progress/phase-1.md).
+      - run: pnpm --filter @kd-learn/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @kd-learn/web exec playwright test --project=chromium
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/web/test-results
+          if-no-files-found: ignore
       # The static SPA build is what Capacitor wraps (plan 2.4).
       - run: pnpm --filter @kd-learn/web build:spa

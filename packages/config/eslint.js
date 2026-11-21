@@ -210,6 +210,7 @@ export default tseslint.config(
     ]),
   },
   // Ports are imported by agent, so they stay as pure as agent: Effect only.
+  // The AI port imports no other package; the storage port also uses the domain types of core.
   {
     files: ['packages/{ai,storage}/src/port/**/*.{ts,tsx}'],
     rules: {
@@ -218,6 +219,18 @@ export default tseslint.config(
         ...uiLibraryPatterns,
         { group: ['@tanstack/*'], message: 'A port must not depend on an adapter.' },
         internalPattern(internalAllow.core),
+      ]),
+      'no-restricted-globals': ['error', ...hostGlobals],
+    },
+  },
+  {
+    files: ['packages/storage/src/port/**/*.{ts,tsx}'],
+    rules: {
+      ...restrict([
+        ...nodeBuiltinPatterns,
+        ...uiLibraryPatterns,
+        { group: ['@tanstack/*'], message: 'A port must not depend on an adapter.' },
+        internalPattern(internalAllow.storage),
       ]),
       'no-restricted-globals': ['error', ...hostGlobals],
     },
