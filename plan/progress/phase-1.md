@@ -17,6 +17,16 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Bước 7: UI | Chưa bắt đầu |
 | Bước 8: kiểm tiêu chí phase | Chưa bắt đầu |
 
+## Bàn giao (2026-11-21)
+
+Plan phần chính đã duyệt và merge (PR #7). Việc tiếp theo, làm ở chat mới: **bước 0** của [loi-day-hoc.md](../loi-day-hoc.md).
+
+- Tạo `packages/storage`, `packages/api`, `packages/server` theo mẫu package có sẵn (`packages/core`: `package.json`, `tsconfig`, script `typecheck`/`test`/`lint`).
+- `storage` export `./port` (chỉ import `effect`, giống `packages/ai/src/port`); driver để bước 5.
+- Thêm lint ranh giới cho `api` và `server` trong `packages/config/eslint.js` (bảng import được phép theo package), kèm test trong `packages/config/test`.
+- Xong khi `turbo build test lint` xanh và test lint chặn import sai.
+- Sau đó: bước 1 (spike SQLite WASM) và bước 2 (schema trong `core`) làm song song.
+
 ## Lưu ý khi chạy model thật
 
 - Chạy thử 1 lượt, xem model và chi phí, rồi mới chạy hàng loạt. Spike đã đốt hạn mức 5 giờ của gói vì bỏ bước này (mỗi lượt Claude Code từng tốn khoảng 980k token).

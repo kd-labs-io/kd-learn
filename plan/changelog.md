@@ -21,3 +21,4 @@
 - **Cập nhật:** 2026-11-21: adapter ACP không còn ghi transcript của Claude Code vào `~/.claude/projects`; email tài khoản không tắt được với gói thuê bao (rủi ro 17). Script spike in model và chi phí mỗi lượt (mục 5)
 - **Cập nhật:** 2026-11-21: thêm phần bàn giao vào `progress/phase-1.md` cho bước lập plan phần chính của phase 1 (mục 8)
 - **Cập nhật:** 2026-11-21: thêm `loi-day-hoc.md` (plan phần chính phase 1: quyết định nền, 9 bước, câu hỏi spike), thêm rủi ro 18, 19, cập nhật mục 6, 7, 8
+- **Cập nhật:** 2026-11-21: thêm phần bàn giao cho bước 0 vào `progress/phase-1.md` (mục 8)
