@@ -159,7 +159,8 @@ describe('account routes', () => {
     expect((await fail({ clientAddress: '10.0.0.2' }, 'next@kd.test')).status).toBe(401);
     // Without a known address there is no shared bucket to exhaust.
     expect((await fail({}, 'next@kd.test')).status).toBe(401);
-  });
+    // About 30 failed logins, each hashing a password: slow on a loaded CI runner.
+  }, 30_000);
 
   it('takes the proxy-appended X-Forwarded-For entry only when trusted', async () => {
     const trusted = make({ KD_LEARN_TRUST_PROXY: '1' });
@@ -182,7 +183,8 @@ describe('account routes', () => {
     for (let i = 0; i < 30; i++) await fail(untrusted.handlers, `9.9.9.${i}`);
     // The header is ignored: every request came from the socket 172.16.0.1.
     expect((await fail(untrusted.handlers, '8.8.8.8')).status).toBe(429);
-  });
+    // About 60 failed logins, each hashing a password: slow on a loaded CI runner.
+  }, 30_000);
 
   it('breaks only the account routes when the admin variables are wrong', async () => {
     const { handlers, logs } = make({ KD_LEARN_ADMIN_PASSWORD: '' });
