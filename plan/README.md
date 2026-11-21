@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)). Đang làm phase 1: spike port AI. Chi tiết ở [progress/phase-1.md](progress/phase-1.md)
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)). Đang làm phase 1: spike port AI xong (2026-11-21, [archive/spike-port-ai.md](archive/spike-port-ai.md)), tiếp theo là phần chính của phase 1. Chi tiết ở [progress/phase-1.md](progress/phase-1.md)
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 
@@ -23,7 +23,6 @@ Số mục giữ nguyên làm ID ổn định: "mục 2.4", "rủi ro 12" vẫn 
 | 4       | [04-phases.md](04-phases.md)       | Phạm vi và tiêu chí xong của từng phase, việc sau phase 6                                     |
 | 5       | [05-rui-ro.md](05-rui-ro.md)       | Rủi ro, việc cần kiểm chứng, kết quả đã kiểm                                                  |
 | 6–7     | [06-viec-mo.md](06-viec-mo.md)     | Câu hỏi chưa chốt, bước tiếp theo                                                             |
-| —       | [spike-port-ai.md](spike-port-ai.md) | Spike port AI của phase 1: TanStack AI, ACP, rủi ro 1, 2 |
 | 8       | [progress/](progress/)             | Tiến độ phase đang làm, mỗi phase một file (`phase-<n>.md`)                                   |
 | —       | [archive/](archive/)               | Phần đã xong: phase đã đóng, rủi ro đã đóng, plan chủ đề đã xong. Chỉ đọc khi cần tra lịch sử |
 

@@ -1,8 +1,8 @@
 # Spike port AI (phase 1)
 
 - **Ngày lập:** 2026-11-17
-- **Trả lời:** [rủi ro 1, 2](05-rui-ro.md); chốt hình dạng port ở [mục 3.3](03-kien-truc.md)
-- **Xong thì:** kết luận chuyển vào `03-kien-truc.md` (mục 3.3), `02-ky-thuat.md` (mục 2.4), cột cách xử lý của rủi ro 1, 2; file này chuyển vào `archive/`
+- **Trả lời:** [rủi ro 1, 2](../05-rui-ro.md); chốt hình dạng port ở [mục 3.3](../03-kien-truc.md)
+- **Đã đóng (2026-11-21):** kết luận đã chuyển vào `03-kien-truc.md` (mục 3.3), `02-ky-thuat.md` (mục 2.4), cột cách xử lý của rủi ro 1, 2
 
 ## Tài liệu hiện hành (tra ngày 2026-11-17)
 
@@ -28,7 +28,7 @@ Không dùng Gemini CLI (`gemini --acp`): đã bị Antigravity CLI thay thế.
 
 ## Việc cần kiểm
 
-**A. Backend API (TanStack AI), [rủi ro 2](05-rui-ro.md):**
+**A. Backend API (TanStack AI), [rủi ro 2](../05-rui-ro.md):**
 
 1. Effect Schema dùng được làm `inputSchema` của tool và `outputSchema` qua `Schema.toStandardSchemaV1`, kể cả sinh JSON Schema gửi cho provider.
 2. `outputSchema` dùng chung với tool khi stream: nhận được `structured-output.complete` sau các lượt gọi tool.
@@ -36,7 +36,7 @@ Không dùng Gemini CLI (`gemini --acp`): đã bị Antigravity CLI thay thế.
 4. So sánh `@tanstack/ai-effect` với tự viết lớp chuyển đổi; chọn một.
 5. Chạy được với Anthropic, OpenAI, Gemini và một endpoint tương thích OpenAI.
 
-**B. Backend ACP, [rủi ro 1](05-rui-ro.md):**
+**B. Backend ACP, [rủi ro 1](../05-rui-ro.md):**
 
 1. Spawn `claude-agent-acp`, `agy acp` và `opencode acp`, đi hết `initialize` → `session/new` → `session/prompt` → `session/update`.
 2. Đưa tool của kd-learn vào qua một MCP server do kd-learn chạy; agent gọi được.

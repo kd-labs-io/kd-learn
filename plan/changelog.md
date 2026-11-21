@@ -16,3 +16,4 @@
 - **Cập nhật:** 2026-11-17: backend ACP dùng Antigravity CLI (`agy acp`) thay cho Gemini CLI (mục 2.4, spike port AI)
 - **Cập nhật:** 2026-11-17: chốt tiêu chí đạt của spike port AI: bắt buộc Anthropic (phần A); Claude Code, Antigravity CLI, opencode với OpenCode Go (phần B); không chặn được tool có sẵn thì ghi lại trước (mục 8, spike port AI)
 - **Cập nhật:** 2026-11-17: xong phần A của spike port AI (TanStack AI), rủi ro 2 đạt; thêm `packages/ai` (mục 5, 8, spike port AI)
+- **Cập nhật:** 2026-11-21: xong phần B của spike port AI (ACP), rủi ro 1 đạt (chờ 8 lượt Claude Code); chốt hình dạng port (mục 3.3), cập nhật mục 2.4, thêm rủi ro 15, 16; đóng spike, chuyển `spike-port-ai.md` vào `archive/` (mục 2.4, 3.3, 5, 6, 7, 8)
