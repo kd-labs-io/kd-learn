@@ -1,9 +1,9 @@
 # Plan phần chính phase 1: lõi dạy học (khách)
 
 - **Ngày lập:** 2026-11-21
-- **Phạm vi:** phần còn lại của phase 1 sau spike port AI ([mục 4](04-phases.md))
+- **Phạm vi:** phần còn lại của phase 1 sau spike port AI ([mục 4](../04-phases.md))
 - **Xong khi:** khách tự nhập key, học xong 1 chủ đề, tải lại trang không mất dữ liệu
-- **Trạng thái:** đã duyệt (2026-11-21)
+- **Trạng thái:** xong (2026-11-21); quyết định nền đã chuyển vào [mục 3.5](../03-kien-truc.md)
 
 ## A. Quyết định nền
 
@@ -55,7 +55,7 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 - **Lối thoát:**
   - Nếu một bước kéo quá M lượt, người học bấm được "sang bước sau" (event `StepSkipped`).
   - Người học sửa được plan trước khi bắt đầu dạy. Phần này để sau phase 1.
-- **Chuyển trạng thái:** dùng tool, không dùng output có cấu trúc, vì Teacher cần vừa stream chữ vừa đổi trạng thái trong cùng một lượt. Đã kiểm bằng lượt chạy thật ở bước 3 (2026-11-21, Haiku): đứng vững, xem [progress/phase-1.md](progress/phase-1.md). Tool theo trạng thái: `submit_assessment` khi probing, `create_plan` khi planning, `complete_step` khi teaching; sau `AssessmentRecorded` client bắt đầu ngay một lượt input rỗng để Teacher lập plan.
+- **Chuyển trạng thái:** dùng tool, không dùng output có cấu trúc, vì Teacher cần vừa stream chữ vừa đổi trạng thái trong cùng một lượt. Đã kiểm bằng lượt chạy thật ở bước 3 (2026-11-21, Haiku): đứng vững, xem [phase-1.md](phase-1.md). Tool theo trạng thái: `submit_assessment` khi probing, `create_plan` khi planning, `complete_step` khi teaching; sau `AssessmentRecorded` client bắt đầu ngay một lượt input rỗng để Teacher lập plan.
 
 ### A5. Side chat
 
@@ -64,12 +64,12 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 
 ### A6. Phạm vi model và hồ sơ dạy học
 
-- Phase 1 chỉ dùng backend TanStack. ACP chỉ dành cho chế độ tài khoản ([mục 2.4](02-ky-thuat.md)), nên không dùng ở đây.
+- Phase 1 chỉ dùng backend TanStack. ACP chỉ dành cho chế độ tài khoản ([mục 2.4](../02-ky-thuat.md)), nên không dùng ở đây.
 - Khách chọn một provider, một model và một key cho mọi vai. Chọn model theo vai thuộc phase 2.
-- Endpoint tương thích OpenAI ([rủi ro 6](05-rui-ro.md)):
+- Endpoint tương thích OpenAI ([rủi ro 6](../05-rui-ro.md)):
   - Request không được chứa `baseURL` tự do. Khách chỉ chọn theo id từ danh sách endpoint được phép.
   - Phase 1 chưa có UI admin, nên danh sách này lấy từ biến môi trường của server, ví dụ `KD_OPENAI_COMPATIBLE_ENDPOINTS`.
-- **Hồ sơ dạy học** ([mục 2.3](02-san-pham.md)):
+- **Hồ sơ dạy học** ([mục 2.3](../02-san-pham.md)):
   - Là dữ liệu có schema (`TeachingProfile` trong `core`): prompt từng vai, N, M, ngôn ngữ dạy.
   - Bản mặc định nằm trong `agent`, prompt viết bằng tiếng Anh. UI sửa hồ sơ thuộc phase 3.
   - Prompt tự viết, không tham khảo prompt của LearnHarness.
@@ -79,24 +79,24 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 - Key lưu trong DB local, ở bảng cài đặt. Có nút xoá key.
 - Server không log header hay body chứa key, và thông báo lỗi trả về không được chứa key. Có test kiểm việc này.
 
-### A8. Lịch sử dài ([rủi ro 3](05-rui-ro.md))
+### A8. Lịch sử dài ([rủi ro 3](../05-rui-ro.md))
 
 - Phase 1 chỉ đặt giới hạn kích thước request, ví dụ 1 MB, cấu hình được. Vượt giới hạn thì trả lỗi `HistoryTooLarge` và UI gợi ý mở buổi học mới.
-- Cơ chế tóm tắt để sau. Việc này vẫn nằm ở [mục 6](06-viec-mo.md).
+- Cơ chế tóm tắt để sau. Việc này vẫn nằm ở [mục 6](../06-viec-mo.md).
 
 ## B. Các bước
 
-Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi model thì test bằng một `AiPort` giả chạy theo kịch bản. Kiểm bằng model thật tối đa một lần mỗi bước: chạy 1 lượt bằng Haiku, xem model và chi phí trước, theo lưu ý ở [progress/phase-1.md](progress/phase-1.md).
+Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi model thì test bằng một `AiPort` giả chạy theo kịch bản. Kiểm bằng model thật tối đa một lần mỗi bước: chạy 1 lượt bằng Haiku, xem model và chi phí trước, theo lưu ý ở [phase-1.md](phase-1.md).
 
 | # | Bước | Package | Xong khi |
 | --- | --- | --- | --- |
 | 0 | Khung package `storage`, `api`, `server`; lint ranh giới cho `api` và `server` | config, storage, api, server | `turbo build test lint` xanh; test lint chặn import sai |
-| 1 | Spike driver SQLite WASM và TanStack DB (C1) | spike | Trả lời đủ câu hỏi ở C1, chốt driver và chốt có dùng TanStack DB không ([mục 6](06-viec-mo.md)) |
+| 1 | Spike driver SQLite WASM và TanStack DB (C1) | spike | Trả lời đủ câu hỏi ở C1, chốt driver và chốt có dùng TanStack DB không ([mục 6](../06-viec-mo.md)) |
 | 2 | Schema và projection: event, `Session`, `LessonPlan`, `TeachingProfile`, kiểm DAG, chọn bước tiếp, phát hiện lượt bị ngắt | core | Test đơn vị cho projection, DAG có chu trình, chọn bước, lượt bị ngắt |
 | 3 | Vòng turn: Prober, Teacher, side chat, tool chuyển trạng thái, hồ sơ mặc định | agent | Kịch bản giả chạy hết `probing → done`; tool lỗi được gửi lại cho model; một lượt chạy thật xác nhận A4 |
 | 4 | API và server: hợp đồng request/SSE bằng Effect Schema, route HTTP trong `apps/web`, giới hạn kích thước, danh sách endpoint, không lộ key, huỷ lượt khi client ngắt | api, server, web | Test hợp đồng; test huỷ; test key không xuất hiện trong log và thông báo lỗi; request có `baseURL` lạ bị từ chối |
 | 5 | DB local: port `storage` (ghi thêm event, đọc buổi học, cài đặt), driver SQLite WASM, store phía client | storage, web | Ghi và đọc lại sau khi tải lại trang (test trình duyệt); ghi theo transaction |
-| 6 | Spike Markdown và KaTeX khi đang stream (C2) | spike | Chốt bộ hiển thị Markdown ([mục 6](06-viec-mo.md)) |
+| 6 | Spike Markdown và KaTeX khi đang stream (C2) | spike | Chốt bộ hiển thị Markdown ([mục 6](../06-viec-mo.md)) |
 | 7 | UI: nhập key và model, danh sách buổi học, màn học (stream, danh sách bước của plan, nút thử lại, sang bước sau), panel side chat, responsive, chuỗi vi/en | web, ui, i18n | Dùng được ở khổ điện thoại và desktop; mọi chuỗi qua Paraglide |
 | 8 | Kiểm tiêu chí phase: học hết 1 chủ đề nhỏ bằng model thật, tải lại giữa lượt và sau khi xong | — | Đạt cả ba tiêu chí; đóng phase 1 theo quy ước ở `README.md` |
 
@@ -106,14 +106,14 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi m
 - Bước 1 làm song song với bước 2 và phải xong trước bước 5, vì driver quyết định hình dạng port `storage`.
 - Bước 3 cần bước 2 xong. Bước 4 cần bước 3 xong.
 - Bước 6 làm bất kỳ lúc nào trước bước 7.
-- Bước 7 cần bước 4, 5 và 6 xong. Đã xong (2026-11-21), ghi chú ở [progress/phase-1.md](progress/phase-1.md).
-- Kiểm bằng trình duyệt dùng Playwright. Đã chốt ở bước 5: `apps/web/e2e`, chạy trên CI bằng Chromium ([progress/phase-1.md](progress/phase-1.md)).
+- Bước 7 cần bước 4, 5 và 6 xong. Đã xong (2026-11-21), ghi chú ở [phase-1.md](phase-1.md).
+- Kiểm bằng trình duyệt dùng Playwright. Đã chốt ở bước 5: `apps/web/e2e`, chạy trên CI bằng Chromium ([phase-1.md](phase-1.md)).
 
 ## C. Câu hỏi cho hai spike
 
-Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
+Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](../05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
 
-**C1. Driver SQLite WASM (OPFS):** đã trả lời (2026-11-21), kết quả ở [progress/phase-1.md](progress/phase-1.md) (phần bước 1) và [mục 2.4](02-ky-thuat.md).
+**C1. Driver SQLite WASM (OPFS):** đã trả lời (2026-11-21), kết quả ở [phase-1.md](phase-1.md) (phần bước 1) và [mục 2.4](../02-ky-thuat.md).
 
 - Có cần chạy trong Worker không? Có cần header COOP/COEP không? Nếu cần thì có xung đột với iframe sandbox ở phase 5 không?
 - Có chạy được ở cả bản SSR (trong lúc hydrate) và bản SPA không?
@@ -121,7 +121,7 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 - Dung lượng bundle và thời gian mở DB lần đầu là bao nhiêu?
 - TanStack DB (RC) có nằm trên driver này được không, hay chỉ dùng như store phản ứng phía trên port?
 
-**C2. Markdown và KaTeX:** đã trả lời (2026-11-21), kết quả ở [progress/phase-1.md](progress/phase-1.md) (phần bước 6) và [mục 2.4](02-ky-thuat.md).
+**C2. Markdown và KaTeX:** đã trả lời (2026-11-21), kết quả ở [phase-1.md](phase-1.md) (phần bước 6) và [mục 2.4](../02-ky-thuat.md).
 
 - TanStack Markdown hiển thị công thức (inline và block) khi đang stream có bị nhấp nháy hay vỡ không?
 - Có giữ mặc định escape HTML không?
@@ -131,5 +131,5 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 
 - ACP, tài khoản, DB server, chọn model theo vai: phase 2.
 - UI sửa hồ sơ dạy học, Practitioner, graph: phase 3.
-- Tóm tắt lịch sử dài: [mục 6](06-viec-mo.md).
+- Tóm tắt lịch sử dài: [mục 6](../06-viec-mo.md).
 - Kiểm trên Safari iOS: phase 6.

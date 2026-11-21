@@ -60,3 +60,18 @@ Hình dạng đã chốt sau [spike port AI](archive/spike-port-ai.md) (2026-11-
 3. Sự kiện được ghi vào DB: DB server với tài khoản, DB local với khách và demo.
 4. Với tài khoản, đóng tab buổi học vẫn chạy tiếp. Với khách, việc đang chạy dừng khi đóng tab.
 
+## 3.5 Lõi dạy học của khách (phase 1)
+
+Quyết định nền chốt ở phase 1, đã kiểm bằng model thật. Lịch sử và lý do ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md) (A1 đến A8) và [archive/phase-1.md](archive/phase-1.md).
+
+- **Event log là nguồn chính thức.** Log của buổi học lưu ở DB local của khách, chỉ ghi thêm, bắt đầu bằng `SessionCreated` (chụp lại hồ sơ dạy học). Mọi event có `id` và `at`. Mỗi lượt gửi `POST /api/turns` kèm key, model, toàn bộ log và input; server dựng projection bằng `core` (thuần), chạy vòng agent, stream SSE về, không đọc hay ghi DB nào.
+- **SSE có bốn loại frame:** `delta` (chữ đang stream, chỉ để hiện), `event` (domain event hoàn chỉnh), `error` (có kiểu), `done`. Event của một lượt chỉ được phát ở cuối lượt; client ghi cả lô trong một transaction.
+- **Tải lại giữa lượt:** client ghi `TurnStarted {turnId, input}` trước khi gửi nên câu trả lời không mất. Lượt có `TurnStarted` mà chưa có `TurnCompleted` hay `TurnFailed` là "bị ngắt"; nút thử lại ghi `TurnStarted` mới cùng input. Lịch sử gửi cho model chỉ gồm lượt đã `TurnCompleted`. Không bao giờ tự chạy lại sau lượt lỗi hay bị ngắt (key sai sẽ lặp vô hạn).
+- **Trạng thái buổi học:** `probing → planning → teaching(bước i) → done`. Chuyển trạng thái bằng tool (`submit_assessment`, `create_plan`, `complete_step`), không dùng output có cấu trúc, vì Teacher vừa stream chữ vừa đổi trạng thái trong một lượt. Plan là DAG (`core` kiểm chu trình); bước tiếp theo là node đầu tiên có mọi `dependsOn` đã xong, bước bị bỏ qua tính là đã giải quyết. Hồ sơ dạy học mặc định: N = 4 câu hỏi probing, M = 6 lượt mỗi bước; quá M thì người học bấm được "sang bước sau" (`StepSkipped`).
+- **Projection chặt:** log đến từ client nên không tin; event sai thứ tự trả `ProjectionError`. Client chạy projection trước mỗi lần ghi và bỏ lô không hợp lệ.
+- **Hai khóa chống hai tab:** Web Lock `kd-learn:turn:<sessionId>` cho lượt chính, `kd-learn:side:<sessionId>` cho side chat; khóa tự nhả khi tải lại hay đóng tab. Mỗi buổi có một `SessionRunner` ở mức module nên lượt vẫn chạy khi màn hình bị huỷ.
+- **Side chat:** luồng riêng theo bước (`step:<stepId>`, trước khi có bước là `general`), ngữ cảnh gồm plan, bước hiện tại và vài tin gần nhất; không ghi vào lịch sử chính, không đổi trạng thái; tin trả lời mang `usage`.
+- **Phạm vi model:** phase 1 chỉ dùng backend TanStack, một provider, một model, một key cho mọi vai. Endpoint tương thích OpenAI chỉ chọn theo id từ `KD_OPENAI_COMPATIBLE_ENDPOINTS`, hợp đồng không có `baseURL` ([rủi ro 6](05-rui-ro.md)).
+- **Key của khách:** lưu trong DB local (bảng cài đặt, có nút xoá), đi theo từng request, server không log header hay body chứa key và lỗi trả về không chứa key (có test, [rủi ro 19](05-rui-ro.md)).
+- **Lịch sử dài:** chỉ có giới hạn kích thước request (mặc định 1 MiB, `HistoryTooLarge`). Thân request tăng khoảng 1,3 KB mỗi lượt, nên giới hạn tới sau cỡ 750 lượt. Cơ chế tóm tắt còn mở ([mục 6](06-viec-mo.md)).
+
