@@ -73,6 +73,11 @@ export interface RunnerDeps {
   readonly lock?: WithLock;
   readonly newId?: () => string;
   readonly now?: () => number;
+  /**
+   * Demo mode (plan A8), read at each turn: the request carries `{ provider: 'demo' }` and the
+   * server picks the model and key, so no key is needed in the settings.
+   */
+  readonly demo?: () => boolean;
 }
 
 const idle: RunnerState = {
@@ -251,7 +256,7 @@ export class SessionRunner {
 
   private async oneTurn(mode: Mode): Promise<Outcome> {
     const storage = await this.deps.storage();
-    const model = modelChoiceOf(await Effect.runPromise(storage.getSettings));
+    const model = await this.modelChoice(storage);
     // No key: write nothing, or an auto turn would leave a dangling `TurnStarted`.
     if (model === undefined) {
       this.setMain({
@@ -362,7 +367,7 @@ export class SessionRunner {
     try {
       const result = await this.lock(sideLockName(this.sessionId), async () => {
         const storage = await this.deps.storage();
-        const model = modelChoiceOf(await Effect.runPromise(storage.getSettings));
+        const model = await this.modelChoice(storage);
         if (model === undefined) {
           this.setSide({
             failure: fail(ClientFailure.NoKey, 'No key, model or endpoint saved.', false),
@@ -466,6 +471,11 @@ export class SessionRunner {
   }
 
   // --- the request ---
+
+  private async modelChoice(storage: StorageService): Promise<ModelChoice | undefined> {
+    if (this.deps.demo?.() === true) return { provider: 'demo' };
+    return modelChoiceOf(await Effect.runPromise(storage.getSettings));
+  }
 
   /**
    * Runs one request and gathers its frames. Resolves to `undefined` when the transport failed or

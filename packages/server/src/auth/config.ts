@@ -1,6 +1,7 @@
 // Account configuration from the environment (plan tai-khoan.md A4). Messages name the variable,
 // never its value.
-import type { AcpAgent } from '@kd-learn/api';
+import { Result, Schema } from 'effect';
+import { AcpModels, type AcpAgent } from '@kd-learn/api';
 import { ConfigError } from '../config.ts';
 import { loadDemoConfig, type DemoConfig } from '../demo/config.ts';
 import { loadMasterKey } from '../settings/secret-box.ts';
@@ -29,6 +30,8 @@ export interface AccountConfig {
   readonly demo: DemoConfig;
   /** ACP agents enabled until an admin changes it (`KD_LEARN_ACP_AGENTS`, default none). */
   readonly acpAgents: ReadonlyArray<AcpAgent>;
+  /** Models allowed per agent until an admin changes it (`KD_LEARN_ACP_MODELS`, default none). */
+  readonly acpModels: AcpModels;
   /** `KD_LEARN_ACP_MAX_CONCURRENT`, default 2. */
   readonly acpMaxConcurrent: number;
 }
@@ -48,6 +51,22 @@ const acpAgentsFrom = (raw: string | undefined): ReadonlyArray<AcpAgent> => {
     }
   }
   return [...new Set(ids as AcpAgent[])];
+};
+
+const acpModelsFrom = (raw: string | undefined): AcpModels => {
+  const value = raw?.trim() ?? '';
+  if (value === '') return {};
+  const message =
+    'KD_LEARN_ACP_MODELS must be a JSON object of agent to model names, e.g. {"claude-code":["claude-haiku-5-5"]}.';
+  let json: unknown;
+  try {
+    json = JSON.parse(value);
+  } catch {
+    throw new ConfigError({ message });
+  }
+  const decoded = Schema.decodeUnknownResult(AcpModels)(json, { onExcessProperty: 'error' });
+  if (Result.isFailure(decoded)) throw new ConfigError({ message });
+  return decoded.success;
 };
 
 const acpMaxFrom = (raw: string | undefined): number => {
@@ -80,6 +99,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * - `KD_LEARN_TRUST_PROXY`: `1` or `true` behind a reverse proxy.
  * - `KD_LEARN_GUEST_MODE`, `KD_LEARN_DEMO_MODE`: `on` / `off`, defaults until an admin changes them.
  * - `KD_LEARN_ACP_AGENTS`: comma list of ACP agents enabled by default; `KD_LEARN_ACP_MAX_CONCURRENT`.
+ * - `KD_LEARN_ACP_MODELS`: JSON object, agent to the model names a role may pick (risk 30).
  * - `KD_LEARN_SECRET_KEY`: required, 32 bytes in base64. Without it the account routes refuse to
  *   run (guest mode does not need it).
  */
@@ -119,6 +139,7 @@ export const loadAccountConfig = (
     demoMode: switchFrom('KD_LEARN_DEMO_MODE', env.KD_LEARN_DEMO_MODE, false),
     demo: loadDemoConfig(env),
     acpAgents: acpAgentsFrom(env.KD_LEARN_ACP_AGENTS),
+    acpModels: acpModelsFrom(env.KD_LEARN_ACP_MODELS),
     acpMaxConcurrent: acpMaxFrom(env.KD_LEARN_ACP_MAX_CONCURRENT),
   };
 };

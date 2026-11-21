@@ -29,6 +29,7 @@
     "@kd-learn/tokens": "workspace:*",
     "@kd-learn/ui": "workspace:*",
     "@stylexjs/stylex": "catalog:",
+    "@tanstack/react-query": "^5.108.1",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "effect": "catalog:",

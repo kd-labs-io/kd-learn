@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { listEndpoints, type EndpointInfo } from '@kd-learn/api';
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { localModeNow } from '../account/auth';
 import { getStorage } from '../storage';
 import { getRunner, isTurnRunningElsewhere, type RunnerState, type SessionRunner } from './runner';
 
@@ -14,6 +15,7 @@ export const apiBaseUrl: string = import.meta.env['VITE_KD_API_BASE_URL'] ?? '';
 export function useRunner(sessionId: string): { runner: SessionRunner; state: RunnerState } {
   const runner = getRunner(sessionId, {
     storage: getStorage,
+    demo: () => localModeNow() === 'demo',
     ...(apiBaseUrl === '' ? {} : { baseUrl: apiBaseUrl }),
   });
   const state = useSyncExternalStore(runner.subscribe, runner.getSnapshot, runner.getSnapshot);

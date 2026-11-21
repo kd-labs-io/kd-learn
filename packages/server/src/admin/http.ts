@@ -31,8 +31,13 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
 
   const config = route('admin.config', ['GET', 'PUT'], (ctx) =>
     asAdmin(ctx, async () => {
+      // The adapter is loaded only while some agent is enabled (it resolves binaries on load).
+      const availability = async (agents: ReadonlyArray<unknown>) =>
+        agents.length === 0 ? true : ctx.accounts.acpAvailable();
       if (ctx.request.method === 'GET') {
-        return json(ctx, Schema.encodeSync(AdminConfig)(ctx.accounts.admin.config()));
+        const current = ctx.accounts.admin.config();
+        const acpAvailable = await availability(current.acpAgents);
+        return json(ctx, Schema.encodeSync(AdminConfig)({ ...current, acpAvailable }));
       }
       const change = await decode(ctx, UpdateAdminConfigRequest);
       if (change instanceof Response) return change;
@@ -46,10 +51,12 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
           demoBudgetLimit: next.demoBudget.limit,
           demoBudgetPeriod: next.demoBudget.period,
           acpAgents: next.acpAgents.join(','),
+          acpModels: Object.values(next.acpModels).reduce((n, list) => n + list.length, 0),
           acpMaxConcurrent: next.acpMaxConcurrent,
         },
       });
-      return json(ctx, Schema.encodeSync(AdminConfig)(next));
+      const acpAvailable = await availability(next.acpAgents);
+      return json(ctx, Schema.encodeSync(AdminConfig)({ ...next, acpAvailable }));
     }),
   );
 

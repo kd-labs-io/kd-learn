@@ -10,7 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ASessionIdRouteImport } from './routes/a.$sessionId'
 import { Route as ApiConfigRouteImport } from './routes/api.config'
 import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
@@ -26,9 +30,29 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ASessionIdRoute = ASessionIdRouteImport.update({
+  id: '/a/$sessionId',
+  path: '/a/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiConfigRoute = ApiConfigRouteImport.update({
@@ -79,7 +103,11 @@ const ApiAuthActionRoute = ApiAuthActionRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
@@ -92,7 +120,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
@@ -106,7 +138,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
@@ -121,7 +157,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/login'
+    | '/register'
     | '/settings'
+    | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
@@ -134,7 +174,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/login'
+    | '/register'
     | '/settings'
+    | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
@@ -147,7 +191,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
+    | '/login'
+    | '/register'
     | '/settings'
+    | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
@@ -161,7 +209,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
+  ASessionIdRoute: typeof ASessionIdRoute
   ApiConfigRoute: typeof ApiConfigRoute
   ApiEndpointsRoute: typeof ApiEndpointsRoute
   ApiTurnsRoute: typeof ApiTurnsRoute
@@ -182,11 +234,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/a/$sessionId': {
+      id: '/a/$sessionId'
+      path: '/a/$sessionId'
+      fullPath: '/a/$sessionId'
+      preLoaderRoute: typeof ASessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/config': {
@@ -257,7 +337,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
+  ASessionIdRoute: ASessionIdRoute,
   ApiConfigRoute: ApiConfigRoute,
   ApiEndpointsRoute: ApiEndpointsRoute,
   ApiTurnsRoute: ApiTurnsRoute,

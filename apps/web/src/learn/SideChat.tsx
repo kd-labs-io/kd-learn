@@ -9,7 +9,8 @@ import { m } from '@kd-learn/i18n';
 import { currentStep, type EventLog, type Session } from '@kd-learn/core';
 import { LessonMarkdown } from '@kd-learn/ui/components/LessonMarkdown';
 import { useEffect, useRef, useState } from 'react';
-import type { RunnerState, SessionRunner } from './runner';
+import type { RunnerState } from './runner';
+import type { LessonActions } from './source';
 import { failureText } from './view';
 
 /** One side thread per step (plan A5), and one for the time before there is a step. */
@@ -31,7 +32,7 @@ function lastSideFailure(log: EventLog, threadId: string) {
 export interface SideChatProps {
   readonly session: Session;
   readonly log: EventLog;
-  readonly runner: SessionRunner;
+  readonly runner: LessonActions;
   readonly state: RunnerState['side'];
 }
 
@@ -57,7 +58,9 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
     const content = draft.trim();
     if (content === '' || running) return;
     setDraft('');
-    void runner.sendSide(threadId, content);
+    void Promise.resolve(runner.sendSide(threadId, content)).then((kept) => {
+      if (kept === false) setDraft((current) => (current === '' ? content : current));
+    });
   };
 
   return (
@@ -89,6 +92,13 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
         <VStack ref={endRef} />
       </VStack>
 
+      {!waitingForAnswer && !running && failure !== undefined ? (
+        <Banner
+          status="error"
+          title={m.side_error({ message: failureText(failure) })}
+          data-testid="side-failed"
+        />
+      ) : null}
       {waitingForAnswer ? (
         <Banner
           status="error"

@@ -74,6 +74,13 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
       const result = ctx.accounts.settings.setRoles(user.id, input.roles);
       // Another user's connection id looks like one that does not exist (plan A3).
       if (result._tag === 'UnknownConnection') return notFound(ctx);
+      if (result._tag === 'ModelNotAllowed') {
+        return ctx.reject(
+          409,
+          ErrorCode.AcpModelNotAllowed,
+          `The admin does not allow this model for the agent of the role ${result.role}.`,
+        );
+      }
       return json(ctx, Schema.encodeSync(AccountSettings)(ctx.accounts.settings.get(user.id)));
     }),
   );

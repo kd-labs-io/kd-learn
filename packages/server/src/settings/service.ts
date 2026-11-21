@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type { ModelRef } from '@kd-learn/ai/port';
 import type {
   AcpAgent,
+  AcpModels,
   ConnectionInfo,
   CreateConnectionRequest,
   ModelRole,
@@ -22,7 +23,11 @@ export type CreateConnectionResult =
   | { readonly _tag: 'UnknownEndpoint' }
   | { readonly _tag: 'AgentDisabled' };
 
-export type SetRolesResult = { readonly _tag: 'Ok' } | { readonly _tag: 'UnknownConnection' };
+export type SetRolesResult =
+  | { readonly _tag: 'Ok' }
+  | { readonly _tag: 'UnknownConnection' }
+  /** An ACP role names a model the admin does not allow for that agent (risk 30). */
+  | { readonly _tag: 'ModelNotAllowed'; readonly role: ModelRole };
 
 export type ResolveResult =
   | { readonly _tag: 'Ok'; readonly model: ModelRef }
@@ -32,13 +37,16 @@ export type ResolveResult =
   /** The master key changed, or the row was tampered with. */
   | { readonly _tag: 'KeyUnreadable'; readonly role: ModelRole }
   /** The ACP agent of the connection is not enabled (any more). */
-  | { readonly _tag: 'AgentDisabled'; readonly role: ModelRole };
+  | { readonly _tag: 'AgentDisabled'; readonly role: ModelRole }
+  /** The model of an ACP role is not on the admin's list (any more). */
+  | { readonly _tag: 'ModelNotAllowed'; readonly role: ModelRole };
 
 export interface SettingsService {
   readonly get: (userId: string) => {
     readonly connections: ReadonlyArray<ConnectionInfo>;
     readonly roles: RoleModels;
     readonly acpAgents: ReadonlyArray<AcpAgent>;
+    readonly acpModels: AcpModels;
   };
   readonly createConnection: (
     userId: string,
@@ -85,6 +93,8 @@ export const makeSettings = (
   endpoints: () => ReadonlyArray<Endpoint>,
   /** ACP agents the admin enabled, read on every call. */
   acpAgents: () => ReadonlyArray<AcpAgent> = () => [],
+  /** Models the admin allows per ACP agent, read on every call (risk 30). */
+  acpModels: () => AcpModels = () => ({}),
   now: () => number = Date.now,
 ): SettingsService => {
   const { db } = database;
@@ -112,6 +122,9 @@ export const makeSettings = (
     ),
   };
 
+  const modelAllowed = (agent: AcpAgent, model: string) =>
+    (acpModels()[agent] ?? []).includes(model);
+
   const rolesOf = (userId: string): RoleModels => {
     const map: Partial<Record<ModelRole, RoleModel>> = {};
     for (const row of q.roles.all(userId) as Array<{
@@ -131,6 +144,9 @@ export const makeSettings = (
       connections: (q.connections.all(userId) as unknown as ConnectionRow[]).map(toInfo),
       roles: rolesOf(userId),
       acpAgents: acpAgents(),
+      acpModels: Object.fromEntries(
+        acpAgents().map((agent) => [agent, acpModels()[agent] ?? []]),
+      ) as AcpModels,
     }),
 
     createConnection: (userId, input) => {
@@ -173,8 +189,11 @@ export const makeSettings = (
             for (const role of modelRoles) {
               const choice = roles[role];
               if (choice === undefined) continue;
-              if (q.connection.get(userId, choice.connectionId) === undefined) {
-                throw new UnknownConnection();
+              const row = q.connection.get(userId, choice.connectionId) as unknown as
+                ConnectionRow | undefined;
+              if (row === undefined) throw new UnknownConnection();
+              if (row.provider === 'acp' && !modelAllowed(row.agent as AcpAgent, choice.model)) {
+                throw new ModelNotAllowed(role);
               }
               q.putRole.run(userId, role, choice.connectionId, choice.model);
             }
@@ -182,6 +201,9 @@ export const makeSettings = (
           });
         } catch (error) {
           if (error instanceof UnknownConnection) return { _tag: 'UnknownConnection' } as const;
+          if (error instanceof ModelNotAllowed) {
+            return { _tag: 'ModelNotAllowed', role: error.role } as const;
+          }
           throw error;
         }
       })(),
@@ -199,6 +221,8 @@ export const makeSettings = (
         const agent = row.agent as AcpAgent;
         // Checked per turn: the admin may disable an agent after the connection was made.
         if (!acpAgents().includes(agent)) return { _tag: 'AgentDisabled', role };
+        // Also per turn: the admin may take a model off the list later.
+        if (!modelAllowed(agent, choice.model)) return { _tag: 'ModelNotAllowed', role };
         return { _tag: 'Ok', model: { provider: 'acp', agent, model: choice.model } };
       }
       const apiKey =
@@ -229,3 +253,8 @@ export const makeSettings = (
 };
 
 class UnknownConnection extends Error {}
+class ModelNotAllowed extends Error {
+  constructor(readonly role: ModelRole) {
+    super('model not allowed');
+  }
+}

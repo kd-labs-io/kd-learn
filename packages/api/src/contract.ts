@@ -126,6 +126,8 @@ export const ErrorCode = {
   DemoQuotaExceeded: 'DemoQuotaExceeded',
   /** The admin has not enabled this ACP agent, or disabled it since (plan A9). */
   AcpAgentDisabled: 'AcpAgentDisabled',
+  /** The model is not on the admin's list for this ACP agent (risk 30). */
+  AcpModelNotAllowed: 'AcpModelNotAllowed',
   /** Every ACP agent slot of the server is in use (plan A9). Retryable. */
   AcpBusy: 'AcpBusy',
   Misconfigured: 'ServerMisconfigured',
@@ -234,6 +236,18 @@ const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))
 export const AcpAgent = Schema.Literals(['claude-code', 'antigravity', 'opencode']);
 export type AcpAgent = typeof AcpAgent.Type;
 
+/**
+ * Models the admin allows per ACP agent (risk 30): an ACP connection runs on the server
+ * operator's own subscription, so a learner may only pick from this list. A missing or empty list
+ * allows nothing.
+ */
+export const AcpModels = Schema.Struct({
+  'claude-code': Schema.optionalKey(Schema.Array(ModelName)),
+  antigravity: Schema.optionalKey(Schema.Array(ModelName)),
+  opencode: Schema.optionalKey(Schema.Array(ModelName)),
+});
+export type AcpModels = typeof AcpModels.Type;
+
 export const CreateConnectionRequest = Schema.Union([
   Schema.Struct({ label: Label, provider: Schema.Literal('anthropic'), apiKey: Secret }),
   Schema.Struct({ label: Label, provider: Schema.Literal('gemini'), apiKey: Secret }),
@@ -282,6 +296,8 @@ export const AccountSettings = Schema.Struct({
   roles: RoleModels,
   /** ACP agents the admin enabled: the ones a new connection may use. */
   acpAgents: Schema.Array(AcpAgent),
+  /** The models a role may pick for each enabled agent. */
+  acpModels: AcpModels,
 });
 export type AccountSettings = typeof AccountSettings.Type;
 
@@ -393,6 +409,8 @@ export type RegistrationMode = typeof RegistrationMode.Type;
 
 /** `GET /api/config` (no sign-in): what this server offers, so the UI shows the right entry points. */
 export const PublicConfig = Schema.Struct({
+  /** False when the server runs without accounts (no `KD_LEARN_SECRET_KEY`): guest mode only. */
+  accounts: Schema.Boolean,
   registration: RegistrationMode,
   guestMode: Schema.Boolean,
   demoMode: Schema.Boolean,
@@ -421,8 +439,16 @@ export const AdminConfig = Schema.Struct({
   /** The demo model from the environment, without its key; absent when none is set. */
   demoModel: Schema.optionalKey(Schema.String),
   acpAgents: Schema.Array(AcpAgent),
+  /** Models a role may pick, per agent (risk 30). */
+  acpModels: AcpModels,
   /** Agent processes that may run at once, for every user together. */
   acpMaxConcurrent: Schema.Int,
+  /**
+   * False when this build does not include the ACP adapter (built without `KD_BUILD_ACP=1`):
+   * enabled agents then fail every turn with `AcpUnavailable`. Checked only while an agent is
+   * enabled (loading the adapter resolves agent binaries); `true` when none is.
+   */
+  acpAvailable: Schema.Boolean,
 });
 export type AdminConfig = typeof AdminConfig.Type;
 
@@ -436,6 +462,8 @@ export const UpdateAdminConfigRequest = Schema.Struct({
   ),
   demoBudgetPeriod: Schema.optionalKey(DemoBudgetPeriod),
   acpAgents: Schema.optionalKey(Schema.Array(AcpAgent)),
+  /** Replaces the whole map. */
+  acpModels: Schema.optionalKey(AcpModels),
   acpMaxConcurrent: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(32)),
   ),

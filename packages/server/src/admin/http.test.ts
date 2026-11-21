@@ -89,7 +89,9 @@ describe('admin switches', () => {
       demoMode: false,
       demoBudget: { limit: 0, period: 'day', used: 0 },
       acpAgents: [],
+      acpModels: {},
       acpMaxConcurrent: 2,
+      acpAvailable: expect.any(Boolean),
     });
   });
 
@@ -102,6 +104,7 @@ describe('admin switches', () => {
     expect(await codeOf(closed)).toBe('GuestModeDisabled');
     const publicConfig = await call(t.handlers.config, 'GET', '/api/config');
     expect(await publicConfig.json()).toEqual({
+      accounts: true,
       registration: 'open',
       guestMode: false,
       demoMode: false,
@@ -139,6 +142,7 @@ describe('admin switches', () => {
     const handlers = createHandlers({ KD_LEARN_GUEST_MODE: 'off' }, { log: () => undefined });
     expect(await codeOf(await guestTurn(handlers))).toBe('GuestModeDisabled');
     expect(await (await call(handlers.config, 'GET', '/api/config')).json()).toEqual({
+      accounts: false,
       registration: 'closed',
       guestMode: false,
       demoMode: false,

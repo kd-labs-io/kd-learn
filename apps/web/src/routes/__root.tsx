@@ -1,13 +1,20 @@
 /// <reference types="vite/client" />
 import { AppShell } from '@astryxdesign/core/AppShell';
-import { ClientOnly, HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
+import {
+  ClientOnly,
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { getLocale } from '@kd-learn/i18n';
 import '../styles/app.css';
 import { I18nRoot } from '../i18n/I18nRoot';
 import { ThemeRoot } from '../theme/ThemeRoot';
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

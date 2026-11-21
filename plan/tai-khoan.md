@@ -76,6 +76,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 
 - Chỉ cho tài khoản, admin bật từng agent (Claude Code, opencode, Antigravity CLI). Adapter đã có ([mục 3.3](03-kien-truc.md)).
 - Giới hạn số process agent chạy đồng thời trên server; vượt thì xếp hàng hoặc trả lỗi rõ ràng.
+- **Model (chốt 2026-11-21, rủi ro 30):** vai dùng kết nối ACP chỉ chọn được model trong danh sách admin cho phép theo từng agent (`KD_LEARN_ACP_MODELS`, sửa trong màn admin). Server kiểm khi đặt vai và ở mỗi lượt.
 - Cài CLI và đăng nhập trong container là câu hỏi spike (C3), vì adapter chạy agent với home là thư mục tạm rỗng. Giữ nguyên [rủi ro 8, 16, 17](05-rui-ro.md).
 
 ### A10. Triển khai
