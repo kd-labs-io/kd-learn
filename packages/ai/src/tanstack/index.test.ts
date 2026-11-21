@@ -15,12 +15,13 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 
 /** A fake Anthropic client that streams text deltas forever and records when it is aborted. */
 const endlessClient = () => {
-  const state = { requests: 0, aborted: false };
+  const state = { requests: 0, aborted: false, params: undefined as unknown };
   const client = {
     beta: {
       messages: {
-        create: async (_params: unknown, options?: { signal?: AbortSignal }) => {
+        create: async (params: unknown, options?: { signal?: AbortSignal }) => {
           state.requests++;
+          state.params = params;
           const signal = options?.signal;
           signal?.addEventListener('abort', () => (state.aborted = true));
           return (async function* () {
@@ -89,6 +90,18 @@ describe('runTurn (TanStack AI)', () => {
     expect(state.requests).toBe(1);
     await sleep(20);
     expect(state.aborted).toBe(true);
+  });
+
+  it('sends the output token cap to the provider', async () => {
+    const { client, state } = endlessClient();
+    await Effect.runPromise(
+      runTurn({ anthropicClient: client })({
+        model: { provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'unused' },
+        messages: [{ role: 'user', content: 'hi' }],
+        maxOutputTokens: 321,
+      }).pipe(Stream.take(1), Stream.runCollect),
+    );
+    expect(state.params).toMatchObject({ max_tokens: 321 });
   });
 });
 

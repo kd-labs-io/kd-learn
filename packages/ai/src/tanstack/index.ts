@@ -70,6 +70,10 @@ const adapterFor = (ref: ModelRef, overrides: AdapterOverrides): Adapter => {
   }
 };
 
+/** Each adapter reads the output token cap under its own provider-native name. */
+const maxTokensKey = (ref: ModelRef) =>
+  ref.provider === 'gemini' ? 'maxOutputTokens' : 'max_tokens';
+
 const toTanstackTool = (spec: ToolSpec<unknown, unknown>, signal: AbortSignal) =>
   toolDefinition({
     name: spec.name,
@@ -212,6 +216,9 @@ export const runTurn =
           tools: (request.tools ?? []).map((t) => toTanstackTool(t, controller.signal)),
           ...(request.output ? { outputSchema: jsonSchemaOf(request.output) } : {}),
           agentLoopStrategy: maxIterations(request.maxSteps ?? 5),
+          ...(request.maxOutputTokens === undefined
+            ? {}
+            : { modelOptions: { [maxTokensKey(request.model)]: request.maxOutputTokens } }),
           abortController: controller,
           stream: true,
         } as Parameters<typeof chat>[0]) as AsyncIterable<StreamChunk>;

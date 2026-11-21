@@ -1,11 +1,14 @@
 // Admin switches and user management (plan tai-khoan.md A7). Stored in `server_config`; a value
 // an admin never set falls back to the environment default.
+import type { ModelRef } from '@kd-learn/ai/port';
 import type {
   AdminConfig,
   AdminUser,
+  PublicConfig,
   RegistrationMode,
   UpdateAdminConfigRequest,
 } from '@kd-learn/api';
+import type { DemoBudgetService } from '../demo/budget.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import type { AuthService } from '../auth/service.ts';
 import { registrationModes } from '../auth/service.ts';
@@ -17,7 +20,11 @@ export interface SwitchDefaults {
 }
 
 export interface AdminService {
+  /** The three switches as the admin set them. */
+  readonly switches: () => PublicConfig;
   readonly config: () => AdminConfig;
+  /** What the public config says: demo counts as on only when it can run. */
+  readonly publicConfig: () => PublicConfig;
   readonly updateConfig: (change: UpdateAdminConfigRequest) => AdminConfig;
   readonly users: () => ReadonlyArray<AdminUser>;
   /** Undefined when there is no such user. */
@@ -33,6 +40,7 @@ export const makeAdmin = (
   database: ServerDatabase,
   auth: AuthService,
   defaults: SwitchDefaults,
+  demo: { readonly budget: DemoBudgetService; readonly model: () => ModelRef | undefined },
   now: () => number = Date.now,
 ): AdminService => {
   const { db } = database;
@@ -51,11 +59,29 @@ export const makeAdmin = (
   };
   const read = (key: string) => (q.get.get(key) as { value: string } | undefined)?.value;
 
-  const config = (): AdminConfig => ({
+  const switches = (): PublicConfig => ({
     registration: auth.registrationMode(),
     guestMode: bool(read('guestMode'), defaults.guestMode),
     demoMode: bool(read('demoMode'), defaults.demoMode),
   });
+  const config = (): AdminConfig => {
+    const model = demo.model();
+    return {
+      ...switches(),
+      demoBudget: demo.budget.status(),
+      // Provider and model name only: the key never leaves the server.
+      ...(model === undefined || model.provider === 'acp'
+        ? {}
+        : { demoModel: `${model.provider}:${model.model}` }),
+    };
+  };
+  const publicConfig = (): PublicConfig => {
+    const on = switches();
+    return {
+      ...on,
+      demoMode: on.demoMode && demo.model() !== undefined && demo.budget.status().limit > 0,
+    };
+  };
 
   type Row = {
     id: string;
@@ -77,7 +103,9 @@ export const makeAdmin = (
   });
 
   return {
+    switches,
     config,
+    publicConfig,
     updateConfig: (change) => {
       database.transaction(() => {
         if (change.registration !== undefined && registrationModes.includes(change.registration)) {
@@ -85,6 +113,8 @@ export const makeAdmin = (
         }
         if (change.guestMode !== undefined) q.put.run('guestMode', String(change.guestMode));
         if (change.demoMode !== undefined) q.put.run('demoMode', String(change.demoMode));
+        if (change.demoBudgetLimit !== undefined) demo.budget.setLimit(change.demoBudgetLimit);
+        if (change.demoBudgetPeriod !== undefined) demo.budget.setPeriod(change.demoBudgetPeriod);
       });
       return config();
     },

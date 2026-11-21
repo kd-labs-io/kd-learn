@@ -83,7 +83,12 @@ describe('admin switches', () => {
     ).toBe(403);
 
     const config = await call(t.handlers.admin, 'GET', '/api/admin/config', t.admin);
-    expect(await config.json()).toEqual({ registration: 'open', guestMode: true, demoMode: false });
+    expect(await config.json()).toEqual({
+      registration: 'open',
+      guestMode: true,
+      demoMode: false,
+      demoBudget: { limit: 0, period: 'day', used: 0 },
+    });
   });
 
   it('turning guest mode off closes /api/turns with 403 GuestModeDisabled', async () => {
@@ -117,7 +122,8 @@ describe('admin switches', () => {
     const t = await setup({ KD_LEARN_GUEST_MODE: 'off', KD_LEARN_DEMO_MODE: 'on' });
     expect(await (await call(t.handlers.config, 'GET', '/api/config')).json()).toMatchObject({
       guestMode: false,
-      demoMode: true,
+      // The switch is on, but there is no demo model and no budget: demo cannot run.
+      demoMode: false,
     });
     const bad = make({ KD_LEARN_GUEST_MODE: 'maybe' });
     expect((await call(bad.handlers.login, 'POST', '/api/auth/login', undefined, {})).status).toBe(

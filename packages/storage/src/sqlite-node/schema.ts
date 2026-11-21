@@ -80,4 +80,12 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
        PRIMARY KEY (user_id, role)
      ) WITHOUT ROWID`,
   ],
+  // v4: the shared demo budget (plan step 6, A8): model calls used per budget period, e.g.
+  // `day:2026-11-21`. Running turns hold their reservation here until they settle.
+  [
+    `CREATE TABLE demo_usage (
+       period_key TEXT PRIMARY KEY,
+       used INTEGER NOT NULL
+     ) WITHOUT ROWID`,
+  ],
 ];
