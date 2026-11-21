@@ -4,7 +4,8 @@
 //
 // Answers, in this order:
 // - a request with `response_format: json_schema` (structured output): JSON built for the schema
-//   it recognises (extractor, auditor, merge), streamed as text;
+//   it recognises (extractor, auditor, merge; the Practitioner writing exercises or grading an
+//   answer, steered by `#wrong` / `#partial` in it), streamed as text;
 // - right after a tool result: "Noted.";
 // - when `create_plan` is offered (the planning turn): a one-step plan, step id `basics`;
 // - the first turn (no assistant message yet): a question;
@@ -45,6 +46,35 @@ const tagOf = (text: string) => {
 const structuredAnswer = (request: ChatRequest, input: string): unknown => {
   const schema = request.response_format?.json_schema?.schema;
   const fields = Object.keys(schema?.properties ?? {});
+  // Practitioner, writing: one draft per exercise key. A multiple choice has `correct`; its
+  // option text says so, since its position is seeded by a server id.
+  if (fields.includes('exercises')) {
+    const keys = (schema?.properties?.['exercises'] as { properties?: Record<string, object> })
+      ?.properties;
+    return {
+      exercises: Object.fromEntries(
+        Object.entries(keys ?? {}).map(([key, draft]) => [
+          key,
+          'correct' in ((draft as { properties?: object }).properties ?? {})
+            ? {
+                question: `Fake question ${key}: which one holds?`,
+                correct: `Fake right option ${key}`,
+                distractors: [1, 2, 3].map((n) => `Fake wrong option ${key}.${n}`),
+              }
+            : { question: `Fake question ${key}: explain it.` },
+        ]),
+      ),
+    };
+  }
+  // Practitioner, grading: `#wrong` or `#partial` in the answer steers the level.
+  if (fields.includes('level')) {
+    const level = input.includes('#wrong')
+      ? 'incorrect'
+      : input.includes('#partial')
+        ? 'partial'
+        : 'correct';
+    return { level, feedback: `Fake feedback: ${level}.` };
+  }
   if (fields.includes('decisions')) {
     return {
       decisions: ['a', 'b'].map((key) => ({ key, action: 'new', existingId: '', reason: 'new' })),

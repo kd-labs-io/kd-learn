@@ -73,8 +73,7 @@ export const makePracticeAccountHandler = (kit: Kit, _log: Logger) => {
     signedIn(ctx, async (user) => {
       const practice = ctx.accounts.practice;
       if (ctx.request.method === 'GET') {
-        const practices = await practice.list(user.id);
-        return json(ctx, Schema.encodeSync(PracticeList)({ practices }));
+        return json(ctx, Schema.encodeSync(PracticeList)(await practice.list(user.id)));
       }
       const input = await decode(ctx, StartPracticeRequest);
       if (input instanceof Response) return input;

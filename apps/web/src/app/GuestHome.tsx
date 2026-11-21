@@ -15,6 +15,7 @@ import { useState } from 'react';
 import type { LocalMode } from '../account/auth';
 import { useStoragePersistent } from '../learn/hooks';
 import { AppHeader } from './AppHeader';
+import { PracticeLink } from '../practice/PracticeLink';
 import { runStorage, useGuestSettings, useSessionList } from '../storage';
 
 export const formatDate = (epochMs: number) =>
@@ -115,6 +116,8 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 data-testid="need-key"
               />
             ) : null}
+
+            <PracticeLink />
 
             <VStack gap={3}>
               <Heading level={2}>{m.home_new_title()}</Heading>

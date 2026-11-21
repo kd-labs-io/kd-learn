@@ -8,14 +8,19 @@ import { Cause, Effect, Exit, Result } from 'effect';
 import type { Layer } from 'effect';
 import { failureOf, gradeExercise, writeExercises } from '@kd-learn/agent';
 import type { AiError, AiPort } from '@kd-learn/ai/port';
-import type { ExerciseView, PracticeView, PublicExerciseContent } from '@kd-learn/api';
+import {
+  exerciseView,
+  practiceList,
+  practiceView,
+  type ExerciseView,
+  type PracticeList,
+  type PracticeView,
+} from '@kd-learn/api';
 import {
   gradeByCode,
   projectKnowledge,
   selectExercises,
-  type Exercise,
   type ExerciseAnswer,
-  type ExerciseContent,
   type ExerciseTypeId,
   type KnowledgeEvent,
   type KnowledgeGraph,
@@ -26,54 +31,6 @@ import type { ServerStorage } from '@kd-learn/storage/sqlite-node';
 import type { Logger } from '../handler.ts';
 import { activeProfile } from '../profile.ts';
 import type { ResolveResult, SettingsService } from '../settings/service.ts';
-
-/** The learner-facing part of a content, picked field by field so an answer key cannot slip out. */
-export const publicContent = (content: ExerciseContent): PublicExerciseContent => {
-  switch (content.type) {
-    case 'multipleChoice':
-      return { type: content.type, question: content.question, options: content.options };
-    case 'shortAnswer':
-    case 'explainReasoning':
-      return { type: content.type, question: content.question };
-    case 'orderChain':
-      return {
-        type: content.type,
-        items: content.items.map(({ propositionId, text }) => ({ propositionId, text })),
-      };
-  }
-};
-
-export const exerciseView = (exercise: Exercise): ExerciseView => ({
-  exerciseId: exercise.exerciseId,
-  practiceId: exercise.practiceId,
-  type: exercise.type,
-  content: publicContent(exercise.content),
-  issuedAt: exercise.issuedAt,
-  ...(exercise.answer === undefined ? {} : { answer: exercise.answer }),
-  ...(exercise.answeredAt === undefined ? {} : { answeredAt: exercise.answeredAt }),
-  ...(exercise.grade === undefined
-    ? {}
-    : {
-        grade: exercise.grade,
-        solution: exercise.content,
-        propositionIds: exercise.propositionIds,
-        edgeIds: exercise.edgeIds,
-      }),
-});
-
-export const practiceView = (
-  graph: KnowledgeGraph,
-  practiceId: string,
-): PracticeView | undefined => {
-  const practice = graph.practices[practiceId];
-  if (practice === undefined) return undefined;
-  return {
-    practiceId,
-    startedAt: practice.startedAt,
-    ...(practice.endedAt === undefined ? {} : { endedAt: practice.endedAt }),
-    exercises: practice.exerciseIds.map((id) => exerciseView(graph.exercises[id]!)),
-  };
-};
 
 export interface ModelFailure {
   readonly code: string;
@@ -99,7 +56,7 @@ export type PracticeResult<A> =
 
 export interface PracticeService {
   /** The open practices, oldest first. */
-  readonly list: (userId: string) => Promise<ReadonlyArray<PracticeView>>;
+  readonly list: (userId: string) => Promise<PracticeList>;
   readonly get: (userId: string, practiceId: string) => Promise<PracticeView | undefined>;
   readonly start: (
     userId: string,
@@ -195,7 +152,7 @@ export const makePracticeService = (deps: {
     const graph = await Effect.runPromise(readGraph(storage));
     const exercise = graph.exercises[exerciseId];
     if (exercise === undefined) return { _tag: 'NotFound' };
-    if (exercise.grade !== undefined) return { _tag: 'Ok', value: exerciseView(exercise) };
+    if (exercise.grade !== undefined) return { _tag: 'Ok', value: exerciseView(graph, exercise) };
     const answer = exercise.answer;
     if (answer === undefined)
       return { _tag: 'Closed', message: 'This exercise has no answer yet.' };
@@ -223,17 +180,11 @@ export const makePracticeService = (deps: {
         : [{ _tag: 'ExerciseGraded', id: newId(), at: now(), exerciseId, ...grade }],
     );
     if ('rejected' in written) return { _tag: 'InvalidAnswer', message: written.rejected };
-    return { _tag: 'Ok', value: exerciseView(written.graph.exercises[exerciseId]!) };
+    return { _tag: 'Ok', value: exerciseView(written.graph, written.graph.exercises[exerciseId]!) };
   };
 
   return {
-    list: async (userId) => {
-      const graph = await graphOf(userId);
-      return Object.values(graph.practices)
-        .filter((p) => p.endedAt === undefined)
-        .sort((a, b) => a.startedAt - b.startedAt)
-        .map((p) => practiceView(graph, p.practiceId)!);
-    },
+    list: async (userId) => practiceList(await graphOf(userId)),
 
     get: async (userId, practiceId) => practiceView(await graphOf(userId), practiceId),
 
