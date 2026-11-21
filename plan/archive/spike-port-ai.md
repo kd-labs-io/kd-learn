@@ -71,11 +71,12 @@ Bài thử: cộng hai số, gọi tool `add` rồi `submit_result` theo schema 
 
 | Agent | Hợp lệ | Sửa sau lỗi validate | Huỷ: Stream đóng sau delta đầu |
 | --- | --- | --- | --- |
-| Claude Code (`claude-agent-acp`) | 20/20 (lượt 0–11 model mặc định, lượt 12–19 `claude-haiku-5-5` sau khi dính giới hạn 5 giờ của gói) | 0 (đợt 2) | 7–8 ms |
+| Claude Code (`claude-agent-acp`) | 20/20, cả 20 lượt chạy `claude-opus-5-5` (xem ghi chú bên dưới) | 0 (đợt 2) | 7–8 ms |
 | opencode (`opencode-go/claude-haiku-5-5`) | 20/20 | 0 (đợt 2) | 10–64 ms |
 | Antigravity CLI (`agy acp`, API key Gemini) | 20/20 | 0 (đợt 2) | khoảng 1,2–1,3 s |
 
 - Đợt 1 chưa đếm lần sửa; đợt 2 mọi lượt chỉ gọi `submit_result` một lần.
+- Lỗi đã sửa (sau khi đóng spike): Claude Code dính giới hạn 5 giờ vì mỗi lượt tốn khoảng 980k token, khoảng 7,8 USD theo giá API. Hai nguyên nhân: (1) `claude-agent-acp` ghi đè `options.model` bằng model mặc định (Opus), nên lượt 12–19 vẫn chạy Opus dù script đã chọn Haiku; (2) Claude Code nạp mọi connector claude.ai của tài khoản (Vercel, Linear, Gmail…) vào ngữ cảnh, khoảng 440k token mỗi lần gọi model. Sửa: đặt `ANTHROPIC_MODEL` và `ENABLE_CLAUDEAI_MCP_SERVERS=false` cho process agent, thêm `strictMcpConfig: true`. Sau khi sửa, một lượt Haiku tốn khoảng 10k token.
 - Lỗi đã sửa: Antigravity vẫn ghi vào thư mục home tạm sau SIGTERM, xoá thư mục bị `ENOTEMPTY` và làm hỏng lượt. Giờ adapter chờ process thoát (SIGKILL sau 2 s) rồi mới xoá.
 
 **B4 (chặn tool có sẵn): đạt với cả ba.** Prompt yêu cầu ghi file, chạy shell và đọc file bí mật ở một thư mục ngoài `cwd`. Có dòng "chỉ dùng tool kd-learn" trong prompt thì cả ba từ chối. Bỏ dòng đó (`toolRule: false`) để chỉ còn chặn kỹ thuật: không file nào được ghi, nội dung bí mật không lộ. Claude Code không có tool nên chỉ in lệnh gọi tool dạng text; opencode chỉ còn tool `skill`; Antigravity trả lời rỗng (chưa rõ nó có thử gọi tool không).

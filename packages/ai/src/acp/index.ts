@@ -73,15 +73,22 @@ const launchFor = (ref: AcpRef, home: string): Launch => {
       return {
         command: process.execPath,
         args: [claudeAgentPath],
-        env: process.env,
-        // No built-in tools, no user/project settings (hooks, MCP servers, default mode), no bypass.
+        env: {
+          ...process.env,
+          // claude-agent-acp overrides `options.model` with its own pick; ANTHROPIC_MODEL wins over it.
+          ...(ref.model ? { ANTHROPIC_MODEL: ref.model } : {}),
+          // Without this, every claude.ai connector of the account joins the context (~500k tokens).
+          ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+        },
+        // No built-in tools, no user/project settings (hooks, MCP servers, default mode), no bypass,
+        // no MCP servers but kd-learn's.
         sessionMeta: {
           claudeCode: {
             options: {
               tools: [],
               settingSources: [],
+              strictMcpConfig: true,
               allowDangerouslySkipPermissions: false,
-              ...(ref.model ? { model: ref.model } : {}),
             },
           },
         },
