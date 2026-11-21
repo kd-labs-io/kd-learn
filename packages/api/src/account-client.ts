@@ -64,6 +64,7 @@ import {
   PracticeView,
   StartPracticeRequest,
 } from './practice.ts';
+import { GraphView, KNOWLEDGE_PATH } from './knowledge.ts';
 import type { ExerciseAnswer, SavedProfile } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
@@ -254,6 +255,15 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         path: EXTRACTIONS_PATH,
         body: bodyOf(ExtractSessionRequest, { sessionId }),
         response: codec(ExtractionList),
+      }),
+    /** The graph without anything about exercises (phase 3 A9). */
+    knowledge: () => go({ method: 'GET', path: KNOWLEDGE_PATH, response: codec(GraphView) }),
+    /** The learner drops a wrong proposition; answers with the graph after it. */
+    retireProposition: (propositionId: string) =>
+      go({
+        method: 'POST',
+        path: `${KNOWLEDGE_PATH}/propositions/${encodeURIComponent(propositionId)}/retire`,
+        response: codec(GraphView),
       }),
 
     sessions: () => go({ method: 'GET', path: SESSIONS_PATH, response: codec(SessionList) }),
