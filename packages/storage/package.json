@@ -7,7 +7,8 @@
   "exports": {
     "./port": "./src/port/index.ts",
     "./memory": "./src/memory/index.ts",
-    "./sqlite-wasm": "./src/sqlite-wasm/index.ts"
+    "./sqlite-wasm": "./src/sqlite-wasm/index.ts",
+    "./sqlite-node": "./src/sqlite-node/index.ts"
   },
   "scripts": {
     "typecheck": "tsc",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@kd-learn/config": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

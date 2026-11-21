@@ -7,7 +7,7 @@
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Bước 0: spike driver SQLite server, auth (C1, C2) | Xong (2026-11-21). Driver: `node:sqlite` thô. Auth: tự viết tối thiểu, Bearer cho cả web và Capacitor. Xem ghi chú bước 0 bên dưới |
-| Bước 1: driver SQLite server | Chưa bắt đầu |
+| Bước 1: driver SQLite server | Xong (2026-11-21). `@kd-learn/storage/sqlite-node`: `openServerDatabase`, `makeServerStorage(db).forUser(userId)`, migration riêng của server, bảng `sessions`. Xem ghi chú bước 1 bên dưới |
 | Bước 2: auth | Chưa bắt đầu |
 | Bước 3: key mã hoá, cài đặt theo vai | Chưa bắt đầu |
 | Bước 4: lượt chạy trên server | Chưa bắt đầu |
@@ -50,7 +50,7 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
 
 **Quy tắc cho driver (bước 1):**
 
-- Dùng `Database`, không dùng alias `DatabaseSync`.
+- Dùng `Database`, không dùng alias `DatabaseSync`. (Bước 1: `@types/node` 26.6 mới chỉ có kiểu `DatabaseSync`, nên code import `DatabaseSync as Database`; alias chỉ deprecated trong tài liệu, chạy với `--throw-deprecation` không báo gì.)
 - Một kết nối cho cả process. Không có `await` nào giữa `BEGIN` và `COMMIT`: cả lô chạy trong một lượt đồng bộ, nên tính nguyên tử có sẵn mà không cần hàng đợi như Worker WASM.
 - Bật `journal_mode=WAL`, `busy_timeout`, `foreign_keys=ON` khi mở.
 - `migrations[0]` gộp bảng `events` với bảng `settings` của khách. Bước 1 tách DDL của `events` thành hằng dùng chung, danh sách migration của server dùng hằng đó (A3).
@@ -77,3 +77,20 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
 
 - Giới hạn đăng nhập sai theo tài khoản giúp kẻ xấu khoá được tài khoản người khác (kể cả admin). Bước 2 thêm giới hạn theo IP và để admin mở khoá. Đã ghi vào rủi ro 23.
 - `argon2` stable từ Node 26.4.0: nâng `engines` lên `>=26.4`.
+
+## Bước 1: driver SQLite server (2026-11-21)
+
+- **Đã làm:**
+  - `packages/storage/src/sqlite/schema.ts` tách DDL của `events` thành `eventsTable`. Migration v1 của khách vẫn sinh đúng các bảng cũ.
+  - `sqlite/codec.ts` gom phần ánh xạ event ↔ dòng và tóm tắt buổi; driver WASM dùng lại nó.
+  - `sqlite-node/`:
+    - `schema.ts`: `serverMigrations`, v1 gồm `events` và `sessions(session_id, user_id, created_at)`. Mọi bảng server sau này (người dùng, token, cấu hình admin, ngân sách demo) thêm vào **cùng danh sách này**, để một DB có một số phiên bản.
+    - `database.ts`: `openServerDatabase` mở một kết nối, bật WAL, `busy_timeout`, `foreign_keys`, rồi chạy migration. Mở DB mới hơn code thì từ chối. `transaction(work)` chạy đồng bộ, rollback khi lỗi, và từ chối thân hàm trả Promise.
+    - `index.ts`: `makeServerStorage(db).forUser(userId)` trả `StorageService`. Lô đầu tiên ghi vào một `sessionId` mới thì nhận quyền sở hữu buổi đó trong cùng transaction. Buổi của người khác: đọc ra rỗng như buổi không tồn tại, ghi vào thì lỗi `Unknown session`. `changes` chỉ báo cho chủ buổi. Cài đặt của khách không lưu trên server: `getSettings` trả `undefined`, còn `saveSettings` và `deleteApiKey` báo lỗi. Cài đặt tài khoản là service riêng ở bước 3.
+  - Các service ngoài port (người dùng, token…) dùng `ServerDatabase.db` và `transaction` của cùng kết nối. Chúng nằm trong `packages/server` và được viết ở các bước sau.
+- **Test:**
+  - `testing/port-contract.ts` là bộ test chung của port, chạy trên `memory` và `sqlite-node`.
+  - Test riêng cho `sqlite-node`:
+    - DB: mở lại file vẫn còn dữ liệu, ở chế độ WAL; danh sách migration dài hơn thì chỉ chạy phần mới; DB mới hơn code thì bị từ chối; `events` chỉ ghi thêm; transaction lỗi hoặc bất đồng bộ thì rollback.
+    - Hai người dùng: chỉ liệt kê buổi của mình, đọc buổi người khác ra rỗng, ghi vào buổi người khác bị từ chối và log không đổi, thông báo thay đổi chỉ tới chủ buổi.
+
