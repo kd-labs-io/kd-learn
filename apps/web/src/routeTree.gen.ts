@@ -10,11 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
+import { Route as ApiTurnsRouteImport } from './routes/api.turns'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEndpointsRoute = ApiEndpointsRouteImport.update({
+  id: '/api/endpoints',
+  path: '/api/endpoints',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTurnsRoute = ApiTurnsRouteImport.update({
+  id: '/api/turns',
+  path: '/api/turns',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevStorageRoute = DevStorageRouteImport.update({
@@ -25,27 +37,35 @@ const DevStorageRoute = DevStorageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/endpoints': typeof ApiEndpointsRoute
+  '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/endpoints': typeof ApiEndpointsRoute
+  '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/endpoints': typeof ApiEndpointsRoute
+  '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev/storage'
+  fullPaths: '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/storage'
-  id: '__root__' | '/' | '/dev/storage'
+  to: '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
+  id: '__root__' | '/' | '/api/endpoints' | '/api/turns' | '/dev/storage'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiEndpointsRoute: typeof ApiEndpointsRoute
+  ApiTurnsRoute: typeof ApiTurnsRoute
   DevStorageRoute: typeof DevStorageRoute
 }
 
@@ -56,6 +76,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/endpoints': {
+      id: '/api/endpoints'
+      path: '/api/endpoints'
+      fullPath: '/api/endpoints'
+      preLoaderRoute: typeof ApiEndpointsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/turns': {
+      id: '/api/turns'
+      path: '/api/turns'
+      fullPath: '/api/turns'
+      preLoaderRoute: typeof ApiTurnsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/storage': {
@@ -70,6 +104,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiEndpointsRoute: ApiEndpointsRoute,
+  ApiTurnsRoute: ApiTurnsRoute,
   DevStorageRoute: DevStorageRoute,
 }
 export const routeTree = rootRouteImport

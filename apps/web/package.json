@@ -22,6 +22,7 @@
     "@kd-learn/core": "workspace:*",
     "@kd-learn/i18n": "workspace:*",
     "@kd-learn/storage": "workspace:*",
+    "@kd-learn/server": "workspace:*",
     "@kd-learn/tokens": "workspace:*",
     "@kd-learn/ui": "workspace:*",
     "@stylexjs/stylex": "catalog:",

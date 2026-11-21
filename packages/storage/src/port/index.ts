@@ -36,8 +36,8 @@ export type GuestProvider = 'anthropic' | 'gemini' | 'openai-compatible';
 export interface GuestSettings {
   readonly provider: GuestProvider;
   readonly model: string;
-  /** Only for `openai-compatible`. */
-  readonly baseURL?: string;
+  /** Only for `openai-compatible`: id of an endpoint the server allows (plan A6), never a URL. */
+  readonly endpointId?: string;
   /** Absent after `deleteApiKey`. */
   readonly apiKey?: string;
 }
