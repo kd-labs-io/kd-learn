@@ -2,7 +2,7 @@
 
 ## 6. Việc còn mở
 
-- Cơ chế tóm tắt lịch sử cho buổi học dài ở chế độ khách.
+- Cơ chế tóm tắt lịch sử cho buổi học dài ở chế độ khách. Phase 1 chỉ đặt giới hạn kích thước request ([loi-day-hoc.md](loi-day-hoc.md) A8).
 - Thư viện auth và driver SQLite cụ thể: chọn sau khi đọc tài liệu hiện hành. Phase 0 chưa cần nên chưa chọn; driver SQLite WASM chọn ở phase 1, auth và driver SQLite server ở phase 2.
 - Phiên bản iOS tối thiểu cho app mobile (liên quan [rủi ro 5](05-rui-ro.md)). Đề xuất iOS 17.5; chưa kiểm trên thiết bị thật.
 - Bộ hiển thị Markdown: TanStack Markdown hay `Markdown` của Astryx, tuỳ kết quả spike công thức toán ở phase 1.
@@ -11,4 +11,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 1: spike port AI xong ([archive/spike-port-ai.md](archive/spike-port-ai.md)). Tiếp theo là phần chính của phase 1 ([mục 4](04-phases.md)). Tiến độ ở [progress/phase-1.md](progress/phase-1.md).
+Phase 1: làm phần chính theo [loi-day-hoc.md](loi-day-hoc.md), bắt đầu từ bước 0. Tiến độ ở [progress/phase-1.md](progress/phase-1.md).
