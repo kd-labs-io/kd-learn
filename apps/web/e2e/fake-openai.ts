@@ -2,9 +2,18 @@
 // talks to it through `KD_OPENAI_COMPATIBLE_ENDPOINTS`, so the server, its turn runner and the
 // TanStack adapter all run for real; only the model is replaced. Run with `node` (type stripping).
 //
-// Every answer is plain text. The first turn (no assistant message yet) asks a question. A request whose last user message contains `hold` streams its first
-// chunk and then waits until `POST /release/<apiKey>` (the key of the test's own connection, so
-// parallel tests do not release each other's turns).
+// Answers, in this order:
+// - a request with `response_format: json_schema` (structured output): JSON built for the schema
+//   it recognises (extractor, auditor, merge), streamed as text;
+// - right after a tool result: "Noted.";
+// - when `create_plan` is offered (the planning turn): a one-step plan, step id `basics`;
+// - the first turn (no assistant message yet): a question;
+// - `#assess` in the learner's message, with `submit_assessment` offered: an assessment;
+// - `#done`, with `complete_step` offered: completes step `basics` (the last one: the session ends);
+// - `hold`: streams a first chunk and waits until `POST /release/<apiKey>` (the key of the test's
+//   own connection, so parallel tests do not release each other's turns);
+// - otherwise it repeats the message.
+// `GET /calls/<apiKey>` counts the requests made with that key.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 const port = Number(process.env['FAKE_OPENAI_PORT'] ?? 4175);
@@ -13,6 +22,81 @@ interface ChatMessage {
   readonly role: string;
   readonly content?: unknown;
 }
+
+interface ChatRequest {
+  readonly messages?: ChatMessage[];
+  readonly tools?: Array<{ function?: { name?: string } }>;
+  readonly response_format?: {
+    type?: string;
+    json_schema?: { schema?: { properties?: Record<string, unknown> } };
+  };
+}
+
+const calls = new Map<string, number>();
+
+/** A short stable tag of a text, so propositions of different sessions differ. */
+const tagOf = (text: string) => {
+  let hash = 0;
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return hash.toString(36);
+};
+
+/** Structured answers of the extraction pipeline, recognised by the fields of the schema. */
+const structuredAnswer = (request: ChatRequest, input: string): unknown => {
+  const schema = request.response_format?.json_schema?.schema;
+  const fields = Object.keys(schema?.properties ?? {});
+  if (fields.includes('decisions')) {
+    return {
+      decisions: ['a', 'b'].map((key) => ({ key, action: 'new', existingId: '', reason: 'new' })),
+      edges: [],
+    };
+  }
+  const items = (schema?.properties?.['propositions'] as { items?: { properties?: object } })?.items
+    ?.properties;
+  if (items !== undefined && 'verdict' in items) {
+    return {
+      propositions: ['a', 'b'].map((key) => ({
+        key,
+        verdict: 'keep',
+        text: '',
+        parts: [],
+        reason: '',
+      })),
+      edges: [],
+    };
+  }
+  if (fields.includes('propositions')) {
+    const tag = tagOf(input);
+    return {
+      propositions: [
+        { key: 'a', text: `Fake claim ${tag} builds on the basics.`, stepId: 'basics' },
+        { key: 'b', text: `Fake claim ${tag} states the basics.`, stepId: 'basics' },
+      ],
+      edges: [{ from: 'a', to: 'b', relation: 'requires', label: 'needs' }],
+    };
+  }
+  return undefined;
+};
+
+const toolCall = (response: ServerResponse, name: string, input: unknown) => {
+  chunk(
+    response,
+    {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id: `call_${name}`,
+          type: 'function',
+          function: { name, arguments: JSON.stringify(input) },
+        },
+      ],
+    },
+    null,
+  );
+  chunk(response, {}, 'tool_calls');
+  response.end('data: [DONE]\n\n');
+};
 
 const waiting = new Map<string, Array<() => void>>();
 const released = new Set<string>();
@@ -71,6 +155,12 @@ const server = createServer((request, response) => {
       response.writeHead(204).end();
       return;
     }
+    const counted = /^\/calls\/(.+)$/.exec(url.pathname);
+    if (request.method === 'GET' && counted?.[1] !== undefined) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ calls: calls.get(decodeURIComponent(counted[1])) ?? 0 }));
+      return;
+    }
     if (request.method === 'GET' && url.pathname === '/') {
       response.writeHead(200).end('ok');
       return;
@@ -79,17 +169,45 @@ const server = createServer((request, response) => {
       response.writeHead(404).end();
       return;
     }
-    const body = JSON.parse(await readBody(request)) as { messages?: ChatMessage[] };
+    const body = JSON.parse(await readBody(request)) as ChatRequest;
     const key = (request.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    calls.set(key, (calls.get(key) ?? 0) + 1);
     const messages = body.messages ?? [];
     const users = messages.filter((message) => message.role === 'user');
     const last = textOf(users.at(-1)?.content);
+    const tools = new Set((body.tools ?? []).map((tool) => tool.function?.name));
     // The agent turn that opens a session has no answer of the learner yet, only a nudge.
     const opening = !messages.some((message) => message.role === 'assistant');
 
     response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-    if (opening) {
+    if (body.response_format?.type === 'json_schema') {
+      const value = structuredAnswer(body, last);
+      if (value === undefined) {
+        chunk(response, { role: 'assistant', content: '{}' }, null);
+      } else {
+        // Two chunks, as a real stream would split it.
+        const text = JSON.stringify(value);
+        const half = Math.ceil(text.length / 2);
+        chunk(response, { role: 'assistant', content: text.slice(0, half) }, null);
+        chunk(response, { content: text.slice(half) }, null);
+      }
+    } else if (messages.at(-1)?.role === 'tool') {
+      chunk(response, { role: 'assistant', content: 'Noted.' }, null);
+    } else if (tools.has('create_plan')) {
+      return toolCall(response, 'create_plan', {
+        nodes: [{ id: 'basics', title: 'Basics', goal: 'Explain the basics', dependsOn: [] }],
+      });
+    } else if (opening) {
       chunk(response, { role: 'assistant', content: 'What do you already know?' }, null);
+    } else if (last.includes('#assess') && tools.has('submit_assessment')) {
+      return toolCall(response, 'submit_assessment', {
+        level: 'beginner',
+        summary: 'Knows a little.',
+        strengths: [],
+        gaps: ['The basics'],
+      });
+    } else if (last.includes('#done') && tools.has('complete_step')) {
+      return toolCall(response, 'complete_step', { stepId: 'basics' });
     } else if (last.includes('hold')) {
       chunk(response, { role: 'assistant', content: 'Thinking it over' }, null);
       await hold(key, response);

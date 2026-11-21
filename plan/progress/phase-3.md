@@ -15,7 +15,7 @@
 | Bước 5: extraction trên server | Xong (2026-11-21). Route khách / demo `POST /api/knowledge/extract` (SSE, không trạng thái), job tài khoản móc vào chỗ ghi lô của runner (cả lượt lẫn bỏ bước cuối), hàng đợi theo người dùng, `Interrupted` lúc khởi động, `GET` / `POST /api/account/knowledge/extractions`; client khách tự trích một lần dưới Web Lock `kd-learn:knowledge`. Demo: giữ 3 lần gọi, trần 16.384 token ra. Xem ghi chú bước 5 bên dưới |
 | Bước 6: registry bài tập, Practitioner | Xong (2026-11-21). Sự kiện luyện tập trong log kiến thức, mức nắm vững theo hộp Leitner, registry bốn loại, hàm chọn bài, Practitioner (một lần gọi ra cả bộ bài, chấm theo ba mức). C4 với Haiku: chấm ổn định 21/21, không bị đánh lừa 9/9, khoảng $0,004 cả lần kiểm. Xem ghi chú bước 6 bên dưới |
 | Bước 7: luyện tập trên server | Xong (2026-11-21) |
-| Bước 8: model giả trả tool call | Chưa bắt đầu |
+| Bước 8: model giả trả tool call | Xong (2026-11-21). `apps/web/e2e/fake-openai.ts` trả structured output (extractor, auditor, merge) và tool call (`submit_assessment` khi có `#assess`, `create_plan` ở lượt lập plan, `complete_step` khi có `#done`), đếm lần gọi theo key. Hai test e2e mới. Xem ghi chú bước 8 bên dưới |
 | Bước 9: màn graph | Chưa bắt đầu |
 | Bước 10: màn luyện tập | Chưa bắt đầu |
 | Bước 11: màn sửa hồ sơ | Xong (2026-11-21). Màn `/profile` cho khách và tài khoản (`ProfileSource` hai cài đặt), mở từ hai màn cài đặt; hồ sơ mặc định chỉ đọc, nhân bản ra bản sửa được với id mới; TanStack Form kiểm bằng `SavedProfile`. Xem ghi chú bước 11 bên dưới |
@@ -34,6 +34,19 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 8: model giả trả tool call và structured output (2026-11-21)
+
+- **Model giả** (`apps/web/e2e/fake-openai.ts`), theo thứ tự:
+  - request có `response_format: json_schema`: JSON theo schema nhận ra được từ tên trường (`decisions` là merge, `propositions` có `verdict` là auditor, còn lại là extractor). Extractor luôn đề xuất hai mệnh đề `a`, `b` (câu có mã băm của nội dung buổi nên khác nhau giữa các buổi) và cạnh `a requires b`; auditor giữ cả hai; merge cho cả hai là mới.
+  - ngay sau tool result: "Noted.";
+  - có tool `create_plan` (lượt lập plan): plan một bước, id `basics`;
+  - lượt mở đầu: câu hỏi như trước;
+  - `#assess` khi có `submit_assessment`, `#done` khi có `complete_step` (bước `basics`, bước cuối nên buổi xong);
+  - `hold` và lặp lại câu như trước.
+  - `GET /calls/<apiKey>` trả số request đã nhận với key đó.
+- **Test** (`apps/web/e2e/knowledge.e2e.ts`): route trích của khách trên server tài khoản (có endpoint `fake`) trả lô hợp lệ; lát rỗng thì 2 lần gọi provider, có ứng viên thì 3 (khẳng định với adapter thật: structured output không tool là một lần gọi). Một buổi tài khoản đi hết bằng API (đánh giá, lập plan, `complete_step`) thì server tự trích, `GET .../extractions` báo `extracted`, trích lại bị `409`.
+- Luyện tập (bước 7, 10) sẽ thêm schema của Practitioner vào `structuredAnswer`.
 
 ## Bước 5: extraction trên server (2026-11-21)
 
