@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 3 (practice + graph, [mục 4](04-phases.md)): plan phần chính ở [luyen-tap-graph.md](luyen-tap-graph.md), tiến độ ở [progress/phase-3.md](progress/phase-3.md). Bước hiện tại: bước 0 (spike hình graph, C1) và bước 1 (spike extraction với Haiku, C2, C3), làm song song được.
+Phase 3 (practice + graph, [mục 4](04-phases.md)): plan phần chính ở [luyen-tap-graph.md](luyen-tap-graph.md), tiến độ ở [progress/phase-3.md](progress/phase-3.md). Bước 0 (hình graph: sigma + graphology) và bước 1 (extraction: pipeline 3 lần gọi) đã xong. Bước hiện tại: bước 2 (log kiến thức trong `core` và `storage`) và bước 3 (hồ sơ dạy học v2, vai `practitioner` / `extractor`), làm song song được.
