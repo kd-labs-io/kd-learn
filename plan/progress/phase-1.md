@@ -7,7 +7,7 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Spike port AI ([spike-port-ai.md](../archive/spike-port-ai.md)) | Xong (2026-11-21). Rủi ro 1, 2 đạt |
-| Bước 0: khung `storage`, `api`, `server` | Chưa bắt đầu |
+| Bước 0: khung `storage`, `api`, `server` | Xong (2026-11-21). Lint ranh giới cho `storage`, `api`, `server` kèm test |
 | Bước 1: spike SQLite WASM + TanStack DB | Chưa bắt đầu |
 | Bước 2: schema, projection (`core`) | Chưa bắt đầu |
 | Bước 3: vòng turn, Prober → Teacher, side chat (`agent`) | Chưa bắt đầu |
@@ -19,13 +19,13 @@ Spike đã merge vào `main` (PR #2, sửa thêm ở PR #3, #4). Plan phần ch�
 
 ## Bàn giao (2026-11-21)
 
-Plan phần chính đã duyệt và merge (PR #7). Việc tiếp theo, làm ở chat mới: **bước 0** của [loi-day-hoc.md](../loi-day-hoc.md).
+Bước 0 xong. Việc tiếp theo, làm song song ở hai chat mới: **bước 1** (spike SQLite WASM, câu hỏi C1) và **bước 2** (schema, projection trong `core`) của [loi-day-hoc.md](../loi-day-hoc.md).
 
-- Tạo `packages/storage`, `packages/api`, `packages/server` theo mẫu package có sẵn (`packages/core`: `package.json`, `tsconfig`, script `typecheck`/`test`/`lint`).
-- `storage` export `./port` (chỉ import `effect`, giống `packages/ai/src/port`); driver để bước 5.
-- Thêm lint ranh giới cho `api` và `server` trong `packages/config/eslint.js` (bảng import được phép theo package), kèm test trong `packages/config/test`.
-- Xong khi `turbo build test lint` xanh và test lint chặn import sai.
-- Sau đó: bước 1 (spike SQLite WASM) và bước 2 (schema trong `core`) làm song song.
+- Ranh giới import (`packages/config/eslint.js`, bảng `internalAllow`):
+  - `api`: chỉ `@kd-learn/core`, không API của Node, không UI.
+  - `server`: `core`, `agent`, `ai`, `api`, `search`, `storage` (cả adapter); dùng được API của Node; không UI, không `tokens`, `ui`, `web`.
+  - `storage`: driver dùng được API của host, chỉ import `core`; `storage/src/port` thuần như `ai/src/port` (chỉ `effect`).
+- Port `storage` hiện còn trống; hình dạng chốt ở bước 5 sau spike bước 1. Nếu port cần kiểu event từ `core`, nới rule port trong `eslint.js` và test tương ứng.
 
 ## Lưu ý khi chạy model thật
 

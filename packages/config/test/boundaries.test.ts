@@ -68,4 +68,66 @@ describe('package boundaries', () => {
     expect(await ruleIds('packages/ai/src/fixture.ts', ok)).toEqual([]);
     expect(await ruleIds('packages/ai/src/fixture.ts', bad)).toContain('no-restricted-imports');
   });
+  it.each([
+    ["import { readFileSync } from 'node:fs';\nexport const y = readFileSync;"],
+    ["import { useState } from 'react';\nexport const y = useState;"],
+    ["import { useQuery } from '@tanstack/react-query';\nexport const y = useQuery;"],
+    ["import { x } from '@kd-learn/agent';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/server';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/ui';\nexport const y = x;"],
+  ])('api rejects %s', async (code) => {
+    expect(await ruleIds('packages/api/src/fixture.ts', code)).toContain('no-restricted-imports');
+  });
+
+  it('api accepts core and effect', async () => {
+    const code = [
+      "import { Schema } from 'effect';",
+      "import { a } from '@kd-learn/core';",
+      'export const all = [Schema.String, a];',
+    ].join('\n');
+    expect(await ruleIds('packages/api/src/fixture.ts', code)).toEqual([]);
+  });
+
+  it('server accepts Node, core, agent, adapters and the contract', async () => {
+    const code = [
+      "import { readFileSync } from 'node:fs';",
+      "import { a } from '@kd-learn/core';",
+      "import { b } from '@kd-learn/agent';",
+      "import { c } from '@kd-learn/ai/tanstack';",
+      "import { d } from '@kd-learn/api';",
+      "import { e } from '@kd-learn/storage/sqlite-node';",
+      'export const all = [readFileSync, a, b, c, d, e, process.env];',
+    ].join('\n');
+    expect(await ruleIds('packages/server/src/fixture.ts', code)).toEqual([]);
+  });
+
+  it.each([
+    ["import { useState } from 'react';\nexport const y = useState;"],
+    ["import { Link } from '@tanstack/react-router';\nexport const y = Link;"],
+    ["import { Button } from '@astryxdesign/core';\nexport const y = Button;"],
+    ["import { x } from '@kd-learn/ui';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/tokens';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/web';\nexport const y = x;"],
+  ])('server rejects %s', async (code) => {
+    expect(await ruleIds('packages/server/src/fixture.ts', code)).toContain(
+      'no-restricted-imports',
+    );
+  });
+
+  it.each([
+    ["import { readFileSync } from 'node:fs';\nexport const y = readFileSync;"],
+    ["import { x } from '@kd-learn/core';\nexport const y = x;"],
+    ['export const y = indexedDB;'],
+  ])('storage port stays pure: rejects %s', async (code) => {
+    expect(await ruleIds('packages/storage/src/port/fixture.ts', code)).not.toEqual([]);
+  });
+
+  it('storage drivers may use host APIs but not UI', async () => {
+    const ok = "import { DatabaseSync } from 'node:sqlite';\nexport const y = DatabaseSync;";
+    const bad = "import { useState } from 'react';\nexport const y = useState;";
+    expect(await ruleIds('packages/storage/src/sqlite-node/fixture.ts', ok)).toEqual([]);
+    expect(await ruleIds('packages/storage/src/sqlite-node/fixture.ts', bad)).toContain(
+      'no-restricted-imports',
+    );
+  });
 });

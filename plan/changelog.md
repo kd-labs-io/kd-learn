@@ -22,3 +22,4 @@
 - **Cập nhật:** 2026-11-21: thêm phần bàn giao vào `progress/phase-1.md` cho bước lập plan phần chính của phase 1 (mục 8)
 - **Cập nhật:** 2026-11-21: thêm `loi-day-hoc.md` (plan phần chính phase 1: quyết định nền, 9 bước, câu hỏi spike), thêm rủi ro 18, 19, cập nhật mục 6, 7, 8
 - **Cập nhật:** 2026-11-21: thêm phần bàn giao cho bước 0 vào `progress/phase-1.md` (mục 8)
+- **Cập nhật:** 2026-11-21: xong bước 0 của phase 1: thêm `packages/storage`, `packages/api`, `packages/server`, lint ranh giới kèm test; bàn giao cho bước 1 và 2 (mục 8)

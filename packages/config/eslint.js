@@ -57,6 +57,16 @@ const internalAllow = {
   i18n: [],
   tokens: ['@kd-learn/core'],
   ui: ['@kd-learn/core', '@kd-learn/tokens', '@kd-learn/i18n'],
+  storage: ['@kd-learn/core'],
+  api: ['@kd-learn/core'],
+  server: [
+    '@kd-learn/core',
+    '@kd-learn/agent',
+    '@kd-learn/ai',
+    '@kd-learn/api',
+    '@kd-learn/search',
+    '@kd-learn/storage',
+  ],
 };
 
 /** Builds a pattern that rejects every @kd-learn/* import except the allowed ones. */
@@ -162,13 +172,33 @@ export default tseslint.config(
   // Packages other than apps/web and packages/ui must not use TanStack (plan 2.5),
   // except TanStack AI, which is the API backend of packages/ai (plan 2.4).
   {
-    files: ['packages/{search,storage,api,server}/**/*.{ts,tsx}'],
+    files: ['packages/search/**/*.{ts,tsx}'],
     rules: restrict([
       {
         group: ['@tanstack/*'],
         message: 'TanStack libraries belong in apps/web and packages/ui only.',
       },
     ]),
+  },
+  // storage: drivers may use host APIs (OPFS, node:sqlite). The port is checked below.
+  {
+    files: ['packages/storage/**/*.{ts,tsx}'],
+    rules: restrict([...uiLibraryPatterns, internalPattern(internalAllow.storage)]),
+  },
+  // api: the HTTP contract runs in the browser and on the server. No Node APIs, no UI.
+  {
+    files: ['packages/api/**/*.{ts,tsx}'],
+    rules: restrict([
+      ...nodeBuiltinPatterns,
+      ...uiLibraryPatterns,
+      internalPattern(internalAllow.api),
+    ]),
+  },
+  // server: runs in Node and wires adapters to agents. No UI, no browser-only packages.
+  {
+    files: ['packages/server/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.node },
+    rules: restrict([...uiLibraryPatterns, internalPattern(internalAllow.server)]),
   },
   {
     files: ['packages/ai/**/*.{ts,tsx}'],
@@ -179,14 +209,14 @@ export default tseslint.config(
       },
     ]),
   },
-  // ai/port is imported by agent, so it stays as pure as agent: Effect only.
+  // Ports are imported by agent, so they stay as pure as agent: Effect only.
   {
-    files: ['packages/ai/src/port/**/*.{ts,tsx}'],
+    files: ['packages/{ai,storage}/src/port/**/*.{ts,tsx}'],
     rules: {
       ...restrict([
         ...nodeBuiltinPatterns,
         ...uiLibraryPatterns,
-        { group: ['@tanstack/*'], message: 'The AI port must not depend on an adapter.' },
+        { group: ['@tanstack/*'], message: 'A port must not depend on an adapter.' },
         internalPattern(internalAllow.core),
       ]),
       'no-restricted-globals': ['error', ...hostGlobals],

@@ -1,0 +1,23 @@
+{
+  "name": "@kd-learn/storage",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Storage port (append events, read sessions, settings) and its drivers: sqlite-wasm (guest), sqlite-node (server).",
+  "type": "module",
+  "exports": {
+    "./port": "./src/port/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

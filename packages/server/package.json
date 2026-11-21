@@ -1,0 +1,24 @@
+{
+  "name": "@kd-learn/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Turn orchestration over HTTP/SSE, background jobs, auth, admin config. Runs in Node.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
