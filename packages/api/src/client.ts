@@ -7,11 +7,15 @@ import {
   EndpointsResponse,
   ErrorBody,
   ErrorCode,
+  EXTRACT_PATH,
+  ExtractFrame,
+  ExtractRequest,
   Frame,
   TURNS_PATH,
   TurnRequest,
 } from './contract.ts';
-import type { EndpointInfo } from './contract.ts';
+import type { EndpointInfo, Failure } from './contract.ts';
+import type { KnowledgeEvent } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
 /**
@@ -42,6 +46,12 @@ const network = (error: unknown) =>
 const protocol = (message: string) => new ClientError({ reason: 'Protocol', message });
 
 /** An HTTP error response as the frames a stream would have carried, so callers have one path. */
+const unexpected = (status: number): Failure => ({
+  code: ErrorCode.Internal,
+  message: `Unexpected response (HTTP ${status}).`,
+  retryable: status >= 500,
+});
+
 const errorFrames = (response: Response): Effect.Effect<ReadonlyArray<Frame>, ClientError> =>
   Effect.tryPromise({ try: () => response.json() as Promise<unknown>, catch: network }).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(ErrorBody)),
@@ -140,6 +150,58 @@ export const streamTurn = (
         ),
       );
     }),
+  );
+
+export type ExtractOutcome =
+  | { readonly _tag: 'Extracted'; readonly events: ReadonlyArray<KnowledgeEvent> }
+  | { readonly _tag: 'Failed'; readonly error: Failure };
+
+/**
+ * `POST /api/knowledge/extract` (guest, demo). Waits for the whole result: an extraction streams no
+ * text. An HTTP error or an `error` frame is `Failed`; the effect fails with `ClientError` only for
+ * transport problems, including a stream cut before `done`. Interrupting it aborts the request.
+ */
+export const extractSession = (
+  request: ExtractRequest,
+  options: ClientOptions = {},
+): Effect.Effect<ExtractOutcome, ClientError> =>
+  Effect.tryPromise({
+    // One promise for the request and the body, so interrupting aborts either.
+    try: async (signal): Promise<ExtractOutcome | ClientError> => {
+      const doFetch = options.fetch ?? globalThis.fetch;
+      const response = await doFetch(urlOf(options, EXTRACT_PATH), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+        body: JSON.stringify(Schema.encodeSync(ExtractRequest)(request)),
+        signal,
+      });
+      if (!response.ok) {
+        const [first] = await Effect.runPromise(errorFrames(response));
+        return {
+          _tag: 'Failed',
+          error: first?._tag === 'error' ? first.error : unexpected(response.status),
+        };
+      }
+      if (response.body === null) return protocol('The response has no body.');
+      let outcome: ExtractOutcome | undefined;
+      for await (const message of messages(response.body)) {
+        let frame: ExtractFrame;
+        try {
+          frame = Schema.decodeUnknownSync(ExtractFrame)(JSON.parse(message.data));
+        } catch {
+          return protocol('Frame does not match the contract.');
+        }
+        if (frame._tag === 'result') outcome = { _tag: 'Extracted', events: frame.events };
+        else if (frame._tag === 'error') outcome = { _tag: 'Failed', error: frame.error };
+        else return outcome ?? protocol('The stream ended without a result.');
+      }
+      return protocol('The stream ended before `done`.');
+    },
+    catch: network,
+  }).pipe(
+    Effect.flatMap((result) =>
+      result instanceof ClientError ? Effect.fail(result) : Effect.succeed(result),
+    ),
   );
 
 /** `GET /api/endpoints`: the OpenAI-compatible endpoints the guest may choose from. */

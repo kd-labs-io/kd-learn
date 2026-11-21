@@ -27,6 +27,12 @@ import {
 } from '@kd-learn/core';
 import { failureOf, modelName, type FailureInfo } from './turn.ts';
 
+/**
+ * Output cap of each extraction call. The auditor of a long Vietnamese session needs more than
+ * 8,192 (thinking counts as output); 16,384 was enough in the step 4 check.
+ */
+export const EXTRACTION_MAX_OUTPUT_TOKENS = 16_384;
+
 export interface ExtractionParams {
   /** Event log of the session to extract. */
   readonly log: EventLog;
@@ -218,9 +224,7 @@ export const runExtraction = (
             messages: [{ role: 'user', content: user }],
             output,
             maxSteps: 1,
-            ...(params.maxOutputTokens === undefined
-              ? {}
-              : { maxOutputTokens: params.maxOutputTokens }),
+            maxOutputTokens: params.maxOutputTokens ?? EXTRACTION_MAX_OUTPUT_TOKENS,
           })
           .pipe(
             Stream.runForEach((event) =>

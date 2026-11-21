@@ -78,6 +78,8 @@ export interface RunnerDeps {
    * server picks the model and key, so no key is needed in the settings.
    */
   readonly demo?: () => boolean;
+  /** Called after a batch with `SessionCompleted` is written (phase 3 A3: extraction starts). */
+  readonly onSessionCompleted?: (sessionId: string) => void;
 }
 
 const idle: RunnerState = {
@@ -126,6 +128,14 @@ export class SessionRunner {
     this.lock = deps.lock ?? withLock;
     this.newId = deps.newId ?? (() => crypto.randomUUID());
     this.now = deps.now ?? (() => Date.now());
+  }
+
+  /** Every write of this runner: the end of the session is seen in one place, whatever wrote it. */
+  private async append(storage: StorageService, events: ReadonlyArray<DomainEvent>) {
+    await appendBatch(storage, this.sessionId, events);
+    if (events.some((event) => event._tag === 'SessionCompleted')) {
+      this.deps.onSessionCompleted?.(this.sessionId);
+    }
   }
 
   // --- subscription (useSyncExternalStore) ---
@@ -209,7 +219,7 @@ export class SessionRunner {
         if (Result.isFailure(projectSession([...log, ...batch]))) {
           throw new InvalidBatch();
         }
-        await appendBatch(storage, this.sessionId, batch);
+        await this.append(storage, batch);
       });
       if (!result.acquired) this.setMain({ failure: fail(ClientFailure.Busy, 'Another tab.') });
     } catch (error) {
@@ -301,7 +311,7 @@ export class SessionRunner {
       });
       return 'failed';
     }
-    await appendBatch(storage, this.sessionId, [started]);
+    await this.append(storage, [started]);
 
     this.setMain({ live: { turnId, text: '' }, failure: undefined });
     const parts = new Map<string, string>();
@@ -350,7 +360,7 @@ export class SessionRunner {
         });
         return 'failed';
       }
-      await appendBatch(storage, this.sessionId, batch);
+      await this.append(storage, batch);
     }
     if (collected.error !== undefined) {
       this.setMain({ live: undefined, failure: collected.error });
@@ -402,7 +412,7 @@ export class SessionRunner {
             });
             return;
           }
-          await appendBatch(storage, this.sessionId, [message]);
+          await this.append(storage, [message]);
         } else if (session.sideThreads[threadId]?.at(-1)?.role !== 'user') {
           return; // Nothing to answer. A retry never adds a second learner message.
         }
@@ -454,7 +464,7 @@ export class SessionRunner {
             });
             return;
           }
-          await appendBatch(storage, this.sessionId, batch);
+          await this.append(storage, batch);
         }
         this.setSide({ live: undefined, failure: collected.error });
       });

@@ -33,6 +33,11 @@ export { serverMigrations } from './schema.ts';
 export interface ServerStorage {
   /** The port, restricted to the sessions of `userId`. Cheap: call it per request. */
   readonly forUser: (userId: string) => StorageService;
+  /**
+   * Users whose knowledge log has an extraction attempt (startup recovery, phase 3 A3). Ids only:
+   * their data is still read through `forUser`.
+   */
+  readonly extractionOwners: () => ReadonlyArray<string>;
 }
 
 /** Thrown inside a transaction when the session belongs to someone else. */
@@ -248,5 +253,10 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
     ),
   });
 
-  return { forUser };
+  const owners = db.prepare(
+    "SELECT DISTINCT owner FROM knowledge_events WHERE tag = 'ExtractionStarted' ORDER BY owner",
+  );
+  const extractionOwners = () => (owners.all() as Array<{ owner: string }>).map((row) => row.owner);
+
+  return { forUser, extractionOwners };
 };

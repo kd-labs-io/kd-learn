@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { listEndpoints, type EndpointInfo } from '@kd-learn/api';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { localModeNow } from '../account/auth';
+import { guestExtractor } from '../knowledge';
 import { getStorage } from '../storage';
 import { getRunner, isTurnRunningElsewhere, type RunnerState, type SessionRunner } from './runner';
 
@@ -17,6 +18,8 @@ export function useRunner(sessionId: string): { runner: SessionRunner; state: Ru
     storage: getStorage,
     demo: () => localModeNow() === 'demo',
     ...(apiBaseUrl === '' ? {} : { baseUrl: apiBaseUrl }),
+    // Phase 3 A3: a completed session is extracted once, by itself.
+    onSessionCompleted: (id) => void guestExtractor.sessionCompleted(id),
   });
   const state = useSyncExternalStore(runner.subscribe, runner.getSnapshot, runner.getSnapshot);
   return { runner, state };

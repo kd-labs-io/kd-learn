@@ -21,6 +21,7 @@ import {
   type ServerStorage,
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
+import { makeExtractionJobs, type ExtractionJobs } from '../knowledge/jobs.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
 import { makeLazyAcp, routedAi } from '../acp/router.ts';
@@ -44,6 +45,8 @@ export interface Accounts {
   readonly auth: AuthService;
   readonly settings: SettingsService;
   readonly sessions: SessionRunner;
+  /** Extraction jobs of account sessions (phase 3 A3). */
+  readonly extractions: ExtractionJobs;
   readonly admin: AdminService;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
@@ -98,19 +101,34 @@ export const initAccounts = async (
   const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
   const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
   const storage = makeServerStorage(database);
+  const ai = routedAi({
+    api: options.ai,
+    acp: options.acp ?? lazyAcp!.layer,
+    maxConcurrent: admin.acpMaxConcurrent,
+  });
+  const extractions = makeExtractionJobs({ storage, settings, ai, log: options.log });
+  // No job survives a restart (A3): attempts left open by the last process are interrupted.
+  extractions.recoverInterrupted(storage.extractionOwners());
   const sessions = makeSessionRunner({
     storage,
     settings,
-    ai: routedAi({
-      api: options.ai,
-      acp: options.acp ?? lazyAcp!.layer,
-      maxConcurrent: admin.acpMaxConcurrent,
-    }),
+    ai,
     log: options.log,
+    onSessionCompleted: extractions.sessionCompleted,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
   const acpAvailable = lazyAcp === undefined ? () => Promise.resolve(true) : lazyAcp.available;
-  return { database, storage, auth, settings, sessions, admin, demo, acpAvailable };
+  return {
+    database,
+    storage,
+    auth,
+    settings,
+    sessions,
+    extractions,
+    admin,
+    demo,
+    acpAvailable,
+  };
 };
 
 export interface AccountHandlers {

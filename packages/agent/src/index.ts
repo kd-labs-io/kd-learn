@@ -15,6 +15,7 @@ export type {
 } from './practice/practitioner.ts';
 export {
   Audited,
+  EXTRACTION_MAX_OUTPUT_TOKENS,
   ExtractionModelFailed,
   Extracted,
   InvalidExtraction,

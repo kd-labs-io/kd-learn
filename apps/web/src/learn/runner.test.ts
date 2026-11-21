@@ -163,6 +163,7 @@ async function setup(
     serve?: (request: TurnRequest, call: number) => Response | Promise<Response>;
     lock?: ConstructorParameters<typeof SessionRunner>[1]['lock'];
     storage?: StorageService;
+    onSessionCompleted?: (sessionId: string) => void;
   } = {},
 ): Promise<Harness> {
   const storage = options.storage ?? makeMemoryStorage();
@@ -183,6 +184,7 @@ async function setup(
     newId: id,
     now: () => 10,
     ...(options.lock === undefined ? {} : { lock: options.lock }),
+    ...(options.onSessionCompleted ? { onSessionCompleted: options.onSessionCompleted } : {}),
   });
   const log = () => Effect.runPromise(storage.readSession(SESSION));
   const session = async () => {
@@ -366,8 +368,9 @@ describe('main turn', () => {
 
 describe('skip a step', () => {
   const profile = { ...defaultProfile, maxTurnsPerStep: 1 };
+  const completed: string[] = [];
   const teaching = async () => {
-    const h = await setup({ profile });
+    const h = await setup({ profile, onSessionCompleted: (id) => completed.push(id) });
     await h.runner.autoStart();
     await h.runner.send('ASSESS');
     await h.runner.send('not yet');
@@ -385,6 +388,8 @@ describe('skip a step', () => {
     expect(session.state._tag).toBe('Done');
     expect(session.skippedSteps).toEqual(['a', 'b']);
     expect(tags(await h.log()).slice(-2)).toEqual(['StepSkipped', 'SessionCompleted']);
+    // Extraction is started by the batch that ends the session (phase 3 A3).
+    expect(completed).toEqual([SESSION]);
   });
 
   it('ignores a stale request and a skip before M turns', async () => {
