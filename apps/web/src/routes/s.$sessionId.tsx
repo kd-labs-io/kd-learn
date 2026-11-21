@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { LearnScreen } from '../learn/LearnScreen';
+import { GuestLesson } from '../learn/GuestLesson';
 
 export const Route = createFileRoute('/s/$sessionId')({ component: LessonRoute });
 
 function LessonRoute() {
   const { sessionId } = Route.useParams();
   // `key`: a different session is a different screen, with its own drafts.
-  return <LearnScreen key={sessionId} sessionId={sessionId} />;
+  return <GuestLesson key={sessionId} sessionId={sessionId} />;
 }

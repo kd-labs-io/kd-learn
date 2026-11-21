@@ -92,13 +92,7 @@ export const initAccounts = async (
   );
   const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
-  const settings = makeSettings(
-    database,
-    box,
-    options.endpoints,
-    admin.acpAgents,
-    admin.acpModels,
-  );
+  const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
   const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
   const sessions = makeSessionRunner({
     storage: makeServerStorage(database),

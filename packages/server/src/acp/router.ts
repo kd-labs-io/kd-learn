@@ -31,12 +31,6 @@ export const makeLazyAcp = (
   importAdapter: () => Promise<{ layer: () => Layer.Layer<AiPort> }> = () =>
     import('@kd-learn/ai/acp'),
 ): { readonly layer: Layer.Layer<AiPort>; readonly available: () => Promise<boolean> } => {
-  let probed: Promise<boolean> | undefined;
-  const available = () =>
-    (probed ??= importAdapter().then(
-      () => true,
-      () => false,
-    ));
   let loaded: Promise<AiPort['Service']> | undefined;
   const load = () =>
     (loaded ??= importAdapter()
@@ -64,6 +58,13 @@ export const makeLazyAcp = (
         }).pipe(Effect.map((port) => port.runTurn(request))),
       )) as AiPort['Service']['runTurn'],
   });
+  // Loading resolves the agent package and bridge script, so it is the real test of the build.
+  let probed: Promise<boolean> | undefined;
+  const available = () =>
+    (probed ??= load().then(
+      () => true,
+      () => false,
+    ));
   return { layer, available };
 };
 

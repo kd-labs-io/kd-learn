@@ -9,7 +9,8 @@ import { m } from '@kd-learn/i18n';
 import { currentStep, type EventLog, type Session } from '@kd-learn/core';
 import { LessonMarkdown } from '@kd-learn/ui/components/LessonMarkdown';
 import { useEffect, useRef, useState } from 'react';
-import type { RunnerState, SessionRunner } from './runner';
+import type { RunnerState } from './runner';
+import type { LessonActions } from './source';
 import { failureText } from './view';
 
 /** One side thread per step (plan A5), and one for the time before there is a step. */
@@ -31,7 +32,7 @@ function lastSideFailure(log: EventLog, threadId: string) {
 export interface SideChatProps {
   readonly session: Session;
   readonly log: EventLog;
-  readonly runner: SessionRunner;
+  readonly runner: LessonActions;
   readonly state: RunnerState['side'];
 }
 

@@ -18,16 +18,14 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
-import { canSkipStep, findInterruptedTurn, type EventLog, type Session } from '@kd-learn/core';
+import { canSkipStep, type EventLog, type Session } from '@kd-learn/core';
 import { LessonMarkdown } from '@kd-learn/ui/components/LessonMarkdown';
-import { useNavigate } from '@tanstack/react-router';
 import { Result } from 'effect';
 import { useEffect, useRef, useState } from 'react';
-import { useSession } from '../storage';
-import { useRunner, useStoragePersistent, useTurnRunningElsewhere } from './hooks';
 import { PlanPanel } from './PlanPanel';
-import { shouldAutoStart, type RunnerState, type SessionRunner } from './runner';
+import { shouldAutoStart, type RunnerState } from './runner';
 import { SideChat } from './SideChat';
+import type { LessonActions, LessonSource } from './source';
 import {
   conversationOf,
   failureAction,
@@ -37,20 +35,26 @@ import {
   type TurnBanner,
 } from './view';
 
-/** The learning screen of one session (plan step 7). */
-export function LearnScreen({ sessionId }: { sessionId: string }) {
-  const navigate = useNavigate();
-  const view = useSession(sessionId);
-  const { runner, state } = useRunner(sessionId);
-  const persistent = useStoragePersistent();
+export interface LearnScreenProps {
+  readonly source: LessonSource;
+  readonly onHome: () => void;
+  readonly onSettings: () => void;
+}
+
+/**
+ * The learning screen of one session (plan step 7). The same screen serves guests (local DB) and
+ * accounts (server log): it only sees a `LessonSource` (plan step 8).
+ */
+export function LearnScreen({ source, onHome: home, onSettings: settings }: LearnScreenProps) {
+  const { view, state, actions: runner, elsewhere, persistent } = source;
   const showPlanColumn = useMediaQuery('(min-width: 768px)');
   const showSideColumn = useMediaQuery('(min-width: 1180px)');
   const [sideOpen, setSideOpen] = useState(false);
 
-  const projected = view.status === 'ready' ? view.data.session : undefined;
+  const projected = view.status === 'ready' ? view.session : undefined;
   const session =
     projected !== undefined && Result.isSuccess(projected) ? projected.success : undefined;
-  const log: EventLog = view.status === 'ready' ? view.data.log : [];
+  const log: EventLog = view.status === 'ready' ? view.log : [];
 
   // A stale failure from an earlier visit (no key, a lost connection) must not outlive the visit.
   useEffect(() => runner.clearFailure(), [runner]);
@@ -60,12 +64,6 @@ export function LearnScreen({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     if (due) void runner.autoStart();
   }, [due, runner]);
-
-  const hasOpenTurn = session !== undefined && findInterruptedTurn(session) !== undefined;
-  const elsewhere = useTurnRunningElsewhere(sessionId, hasOpenTurn && !state.main.running);
-
-  const home = () => void navigate({ to: '/' });
-  const settings = () => void navigate({ to: '/settings' });
 
   if (view.status === 'loading') {
     return (
@@ -83,13 +81,13 @@ export function LearnScreen({ sessionId }: { sessionId: string }) {
       <Layout
         content={
           <LayoutContent padding={6}>
-            <Banner status="error" title={m.storage_error({ reason: view.error.message })} />
+            <Banner status="error" title={m.storage_error({ reason: view.message })} />
           </LayoutContent>
         }
       />
     );
   }
-  if (log.length === 0) {
+  if (view.status === 'not-found' || log.length === 0) {
     return (
       <Layout
         content={
@@ -270,7 +268,7 @@ interface StatusProps {
   readonly session: Session;
   readonly state: RunnerState;
   readonly elsewhere: boolean;
-  readonly runner: SessionRunner;
+  readonly runner: LessonActions;
   readonly onSettings: () => void;
   readonly onNew: () => void;
 }
@@ -288,7 +286,20 @@ function Status({ session, state, elsewhere, runner, onSettings, onNew }: Status
       />
     );
   }
-  if (state.main.running) return null;
+  if (state.main.running) {
+    const cancel = runner.cancel;
+    return cancel === undefined ? null : (
+      <HStack justify="end">
+        <Button
+          label={m.turn_stop()}
+          variant="ghost"
+          size="sm"
+          onClick={() => void cancel()}
+          data-testid="turn-stop"
+        />
+      </HStack>
+    );
+  }
   if (elsewhere) {
     return <Banner status="info" title={m.turn_elsewhere()} data-testid="turn-elsewhere" />;
   }
@@ -370,7 +381,7 @@ interface ComposerProps {
   readonly session: Session;
   readonly state: RunnerState;
   readonly elsewhere: boolean;
-  readonly runner: SessionRunner;
+  readonly runner: LessonActions;
 }
 
 function Composer({ session, state, elsewhere, runner }: ComposerProps) {

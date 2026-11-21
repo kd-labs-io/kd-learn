@@ -26,7 +26,7 @@ export interface SwitchDefaults {
 
 export interface AdminService {
   /** The three switches as the admin set them. */
-  readonly switches: () => PublicConfig;
+  readonly switches: () => Omit<PublicConfig, 'accounts'>;
   /** Without `acpAvailable`, which the route adds (it needs a load attempt). */
   readonly config: () => Omit<AdminConfig, 'acpAvailable'>;
   /** What the public config says: demo counts as on only when it can run. */
@@ -68,7 +68,7 @@ export const makeAdmin = (
   };
   const read = (key: string) => (q.get.get(key) as { value: string } | undefined)?.value;
 
-  const switches = (): PublicConfig => ({
+  const switches = (): Omit<PublicConfig, 'accounts'> => ({
     registration: auth.registrationMode(),
     guestMode: bool(read('guestMode'), defaults.guestMode),
     demoMode: bool(read('demoMode'), defaults.demoMode),
@@ -102,6 +102,7 @@ export const makeAdmin = (
   const publicConfig = (): PublicConfig => {
     const on = switches();
     return {
+      accounts: true,
       ...on,
       demoMode: on.demoMode && demo.model() !== undefined && demo.budget.status().limit > 0,
     };

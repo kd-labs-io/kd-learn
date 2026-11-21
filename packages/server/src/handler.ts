@@ -503,7 +503,7 @@ export const createHandlers = (
     guestAllowed = async () => guestMode;
     publicConfig = async (request) =>
       Response.json(
-        { registration: 'closed', guestMode, demoMode: false },
+        { accounts: false, registration: 'closed', guestMode, demoMode: false },
         {
           headers: {
             ...SECURITY_HEADERS,

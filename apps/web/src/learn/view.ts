@@ -58,6 +58,16 @@ const SERVER_CODES = new Set([
   'InternalError',
   'MethodNotAllowed',
   'OutputInvalid',
+  'TurnInProgress',
+  'NothingToRun',
+  'TurnTimeout',
+  'AcpBusy',
+  'AcpUnavailable',
+  'DemoQuotaExceeded',
+  'DemoModeDisabled',
+  'GuestModeDisabled',
+  'Unauthorized',
+  'NotFound',
 ]);
 
 export function failureText(failure: UiFailure): string {
@@ -76,6 +86,28 @@ export function failureText(failure: UiFailure): string {
       return m.error_HistoryTooLarge();
     case 'UnknownEndpoint':
       return m.error_UnknownEndpoint();
+    case 'RoleNotConfigured':
+      return m.error_RoleNotConfigured();
+    case 'KeyUnreadable':
+      return m.error_KeyUnreadable();
+    case 'AcpAgentDisabled':
+      return m.error_AcpAgentDisabled();
+    case 'AcpModelNotAllowed':
+      return m.error_AcpModelNotAllowed();
+    case 'AcpBusy':
+      return m.error_AcpBusy();
+    case 'AcpUnavailable':
+      return m.error_AcpUnavailable();
+    case 'TurnInProgress':
+      return m.error_TurnInProgress();
+    case 'TurnTimeout':
+      return m.error_TurnTimeout();
+    case 'DemoQuotaExceeded':
+      return m.error_DemoQuotaExceeded();
+    case 'DemoModeDisabled':
+      return m.error_DemoModeDisabled();
+    case 'GuestModeDisabled':
+      return m.error_GuestModeDisabled();
     default:
       // A provider code that cannot be retried is a key, model or permission problem.
       return failure.retryable || SERVER_CODES.has(failure.code)
@@ -90,6 +122,11 @@ export function failureAction(failure: UiFailure): FailureAction {
       return 'new-session';
     case 'UnknownEndpoint':
     case ClientFailure.NoKey:
+      return 'settings';
+    case 'RoleNotConfigured':
+    case 'KeyUnreadable':
+    case 'AcpAgentDisabled':
+    case 'AcpModelNotAllowed':
       return 'settings';
     default:
       return !failure.retryable &&

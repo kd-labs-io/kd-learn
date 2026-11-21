@@ -409,6 +409,8 @@ export type RegistrationMode = typeof RegistrationMode.Type;
 
 /** `GET /api/config` (no sign-in): what this server offers, so the UI shows the right entry points. */
 export const PublicConfig = Schema.Struct({
+  /** False when the server runs without accounts (no `KD_LEARN_SECRET_KEY`): guest mode only. */
+  accounts: Schema.Boolean,
   registration: RegistrationMode,
   guestMode: Schema.Boolean,
   demoMode: Schema.Boolean,
