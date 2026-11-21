@@ -40,7 +40,7 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 
 ### A4. Trạng thái buổi học và vai agent
 
-- **Trạng thái:** đã duyệt (2026-11-21)
+- **Trạng thái:** `probing → planning → teaching(bước i) → done`. "Học xong 1 chủ đề" nghĩa là buổi học ở trạng thái `done`.
 - **Vai agent:**
   - **Prober:** hỏi nhiều nhất N câu (N lấy từ hồ sơ dạy học). Kết thúc bằng tool `submit_assessment`, sinh event `AssessmentRecorded`.
   - **Teacher:**
