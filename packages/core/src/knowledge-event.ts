@@ -113,6 +113,15 @@ export const SessionExtracted = Schema.TaggedStruct('SessionExtracted', {
   extractionId: Schema.NonEmptyString,
   /** Profile whose prompts ran the extraction (A2). */
   profileId: Schema.NonEmptyString,
+  /** Tokens summed over the model calls of the extraction, and how many calls it made. */
+  usage: Schema.optionalKey(
+    Schema.Struct({
+      model: Schema.NonEmptyString,
+      calls: NonNegativeInt,
+      inputTokens: NonNegativeInt,
+      outputTokens: NonNegativeInt,
+    }),
+  ),
 });
 
 /** `message` must never contain a key. `Interrupted` and `Conflict` are written by the runner. */

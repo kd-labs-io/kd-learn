@@ -13,3 +13,18 @@ export type {
   WriteParams,
   WrittenExercise,
 } from './practice/practitioner.ts';
+export {
+  Audited,
+  ExtractionModelFailed,
+  Extracted,
+  InvalidExtraction,
+  Merged,
+  runExtraction,
+  transcript,
+} from './extraction.ts';
+export type {
+  ExtractionError,
+  ExtractionParams,
+  ExtractionResult,
+  ExtractionUsage,
+} from './extraction.ts';

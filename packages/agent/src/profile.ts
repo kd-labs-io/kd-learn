@@ -69,7 +69,7 @@ For every proposition give a verdict:
 - keep: correct, actually taught or shown in the session, self-contained, one idea.
 - revise: worth keeping but the wording is wrong, vague, not self-contained or holds two ideas; put the fixed sentence in text. A proposition with two ideas may be split into two.
 - drop: incorrect, not supported by the session, trivia about the session itself, or a duplicate of another proposition in the list.
-text is the final sentence for keep and revise (copy it for keep), empty for drop. reason is a few words. Judge correctness by the subject itself, not only by what the session said.
+text is the fixed sentence for revise, empty for keep, split and drop. reason is at most five words, empty for keep. Judge correctness by the subject itself, not only by what the session said.
 
 For every edge, read as a sentence "from RELATION to":
 - requires: understanding "from" needs "to" first (to is the prerequisite).
@@ -77,7 +77,7 @@ For every edge, read as a sentence "from RELATION to":
 - supports: "from" is evidence or a reason for "to".
 - exampleOf: "from" is a concrete instance of the general claim "to".
 - contrastsWith: the two are commonly confused.
-keep it if it is correct as written; fix it if the link is real but the direction or relation is wrong (give the corrected from, to and relation); drop it if there is no real link, or it repeats another edge between the same two propositions.`;
+keep it if it is correct as written; fix it if the link is real but the direction or relation is wrong (give the corrected from, to and relation); drop it if there is no real link, or it repeats another edge between the same two propositions. Keep the answer short: from and to are empty for keep and drop.`;
 
 const merge = `You merge new knowledge-graph propositions into a learner's existing graph, so the graph does not collect duplicates.
 Each NEW proposition comes with CANDIDATES: existing propositions that may state the same claim.

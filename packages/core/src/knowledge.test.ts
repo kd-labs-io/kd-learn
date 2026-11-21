@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   emptyKnowledgeGraph,
   extractionStatus,
+  fitKnowledgeBatch,
   projectKnowledge,
   resolveProposition,
   shouldAutoExtract,
@@ -372,5 +373,50 @@ describe('projectKnowledge: scale', () => {
     expect(Result.isSuccess(result)).toBe(true);
     // About 10 ms on a laptop; the bound only catches a return to quadratic work.
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+describe('fitKnowledgeBatch', () => {
+  it('drops edges that repeat, loop or make a cycle on the current graph, and keeps the rest', () => {
+    const graphLog: KnowledgeEvent[] = [
+      added('a'),
+      added('b'),
+      added('gone'),
+      edge('e1', 'a', 'b', 'implies'),
+      { _tag: 'PropositionRetired', ...meta(), propositionId: 'gone' },
+    ];
+    const graph = project(graphLog);
+    const batch = [
+      added('c'),
+      edge('n1', 'b', 'a', 'implies'), // cycle with e1
+      edge('n2', 'a', 'b', 'implies'), // repeats e1
+      edge('n3', 'c', 'c', 'supports'), // self-loop
+      edge('n4', 'c', 'gone', 'supports'), // retired end
+      edge('n5', 'b', 'c', 'implies'), // fine
+      edge('n6', 'c', 'a', 'implies'), // cycle through n5, accepted earlier in the batch
+    ];
+    const fit = fitKnowledgeBatch(graph, batch);
+    expect(fit.droppedEdges.map((d) => d.edgeId)).toEqual(['n1', 'n2', 'n3', 'n4', 'n6']);
+    expect(fit.events.map((e) => ('edgeId' in e ? e.edgeId : e._tag))).toEqual([
+      'PropositionAdded',
+      'n5',
+    ]);
+    expect(Result.isSuccess(projectKnowledge([...graphLog, ...fit.events]))).toBe(true);
+  });
+
+  it('moves a source or an edge end from a merged-away proposition to the one it went into', () => {
+    const log: KnowledgeEvent[] = [
+      added('a'),
+      added('b'),
+      added('c'),
+      { _tag: 'PropositionsMerged', ...meta(), from: 'a', into: 'b' },
+    ];
+    const graph = project(log);
+    const fit = fitKnowledgeBatch(graph, [
+      { _tag: 'PropositionSourced', ...meta(), propositionId: 'a', source: { sessionId: 's9' } },
+      edge('m1', 'c', 'a', 'supports'),
+    ]);
+    expect(fit.events).toMatchObject([{ propositionId: 'b' }, { from: 'c', to: 'b' }]);
+    expect(Result.isSuccess(projectKnowledge([...log, ...fit.events]))).toBe(true);
   });
 });

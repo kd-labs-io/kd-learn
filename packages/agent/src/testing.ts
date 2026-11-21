@@ -2,8 +2,7 @@
 // Mirrors what the TanStack adapter does with tools: decode the input, run the tool, and send a
 // failure back to the model as a tool result instead of ending the turn.
 import { Effect, Schema, Stream } from 'effect';
-import { AiPort } from '@kd-learn/ai/port';
-import { OutputInvalid } from '@kd-learn/ai/port';
+import { AiPort, OutputInvalid } from '@kd-learn/ai/port';
 import type { AiError, FinishReason, TurnEvent, TurnRequest } from '@kd-learn/ai/port';
 import type { DomainEvent } from '@kd-learn/core';
 import type { AgentOutput } from './turn.ts';
