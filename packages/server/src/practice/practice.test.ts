@@ -259,6 +259,54 @@ describe('guest practice routes', () => {
   });
 });
 
+describe('guest practice failures', () => {
+  it('hides a defect behind a fixed message, without the key (risk 19)', async () => {
+    for (const [env, model, key] of [
+      [{}, guestModel, GUEST_KEY],
+      [demoEnv(10), { provider: 'demo' }, DEMO_KEY],
+    ] as const) {
+      const crash: Program = () => Stream.die(new Error(`adapter crashed with ${key}`));
+      const t = guest([crash], env);
+      const response = await t.issue({ model });
+      expect(response.status).toBe(500);
+      const text = await response.text();
+      expect(text).toContain('server error');
+      expect(text).not.toContain(key);
+      expect(JSON.stringify(t.logs)).not.toContain(key);
+    }
+  });
+
+  it('cancels the provider call when the guest disconnects, and settles the demo call', async () => {
+    const interrupted = { value: false };
+    const hang: Program = () =>
+      Stream.fromEffect(
+        Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => (interrupted.value = true)))),
+      );
+    const t = guest([hang], demoEnv(5));
+    const closed = new AbortController();
+    const response = send(
+      t.handlers.practice,
+      'POST',
+      '/api/practice/issue',
+      undefined,
+      {
+        model: { provider: 'demo' },
+        profile: defaultProfile,
+        slice,
+        targets: [{ type: 'shortAnswer', propositionIds: ['p1'], edgeIds: [] }],
+      },
+      closed.signal,
+    );
+    await until(() => t.fake.requests.length === 1);
+    closed.abort();
+    await response.catch(() => undefined);
+    await until(() => interrupted.value);
+    expect(t.logs.some((l) => l.event === 'practice.end' && l.fields.outcome === 'cancelled')).toBe(
+      true,
+    );
+  });
+});
+
 describe('demo practice', () => {
   const setup = async (programs: Program[], budget: number) => {
     const t = guest(programs, demoEnv(budget));
@@ -310,7 +358,7 @@ describe('demo practice', () => {
     expect(t.fake.requests).toHaveLength(2);
   });
 
-  it('gives the call back when the call fails before reaching the model', async () => {
+  it('refuses a demo request over 256 KiB before reserving', async () => {
     const t = await setup([], 3);
     const tooBig = await t.issue({
       ...demo,
@@ -318,11 +366,18 @@ describe('demo practice', () => {
         ...slice,
         propositions: [
           ...slice.propositions,
-          ...Array.from({ length: 150 }, (_, i) => ({
+          ...Array.from({ length: 190 }, (_, i) => ({
             propositionId: `big${i}`,
-            text: 'x'.repeat(1900),
+            text: 'x'.repeat(1000),
           })),
         ],
+        edges: Array.from({ length: 300 }, (_, i) => ({
+          edgeId: `big${i}`,
+          from: 'p1',
+          to: 'p4',
+          relation: 'supports',
+          label: 'y'.repeat(200),
+        })),
       },
     });
     expect(tooBig.status).toBe(413);
@@ -389,7 +444,13 @@ describe('account practice', () => {
     });
     expect(started.status).toBe(201);
     const text = await started.text();
-    for (const hidden of ['correctIndex', 'constraints', 'reference']) {
+    for (const hidden of [
+      'correctIndex',
+      'constraints',
+      'reference',
+      'propositionIds',
+      'edgeIds',
+    ]) {
       expect(text).not.toContain(hidden);
     }
     const view = JSON.parse(text) as View;

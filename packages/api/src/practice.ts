@@ -20,6 +20,7 @@ import {
   ExerciseTypeId,
   Feedback,
   KnowledgeLog,
+  maxPropositionLength,
   PropositionId,
   Relation,
   Score,
@@ -38,7 +39,7 @@ export const MAX_PRACTICE_EXERCISES = 10;
 export const ExerciseTargetInput = Schema.Struct({
   type: ExerciseTypeId,
   propositionIds: Schema.NonEmptyArray(PropositionId).check(Schema.isMaxLength(6)),
-  edgeIds: Schema.Array(EdgeId).check(Schema.isMaxLength(20)),
+  edgeIds: Schema.Array(EdgeId).check(Schema.isMaxLength(100)),
 });
 export type ExerciseTargetInput = typeof ExerciseTargetInput.Type;
 
@@ -50,7 +51,7 @@ export const KnowledgeSlice = Schema.Struct({
   propositions: Schema.Array(
     Schema.Struct({
       propositionId: PropositionId,
-      text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2000)),
+      text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maxPropositionLength)),
     }),
   ).check(Schema.isMaxLength(200)),
   edges: Schema.Array(
@@ -146,8 +147,6 @@ export const ExerciseView = Schema.Struct({
   exerciseId: Schema.NonEmptyString,
   practiceId: Schema.NonEmptyString,
   type: ExerciseTypeId,
-  propositionIds: Schema.Array(PropositionId),
-  edgeIds: Schema.Array(EdgeId),
   content: PublicExerciseContent,
   issuedAt: Schema.Number,
   answer: Schema.optionalKey(ExerciseAnswer),
@@ -155,6 +154,12 @@ export const ExerciseView = Schema.Struct({
   grade: Schema.optionalKey(ExerciseGradeView),
   /** The full content with its answer key, once graded. */
   solution: Schema.optionalKey(ExerciseContent),
+  /**
+   * What it tests, once graded. Hidden before: with the graph they give the answer away (the
+   * proposition a multiple choice asks for, the edges of an ordering).
+   */
+  propositionIds: Schema.optionalKey(Schema.Array(PropositionId)),
+  edgeIds: Schema.optionalKey(Schema.Array(EdgeId)),
 });
 export type ExerciseView = typeof ExerciseView.Type;
 

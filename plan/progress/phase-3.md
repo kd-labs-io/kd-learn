@@ -78,7 +78,8 @@
 
 - `POST /api/practice/issue`: `{model, profile, slice, targets}`. `slice` là mệnh đề đích, lân cận và cạnh giữa chúng (tối đa 200 mệnh đề, 400 cạnh); `targets` (1–10) do client chọn bằng `selectExercises`. Server kiểm id của target có trong lát rồi mới gọi; trả `{events}` = `PracticeStarted` + một `ExerciseIssued` mỗi bài viết được (id mới do server tạo), client ghi bằng checked append. Không viết được bài nào thì 409 `NothingToRun`.
 - `POST /api/practice/grade`: `{model, profile, exerciseId, content, answer}`, chỉ loại chấm bằng model; loại chấm bằng code trả 400, không gọi (client tự chấm bằng `gradeByCode`). Trả `{events: [ExerciseGraded]}` có `profileId`.
-- Cùng cổng như `/api/turns`: công tắc khách, cổng demo, từ chối `baseURL`, endpoint theo id; demo tối đa 256 KiB. Demo dùng hồ sơ của server, giữ ngôn ngữ của người học. Lỗi model: 502 với mã và thông báo từ `failureOf` (đã xoá key); defect: 500 thông báo cố định; ngắt kết nối thì huỷ lời gọi provider.
+- Cùng cổng như `/api/turns`: công tắc khách, cổng demo, từ chối `baseURL`, endpoint theo id; demo tối đa 256 KiB. Demo dùng hồ sơ của server, giữ ngôn ngữ của người học. Lỗi model: 502 với mã và thông báo từ `failureOf` (đã xoá key); defect: 500 thông báo cố định, log chỉ ghi mã; ngắt kết nối thì huỷ lời gọi provider (test), demo vẫn tính lời gọi đã bắt đầu.
+- Demo vẫn phải gửi đủ `profile` dù server chỉ lấy ngôn ngữ.
 - Chưa có heartbeat: lời gọi viết bài dài (Haiku khoảng vài giây) chạy trong một request JSON.
 
 **Ngân sách demo:** ra bài giữ chỗ 1 lần gọi (0 nếu cả bộ toàn bài sắp xếp, dựng bằng code), chấm bằng model 1, chấm bằng code không qua server. Quyết toán sau lời gọi bằng `meteredAi`. Output có cấu trúc không có tool là đúng một lời gọi (TanStack bỏ qua vòng agent), nên đếm khớp. Trần token ra theo vai: `DEMO_ROLE_OUTPUT_CAPS` trong `demo/metered.ts` (`practitioner: 8000`; bước 5 thêm `extractor`); `meteredAi` giờ lấy số nhỏ hơn giữa trần của request và trần demo, nên viết bài chạy với 8.000, chấm với 4.000 như Practitioner tự đặt; lượt học không đặt trần nên vẫn 2.048.
@@ -95,7 +96,7 @@
 | `POST /exercises/:exerciseId/grade` | chấm câu trả lời đã lưu (sau lỗi hay mất kết nối); đã chấm thì trả điểm cũ, không gọi |
 
 - Mọi đọc ghi qua `forUser(userId)`; id của người khác trả 404. Ghi bằng `appendKnowledgeChecked`, lô dựng lại theo graph lúc ghi: bài có mệnh đề / cạnh vừa bị bỏ thì loại, không còn bài nào thì 409; hai lần chấm cùng lúc giữ điểm đầu.
-- **Ẩn đáp án:** bài trả về dựng bằng danh sách trường cho phép theo loại (`PublicExerciseContent`), không có `correctIndex`, `constraints`, `reference`; sau khi chấm mới có `solution` (nội dung đầy đủ).
+- **Ẩn đáp án:** bài trả về dựng bằng danh sách trường cho phép theo loại (`PublicExerciseContent`), không có `correctIndex`, `constraints`, `reference`, và cũng không có `propositionIds` / `edgeIds` (cùng với graph thì lộ đáp án: mệnh đề mà câu trắc nghiệm hỏi, các cạnh của bài sắp xếp); sau khi chấm mới có `solution` (nội dung đầy đủ) và hai trường đó.
 - Lời gọi model không gắn với request: đóng kết nối thì vẫn viết / chấm xong, kết quả nằm trong log (test). Trần thời gian dùng `turnTimeoutMs` (mặc định 3 phút), hết giờ 504 `TurnTimeout`. Một người chỉ có một lần bắt đầu chạy cùng lúc (409 `TurnInProgress`), tránh bấm hai lần trả hai lần.
 - Model: vai `practitioner` qua `resolveModel` (không đặt thì dùng `teacher`), kể cả khi cả bộ là bài sắp xếp; lỗi cấu hình dùng chung bảng mã với lượt học (`modelUnavailable` trong `sessions/http.ts`): `RoleNotConfigured` → 409. Chấm bằng code không cần model. Dùng chung lớp AI có định tuyến ACP với lượt học (đếm chỗ ACP chung).
 - Lỗi model: 502 với mã của provider; câu trả lời vẫn được giữ.

@@ -50,8 +50,6 @@ describe('account client', () => {
       exerciseId: 'x/1',
       practiceId: 'p1',
       type: 'multipleChoice',
-      propositionIds: ['a'],
-      edgeIds: [],
       content: { type: 'multipleChoice', question: 'Q?', options: ['a', 'b'] },
       issuedAt: 1,
     };

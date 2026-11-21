@@ -177,8 +177,6 @@ type Outcome<A> =
       readonly code: string;
       readonly message: string;
       readonly retryable: boolean;
-      /** For the log only: a redacted summary of a defect. */
-      readonly detail?: string;
     }
   | { readonly _tag: 'Cancelled' };
 
@@ -188,7 +186,6 @@ const runModel = async <A>(
   opened: Opened,
   signal: AbortSignal,
 ): Promise<Outcome<A>> => {
-  const key = opened.model.provider === 'acp' ? '' : opened.model.apiKey;
   const exit = await Effect.runPromiseExit(program.pipe(Effect.provide(opened.ai)), { signal });
   if (Exit.isSuccess(exit)) return { _tag: 'Ok', value: exit.value };
   if (Cause.hasInterruptsOnly(exit.cause)) return { _tag: 'Cancelled' };
@@ -200,18 +197,13 @@ const runModel = async <A>(
     code: ErrorCode.Internal,
     message: 'Practice failed because of a server error.',
     retryable: true,
-    detail: redact(String(Cause.squash(exit.cause)), key).slice(0, 200),
   };
 };
 
 const failedFields = (outcome: Exclude<Outcome<unknown>, { _tag: 'Ok' }>): LogFields =>
   outcome._tag === 'Cancelled'
     ? { outcome: 'cancelled' }
-    : {
-        outcome: 'failed',
-        code: outcome.code,
-        ...(outcome.detail === undefined ? {} : { detail: outcome.detail }),
-      };
+    : { outcome: 'failed', code: outcome.code };
 
 export const makePracticeHandler = (deps: HandlerDeps): Handler => {
   const { config } = deps;

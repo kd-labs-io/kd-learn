@@ -47,13 +47,18 @@ export const exerciseView = (exercise: Exercise): ExerciseView => ({
   exerciseId: exercise.exerciseId,
   practiceId: exercise.practiceId,
   type: exercise.type,
-  propositionIds: exercise.propositionIds,
-  edgeIds: exercise.edgeIds,
   content: publicContent(exercise.content),
   issuedAt: exercise.issuedAt,
   ...(exercise.answer === undefined ? {} : { answer: exercise.answer }),
   ...(exercise.answeredAt === undefined ? {} : { answeredAt: exercise.answeredAt }),
-  ...(exercise.grade === undefined ? {} : { grade: exercise.grade, solution: exercise.content }),
+  ...(exercise.grade === undefined
+    ? {}
+    : {
+        grade: exercise.grade,
+        solution: exercise.content,
+        propositionIds: exercise.propositionIds,
+        edgeIds: exercise.edgeIds,
+      }),
 });
 
 export const practiceView = (
