@@ -113,7 +113,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước nào gọi m
 
 Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
 
-**C1. Driver SQLite WASM (OPFS):**
+**C1. Driver SQLite WASM (OPFS):** đã trả lời (2026-11-21), kết quả ở [progress/phase-1.md](progress/phase-1.md) (phần bước 1) và [mục 2.4](02-ky-thuat.md).
 
 - Có cần chạy trong Worker không? Có cần header COOP/COEP không? Nếu cần thì có xung đột với iframe sandbox ở phase 5 không?
 - Có chạy được ở cả bản SSR (trong lúc hydrate) và bản SPA không?

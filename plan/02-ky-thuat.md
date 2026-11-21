@@ -17,6 +17,7 @@
 | UI | [Astryx](https://astryx.atmeta.com) (MIT, React 19, đang beta) với theme riêng dựng từ `DESIGN.md`. Component riêng của kd-learn viết bằng StyleX dùng token có kiểu, qua plugin Vite của `@astryxdesign/build`; nếu không chạy được thì lùi về CSS Modules + `var(--...)`. Không dùng Tailwind và shadcn. Hạn chế `swizzle` |
 | Biểu đồ | TanStack Charts, màu lấy từ token Astryx qua `var(--...)` |
 | DB | SQLite ở mọi nơi: SQLite trên server, SQLite WASM (OPFS) cho khách |
+| Driver SQLite khách | `@journeyapps/wa-sqlite` (ghim 2.0.x) với `OPFSCoopSyncVFS`, chạy trong Worker do `packages/storage` tự viết. Không cần COOP/COEP (không xung đột với iframe sandbox ở phase 5); nhiều tab cùng mở và ghi được; transaction chạy trọn trong Worker. Chọn sau spike bước 1 phase 1 (2026-11-21, [progress/phase-1.md](progress/phase-1.md)). Loại: VFS `opfs` của `@sqlite.org/sqlite-wasm` (cần COOP/COEP), `opfs-sahpool` (chỉ một tab mở được DB) |
 | Lõi | Effect v4 cho service, lỗi, đồng thời, schema, job nền |
 | Model | TanStack AI cho backend API, qua adapter tự viết sang `Stream` của Effect ([mục 3.3](03-kien-truc.md)). Không dùng module AI của Effect, chưa dùng `@tanstack/ai-effect` (còn 0.x) |
 | Provider | Anthropic, OpenAI, Google Gemini, endpoint tương thích OpenAI (admin khai báo danh sách được phép) |
@@ -40,7 +41,7 @@ Mỗi phase chỉ thêm thư viện khi thật sự cần. Các thư viện này
 | Highlight | Đoạn code trong bài dạy, màu tô code nối với token Astryx | 1 | Chốt |
 | Virtual | Lịch sử buổi học dài, danh sách mệnh đề, danh sách bài luyện tập | 1 | Chốt |
 | Pacer | Chỉ phía UI: gộp các lần render khi stream, debounce ô tìm kiếm. Phía server dùng Effect | 1 | Khi cần |
-| DB (1.0 RC) | Store phản ứng phía client, nằm trên port `storage` cho DB local của khách | 1 | Cần spike, chưa chốt |
+| DB (1.0 RC) | Store phản ứng phía client, nằm trên port `storage` cho DB local của khách | — | Không dùng ở phase 1 (spike 2026-11-21): chỉ chạy phía client (không SSR), adapter lưu bền của nó lưu JSON theo collection, không dùng chung được với driver server. Chạy được khi đặt phía trên port; xem lại ở phase 3 nếu màn hình graph cần live query |
 | Charts | Tiến độ học, mức nắm vững, lịch học, hạn mức demo; thử cho màn hình graph | 3 | Chốt |
 | Hotkeys (beta) | Phím tắt khi luyện tập | 3 | Khi cần |
 | Table | Duyệt mệnh đề của graph nếu cần lọc và sắp xếp phức tạp; còn lại dùng `Table` của Astryx | 3 | Khi cần |

@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SpikeSqliteRouteImport } from './routes/spike.sqlite'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpikeSqliteRoute = SpikeSqliteRouteImport.update({
+  id: '/spike/sqlite',
+  path: '/spike/sqlite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/spike/sqlite': typeof SpikeSqliteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/spike/sqlite': typeof SpikeSqliteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/spike/sqlite': typeof SpikeSqliteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/spike/sqlite'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/spike/sqlite'
+  id: '__root__' | '/' | '/spike/sqlite'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SpikeSqliteRoute: typeof SpikeSqliteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/spike/sqlite': {
+      id: '/spike/sqlite'
+      path: '/spike/sqlite'
+      fullPath: '/spike/sqlite'
+      preLoaderRoute: typeof SpikeSqliteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SpikeSqliteRoute: SpikeSqliteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
