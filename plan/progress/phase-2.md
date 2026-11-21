@@ -15,7 +15,7 @@
 | Bước 6: demo với ngân sách chung | Xong (2026-11-21). `packages/server/src/demo/`. Xem ghi chú bước 6 bên dưới |
 | Bước 7: ACP | Xong (2026-11-21). `packages/server/src/acp/`. Xem ghi chú bước 7 bên dưới |
 | Bước 8: UI | Xong (2026-11-21). `apps/web/src/account/`, `learn/account-lesson.ts`, `learn/source.ts`. Xem ghi chú bước 8 bên dưới |
-| Bước 9: Docker Compose | Chưa bắt đầu |
+| Bước 9: Docker Compose | Xong (2026-11-21). `Dockerfile`, `docker-compose.yml`, `.env.example`, `docs/deploy.md`, `scripts/compose-smoke.sh`. Xem ghi chú bước 9 bên dưới |
 | Bước 10: kiểm tiêu chí phase | Chưa bắt đầu |
 
 ## Bước 0: spike C1, C2 (2026-11-21)
@@ -334,4 +334,29 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Giới hạn đăng ký 10 lần mỗi giờ theo địa chỉ làm các test song song hỏng lẫn nhau (cùng localhost). Server e2e đặt `KD_LEARN_TRUST_PROXY=1` và mỗi test gửi `X-Forwarded-For` riêng. Chạy `--repeat-each=3` trên Chromium: 84/84 xanh.
   - Form đăng nhập chỉ hiện sau khi hydrate: chữ gõ vào ô do server render trước khi hydrate bị mất (thấy khi chạy song song).
 - **Không kiểm bằng model thật ở bước này:** đường server đã kiểm bằng Haiku ở bước 4 và 6; bước 8 chỉ thêm UI, đã chạy qua server thật với model giả.
+
+## Bước 9: Docker Compose (2026-11-21)
+
+- **Image (`Dockerfile`):** hai tầng.
+  - Tầng build: `pnpm fetch` chỉ từ lockfile (đổi code không tải lại package), rồi `turbo build --filter=@kd-learn/web`.
+  - Tầng chạy: chỉ chép `.output/`. Bản build Nitro tự đủ, không cần `node_modules`. Image khoảng 390 MB.
+  - Ghim `node:26.13.1-slim` (rủi ro 28, `node:sqlite` còn là release candidate). Chạy bằng user `node`. DB ở `/data/kd-learn.db`, `/data` là volume.
+  - Không kèm ACP (C3). Trong container, `acpAvailable` là `false`, nên màn admin cảnh báo khi admin bật agent.
+  - Healthcheck gọi `GET /api/config` bằng `fetch` của Node (image slim không có `curl`). Route này cũng tạo admin đầu tiên.
+- **`.dockerignore`:** loại `.env`, `.git`, `plan`, `probe`, `node_modules`, các bản build. Secret không vào build context.
+- **Compose (`docker-compose.yml`):**
+  - Một service `web`, volume có tên `kd-learn-data`.
+  - Port chỉ mở trên `127.0.0.1` (đổi được bằng `KD_LEARN_BIND`, `KD_LEARN_PORT`): HTTPS do reverse proxy lo (A10).
+  - Env lấy từ `.env` (mẫu ở `.env.example`). Đường dẫn file đổi được bằng `KD_LEARN_ENV_FILE`, để script kiểm tra dùng file env tạm. `KD_LEARN_DB_PATH` cố định trong compose, `.env` không đổi được.
+- **Tài liệu (`docs/deploy.md`, tiếng Anh vì dành cho người host):** chạy nhanh, bảng biến env, ví dụ Caddy và nginx, sao lưu và khôi phục, nâng cấp.
+  - Lưu ý cho proxy: tắt buffer cho SSE. Stream tài khoản ping 15 giây một lần, còn stream của khách không ping, nên read timeout của proxy cần từ 5 phút trở lên.
+  - Sao lưu bằng `backup()` của `node:sqlite` qua `docker compose exec`, vì image không có CLI `sqlite3`. Khôi phục: dừng app, chép file vào volume bằng một container chạy một lần, xoá `-wal` / `-shm` cũ.
+  - Nhắc giữ `KD_LEARN_SECRET_KEY` cùng bản sao lưu: mất key thì key provider trong DB không đọc được.
+- **Kiểm tra (`scripts/compose-smoke.sh`, CI chạy ở job `docker`):**
+  - build image, `docker compose up --wait` (chờ healthcheck);
+  - `/api/config` báo `accounts: true`, admin đầu tiên đăng nhập được;
+  - tạo một buổi học, `down` rồi `up`: buổi học vẫn còn (volume);
+  - sao lưu, xoá DB (còn 0 buổi), khôi phục (lại có 1 buổi), đúng theo lệnh trong tài liệu;
+  - mật khẩu admin không có trong log.
+  - Script dùng file env, tên project và volume tạm, không in secret. Chạy local: xanh.
 

@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0–8 xong; bước hiện tại: bước 9 (Docker Compose). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).
+Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0–9 xong; bước hiện tại: bước 10 (kiểm tiêu chí phase trên stack Compose bằng model thật). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).

@@ -1,0 +1,21 @@
+# Only what the build needs. Secrets (.env) never enter the build context.
+**/node_modules
+**/.output
+**/.turbo
+**/dist
+**/.tanstack
+**/.nitro
+**/test-results
+**/playwright-report
+**/*.db
+**/*.db-*
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+.agents
+probe
+plan
+data

@@ -32,3 +32,11 @@ jobs:
           if-no-files-found: ignore
       # The static SPA build is what Capacitor wraps (plan 2.4).
       - run: pnpm --filter @kd-learn/web build:spa
+
+  # The Compose stack (plan step 9): build the image, healthcheck, first admin signs in, data
+  # survives down and up.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: ./scripts/compose-smoke.sh
