@@ -3,7 +3,7 @@
 - **Ngày lập:** 2026-11-21
 - **Phạm vi:** phase 2 ([mục 4](04-phases.md)): SQLite server, auth bằng token, key mã hoá, công tắc admin, demo có hạn mức, UI chọn model theo vai, backend ACP, Docker Compose
 - **Xong khi:** hai tài khoản dữ liệu riêng; đóng tab buổi học vẫn chạy tiếp; demo dừng đúng hạn mức
-- **Trạng thái:** chưa bắt đầu. Bắt đầu thì tạo `progress/phase-2.md`
+- **Trạng thái:** đang làm, tiến độ ở [progress/phase-2.md](progress/phase-2.md). Bước 0 xong: `node:sqlite`, auth tự viết, Bearer
 - **Nền đã có:** lõi dạy học của khách ([mục 3.5](03-kien-truc.md)), port AI ([mục 3.3](03-kien-truc.md)), port `storage` và `migrations` dùng chung trong `packages/storage/src/sqlite/schema.ts`
 
 Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khách A6, ngân sách demo A8) đã chốt ngày 2026-11-21.
