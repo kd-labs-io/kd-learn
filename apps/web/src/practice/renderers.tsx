@@ -10,7 +10,12 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
 import type { ExerciseView, PublicExerciseContent } from '@kd-learn/api';
-import type { ExerciseAnswer, ExerciseContent, ExerciseTypeId } from '@kd-learn/core';
+import {
+  maxAnswerLength,
+  type ExerciseAnswer,
+  type ExerciseContent,
+  type ExerciseTypeId,
+} from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
 import { useState, type ReactNode } from 'react';
 
@@ -51,7 +56,7 @@ function MultipleChoice({ exerciseId, content, answer, onDraft }: RendererProps<
         data-testid="exercise-options"
       >
         {content.options.map((option, index) => (
-          <RadioListItem key={option} label={option} value={String(index)} />
+          <RadioListItem key={index} label={option} value={String(index)} />
         ))}
       </RadioList>
     </VStack>
@@ -77,7 +82,9 @@ function TextExercise({
         isReadOnly={stored !== undefined}
         onChange={(value) => {
           setText(value);
-          onText(value.trim() === '' ? undefined : value.trim());
+          const trimmed = value.trim();
+          // Over the limit the server refuses to grade it: no answer to submit.
+          onText(trimmed === '' || trimmed.length > maxAnswerLength ? undefined : trimmed);
         }}
         data-testid="exercise-text"
       />
