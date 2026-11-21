@@ -4,7 +4,7 @@
 import { Heading } from '@astryxdesign/core/Heading';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
-import { projectSession, type DomainEvent } from '@kd-learn/core';
+import { projectSession, type DomainEvent, type SavedProfile } from '@kd-learn/core';
 import type { GuestSettings } from '@kd-learn/storage/port';
 import { createFileRoute } from '@tanstack/react-router';
 import { Result } from 'effect';
@@ -35,6 +35,9 @@ const api = {
   saveSettings: (settings: GuestSettings) =>
     guard(() => runStorage((storage) => storage.saveSettings(settings))),
   deleteApiKey: () => guard(() => runStorage((storage) => storage.deleteApiKey)),
+  getProfile: () => guard(() => runStorage((storage) => storage.getProfile)),
+  saveProfile: (profile: SavedProfile | undefined) =>
+    guard(() => runStorage((storage) => storage.saveProfile(profile))),
   /** State of the projection of a stored log, to check `core` and the store work together. */
   async state(sessionId: string) {
     const log = await runStorage((storage) => storage.readSession(sessionId));

@@ -9,7 +9,7 @@
 // - Events are append-only. A driver never updates or deletes one.
 import { Context, Data } from 'effect';
 import type { Effect, Stream } from 'effect';
-import type { DomainEvent, EventLog } from '@kd-learn/core';
+import type { DomainEvent, EventLog, SavedProfile, TeachingProfile } from '@kd-learn/core';
 
 /** Result of one successful `appendEvents`. */
 export interface AppendResult {
@@ -45,7 +45,8 @@ export interface GuestSettings {
 /** Something changed in the store, possibly written by another tab. Re-read what you show. */
 export type StorageChange =
   | { readonly _tag: 'SessionChanged'; readonly sessionId: string }
-  | { readonly _tag: 'SettingsChanged' };
+  | { readonly _tag: 'SettingsChanged' }
+  | { readonly _tag: 'ProfileChanged' };
 
 /** No usable storage in this context (no OPFS, no Worker). The caller may fall back to memory. */
 export class StorageUnavailable extends Data.TaggedError('StorageUnavailable')<{
@@ -92,6 +93,18 @@ export interface StorageService {
 
   /** Removes only the key (plan A7). Provider and model stay. */
   readonly deleteApiKey: Effect.Effect<void, StorageError>;
+
+  /**
+   * The teaching profile this person saved (phase 3 A2), as a `TeachingProfile` so a profile saved
+   * under looser limits still reads back. Undefined: none saved, use the default profile.
+   */
+  readonly getProfile: Effect.Effect<TeachingProfile | undefined, StorageError>;
+
+  /**
+   * Replaces the saved profile; undefined goes back to the default. A driver rejects a profile that
+   * is not a valid `SavedProfile` (limits of length and range) with `StorageFailure`.
+   */
+  readonly saveProfile: (profile: SavedProfile | undefined) => Effect.Effect<void, StorageError>;
 
   /**
    * Commits made through this driver or by other tabs. Each subscriber gets its own queue.

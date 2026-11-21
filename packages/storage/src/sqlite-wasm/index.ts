@@ -16,7 +16,13 @@ import {
   type StorageError,
   type StorageService,
 } from '../port/index.ts';
-import { decodeLog as decodePayloads, summarize, toEventRow } from '../sqlite/codec.ts';
+import {
+  decodeLog as decodePayloads,
+  decodeProfile,
+  encodeProfile,
+  summarize,
+  toEventRow,
+} from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 import type { AppendReply, Operation, Response, WireSession } from './protocol.ts';
 
@@ -211,6 +217,26 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     deleteApiKey: call<void>({ op: 'putSettings', entries: {}, remove: ['apiKey'] }).pipe(
       Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
     ),
+
+    getProfile: call<string | undefined>({ op: 'getProfile' }).pipe(
+      Effect.flatMap((payload) =>
+        payload === undefined
+          ? Effect.succeed(undefined)
+          : Effect.try({
+              try: () => decodeProfile(payload),
+              catch: () => new StorageFailure({ message: 'Stored profile is not valid' }),
+            }),
+      ),
+    ),
+
+    saveProfile: (profile) =>
+      Effect.try({
+        try: () => (profile === undefined ? undefined : encodeProfile(profile)),
+        catch: () => new StorageFailure({ message: 'Profile is not valid' }),
+      }).pipe(
+        Effect.flatMap((payload) => call<void>({ op: 'putProfile', payload, at: Date.now() })),
+        Effect.tap(() => Effect.sync(() => committed({ _tag: 'ProfileChanged' }))),
+      ),
 
     changes: Stream.callback<StorageChange>((queue) =>
       Effect.acquireRelease(

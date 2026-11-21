@@ -2,7 +2,7 @@
 // Plain data, no IO: the server decodes requests and encodes frames with these schemas, the
 // client does the opposite, and neither side hand-writes JSON shapes.
 import { Schema } from 'effect';
-import { DomainEvent, EventLog } from '@kd-learn/core';
+import { DomainEvent, EventLog, SavedProfile, TeachingProfile } from '@kd-learn/core';
 
 export const TURNS_PATH = '/api/turns';
 export const ENDPOINTS_PATH = '/api/endpoints';
@@ -14,6 +14,7 @@ export const INVITES_PATH = '/api/admin/invites';
 export const ACCOUNT_SETTINGS_PATH = '/api/account/settings';
 export const CONNECTIONS_PATH = '/api/account/connections';
 export const ROLES_PATH = '/api/account/roles';
+export const PROFILE_PATH = '/api/account/profile';
 export const SESSIONS_PATH = '/api/account/sessions';
 export const CONFIG_PATH = '/api/config';
 export const ADMIN_CONFIG_PATH = '/api/admin/config';
@@ -225,9 +226,24 @@ export type InviteResponse = typeof InviteResponse.Type;
 // Account settings (plan tai-khoan.md A5, A6). A key goes in once and never comes back out:
 // responses carry only `hasKey` and the last 4 characters.
 
-/** Roles that pick their own model. Phase 3 adds more keys without changing the shape. */
-export const ModelRole = Schema.Literals(['prober', 'teacher', 'sideChat']);
+/** Roles that pick their own model. Phase 3 adds `practitioner` and `extractor` (phase 3 A5). */
+export const ModelRole = Schema.Literals([
+  'prober',
+  'teacher',
+  'sideChat',
+  'practitioner',
+  'extractor',
+]);
 export type ModelRole = typeof ModelRole.Type;
+
+/**
+ * A role that is not set uses the model of this role instead (phase 3 A5): accounts from phase 2
+ * have no model for the phase 3 roles. One level only; the roles of phase 2 have no fallback.
+ */
+export const roleFallback: Readonly<Partial<Record<ModelRole, ModelRole>>> = {
+  practitioner: 'teacher',
+  extractor: 'teacher',
+};
 
 const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80));
 
@@ -283,6 +299,8 @@ export const RoleModels = Schema.Struct({
   prober: Schema.optionalKey(RoleModel),
   teacher: Schema.optionalKey(RoleModel),
   sideChat: Schema.optionalKey(RoleModel),
+  practitioner: Schema.optionalKey(RoleModel),
+  extractor: Schema.optionalKey(RoleModel),
 });
 export type RoleModels = typeof RoleModels.Type;
 
@@ -300,6 +318,24 @@ export const AccountSettings = Schema.Struct({
   acpModels: AcpModels,
 });
 export type AccountSettings = typeof AccountSettings.Type;
+
+// Teaching profile of an account (phase 3 A2): `GET`, `PUT` (ProfileRequest) and `DELETE` (back to
+// the default) on `PROFILE_PATH`. Each answers with `ProfileResponse`.
+
+/** `PUT /api/account/profile`. Validated against the saving limits on both sides. */
+export const ProfileRequest = Schema.Struct({ profile: SavedProfile });
+export type ProfileRequest = typeof ProfileRequest.Type;
+
+/** Body limit of `PUT /api/account/profile`: seven prompts at the longest, as 3-byte UTF-8. */
+export const MAX_PROFILE_BODY_BYTES = 512 * 1024;
+
+export const ProfileResponse = Schema.Struct({
+  /** The profile new sessions use: the saved one with defaults filled in, or the default. */
+  profile: TeachingProfile,
+  /** False when nothing is saved and `profile` is the default. */
+  saved: Schema.Boolean,
+});
+export type ProfileResponse = typeof ProfileResponse.Type;
 
 // Account sessions (plan tai-khoan.md A1, A2). The server writes the log; the client only reads it,
 // starts turns, and follows the stream. Paths below `SESSIONS_PATH`:

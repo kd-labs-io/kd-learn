@@ -20,6 +20,7 @@ import type {
   ModelRole,
   RoleModels,
 } from '@kd-learn/api';
+import { roleFallback } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -28,10 +29,28 @@ import { errorCode, errorText, keys, useAccountApi } from './api';
 
 type Provider = ConnectionInfo['provider'];
 
-const ROLES: ReadonlyArray<ModelRole> = ['prober', 'teacher', 'sideChat'];
+const ROLES: ReadonlyArray<ModelRole> = [
+  'prober',
+  'teacher',
+  'sideChat',
+  'practitioner',
+  'extractor',
+];
 
-const roleLabel = (role: ModelRole) =>
-  role === 'prober' ? m.role_prober() : role === 'teacher' ? m.role_teacher() : m.role_sideChat();
+const roleLabel = (role: ModelRole) => {
+  switch (role) {
+    case 'prober':
+      return m.role_prober();
+    case 'teacher':
+      return m.role_teacher();
+    case 'sideChat':
+      return m.role_sideChat();
+    case 'practitioner':
+      return m.role_practitioner();
+    case 'extractor':
+      return m.role_extractor();
+  }
+};
 
 const providerLabel = (provider: Provider) =>
   provider === 'anthropic'
@@ -321,6 +340,8 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
       prober: current.prober,
       teacher: current.prober,
       sideChat: current.prober,
+      practitioner: current.prober,
+      extractor: current.prober,
     }));
 
   return (
@@ -332,6 +353,7 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
       ) : (
         <>
           {ROLES.map((role) => {
+            const fallback = roleFallback[role];
             const connection = connectionOf(draft[role].connectionId);
             const acpModels =
               connection?.provider === 'acp' && connection.agent !== undefined
@@ -340,6 +362,11 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
             return (
               <VStack key={role} gap={2} data-testid={`role-${role}`}>
                 <Heading level={4}>{roleLabel(role)}</Heading>
+                {fallback === undefined ? null : (
+                  <Text type="supporting">
+                    {m.roles_fallback_hint({ role: roleLabel(fallback) })}
+                  </Text>
+                )}
                 <Selector
                   label={m.roles_connection()}
                   placeholder={m.roles_connection_placeholder()}
@@ -402,5 +429,11 @@ function draftOf(roles: RoleModels): Record<ModelRole, { connectionId: string; m
     connectionId: roles[role]?.connectionId ?? '',
     model: roles[role]?.model ?? '',
   });
-  return { prober: one('prober'), teacher: one('teacher'), sideChat: one('sideChat') };
+  return {
+    prober: one('prober'),
+    teacher: one('teacher'),
+    sideChat: one('sideChat'),
+    practitioner: one('practitioner'),
+    extractor: one('extractor'),
+  };
 }

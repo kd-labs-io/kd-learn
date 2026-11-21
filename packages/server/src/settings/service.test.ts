@@ -54,6 +54,37 @@ describe('settings service', () => {
     expect(settings.resolveModel(id, 'prober')._tag).toBe('RoleNotConfigured');
   });
 
+  it('runs an unset phase 3 role on the teacher model, and reports the role asked for', async () => {
+    const { settings, user } = await setup();
+    const id = await user('a@x.io');
+    const result = settings.createConnection(id, {
+      label: 'A',
+      provider: 'anthropic',
+      apiKey: KEY,
+    });
+    if (result._tag !== 'Ok') throw new Error(result._tag);
+    const connectionId = result.connection.id;
+    // Neither the role nor the teacher is set: a practice route answers 409 RoleNotConfigured.
+    expect(settings.resolveModel(id, 'practitioner')).toEqual({
+      _tag: 'RoleNotConfigured',
+      role: 'practitioner',
+    });
+    settings.setRoles(id, { teacher: { connectionId, model: 'teacher-model' } });
+    for (const role of ['practitioner', 'extractor'] as const) {
+      const resolved = settings.resolveModel(id, role);
+      expect(resolved._tag === 'Ok' && resolved.model.model).toBe('teacher-model');
+    }
+    // The roles of phase 2 have no fallback.
+    expect(settings.resolveModel(id, 'prober')._tag).toBe('RoleNotConfigured');
+    settings.setRoles(id, {
+      teacher: { connectionId, model: 'teacher-model' },
+      extractor: { connectionId, model: 'cheap-model' },
+    });
+    const extractor = settings.resolveModel(id, 'extractor');
+    expect(extractor._tag === 'Ok' && extractor.model.model).toBe('cheap-model');
+    expect(settings.get(id).roles.extractor).toEqual({ connectionId, model: 'cheap-model' });
+  });
+
   it('unsets the roles of a deleted connection', async () => {
     const { settings, user } = await setup();
     const id = await user('a@x.io');

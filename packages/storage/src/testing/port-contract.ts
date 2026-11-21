@@ -2,7 +2,7 @@
 // driver). Imported by each driver's test file; not a test file itself.
 import { Effect, Stream } from 'effect';
 import { describe, expect, it } from 'vitest';
-import type { DomainEvent } from '@kd-learn/core';
+import { MAX_PROMPT_LENGTH, type DomainEvent, type SavedProfile } from '@kd-learn/core';
 import type { StorageChange, StorageService } from '../port/index.ts';
 
 export const turnStarted = (id: string, at: number): DomainEvent => ({
@@ -27,6 +27,14 @@ export const sessionCreated = (sessionId: string, topic: string, at: number): Do
     prompts: { prober: 'p', teacher: 't', sideChat: 's' },
   },
 });
+
+export const savedProfile: SavedProfile = {
+  id: 'mine',
+  language: 'vi',
+  maxProbeQuestions: 3,
+  maxTurnsPerStep: 4,
+  prompts: { prober: 'p', teacher: 't', sideChat: 's', merge: 'm' },
+};
 
 export const portContract = (name: string, make: () => StorageService) =>
   describe(`${name}: storage port contract`, () => {
@@ -71,6 +79,41 @@ export const portContract = (name: string, make: () => StorageService) =>
         ['new', 'Graphs', 1],
         ['old', 'Fractions', 1],
       ]);
+    });
+
+    it('saves, replaces and resets the teaching profile', async () => {
+      const storage = make();
+      expect(await Effect.runPromise(storage.getProfile)).toBeUndefined();
+      const mine = { ...savedProfile, name: 'Mine' };
+      await Effect.runPromise(storage.saveProfile(mine));
+      expect(await Effect.runPromise(storage.getProfile)).toEqual(mine);
+      const next = { ...mine, maxTurnsPerStep: 9 };
+      await Effect.runPromise(storage.saveProfile(next));
+      expect(await Effect.runPromise(storage.getProfile)).toEqual(next);
+      await Effect.runPromise(storage.saveProfile(undefined));
+      expect(await Effect.runPromise(storage.getProfile)).toBeUndefined();
+    });
+
+    it('rejects a profile outside the saving limits and keeps the old one', async () => {
+      const storage = make();
+      await Effect.runPromise(storage.saveProfile(savedProfile));
+      const tooLong = {
+        ...savedProfile,
+        prompts: { ...savedProfile.prompts, teacher: 'x'.repeat(MAX_PROMPT_LENGTH + 1) },
+      };
+      const exit = await Effect.runPromiseExit(storage.saveProfile(tooLong));
+      expect(exit._tag).toBe('Failure');
+      expect(await Effect.runPromise(storage.getProfile)).toEqual(savedProfile);
+    });
+
+    it('announces a profile change', async () => {
+      const storage = make();
+      const seen = Effect.runPromise(
+        storage.changes.pipe(Stream.take(1), Stream.runCollect),
+      ) as Promise<ReadonlyArray<StorageChange>>;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await Effect.runPromise(storage.saveProfile(savedProfile));
+      expect(await seen).toEqual([{ _tag: 'ProfileChanged' }]);
     });
 
     it('announces commits to subscribers', async () => {

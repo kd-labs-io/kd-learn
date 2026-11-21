@@ -90,4 +90,13 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
   ],
   // v5: ACP connections (plan step 7, A9): the agent id; such a row has no key.
   [`ALTER TABLE connections ADD COLUMN agent TEXT`],
+  // v6: the saved teaching profile of each user (phase 3 A2), read through `forUser` only. Owned
+  // by the storage port, like `sessions`, so no foreign key to `users` (the port knows no users).
+  [
+    `CREATE TABLE teaching_profiles (
+       user_id TEXT PRIMARY KEY,
+       payload TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     ) WITHOUT ROWID`,
+  ],
 ];

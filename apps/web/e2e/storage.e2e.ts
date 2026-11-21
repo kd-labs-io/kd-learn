@@ -116,6 +116,35 @@ test('guest settings persist and the key can be deleted alone', async ({ page })
   });
 });
 
+test('the saved teaching profile persists, rejects one out of bounds, and resets', async ({
+  page,
+}) => {
+  await openHarness(page);
+  expect(await page.evaluate(() => window.__kdStorage!.getProfile())).toBeUndefined();
+
+  const profile = {
+    id: 'mine',
+    language: 'vi',
+    maxProbeQuestions: 2,
+    maxTurnsPerStep: 3,
+    prompts: { prober: 'p', teacher: 't', sideChat: 's', merge: 'm' },
+  };
+  await page.evaluate((p) => window.__kdStorage!.saveProfile(p), profile);
+  await page.reload();
+  await expect(page.locator('#storage-state')).toHaveText('ready');
+  expect(await page.evaluate(() => window.__kdStorage!.getProfile())).toEqual(profile);
+
+  const rejected = await page.evaluate(
+    (p) => window.__kdStorage!.saveProfile({ ...p, maxTurnsPerStep: 0 }),
+    profile,
+  );
+  expect(rejected).toMatchObject({ error: 'StorageFailure' });
+  expect(await page.evaluate(() => window.__kdStorage!.getProfile())).toEqual(profile);
+
+  await page.evaluate(() => window.__kdStorage!.saveProfile(undefined));
+  expect(await page.evaluate(() => window.__kdStorage!.getProfile())).toBeUndefined();
+});
+
 test('two tabs write to one session at once without losing or duplicating events', async ({
   context,
 }) => {

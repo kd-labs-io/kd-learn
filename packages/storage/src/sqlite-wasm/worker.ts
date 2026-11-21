@@ -149,6 +149,21 @@ async function handleRequest(request: Request): Promise<unknown> {
         }
         for (const key of request.remove) await run('DELETE FROM settings WHERE key = ?', [key]);
       });
+    case 'getProfile': {
+      const [row] = await run('SELECT payload FROM teaching_profile WHERE slot = 1');
+      return row === undefined ? undefined : String(row.payload);
+    }
+    case 'putProfile':
+      if (request.payload === undefined) {
+        await run('DELETE FROM teaching_profile WHERE slot = 1');
+      } else {
+        await run(
+          `INSERT INTO teaching_profile (slot, payload, updated_at) VALUES (1, ?, ?)
+             ON CONFLICT (slot) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
+          [request.payload, request.at],
+        );
+      }
+      return undefined;
     case 'close':
       await sqlite3?.close(handle);
       await vfs?.close();

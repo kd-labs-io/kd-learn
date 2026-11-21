@@ -13,7 +13,8 @@
 //   project as interrupted (phase 1 rule). Nothing ever re-runs a turn by itself.
 // - Events are scrubbed of the resolved key before they are written or published (risk 19).
 import { Cause, Effect, Exit, Fiber, Layer, Result, Stream } from 'effect';
-import { defaultProfile, runSideChat, runTurn } from '@kd-learn/agent';
+import { runSideChat, runTurn } from '@kd-learn/agent';
+import { activeProfile } from '../profile.ts';
 import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
 import { shouldAutoStart } from '@kd-learn/agent/client';
 import type { AiPort, ModelRef } from '@kd-learn/ai/port';
@@ -537,6 +538,9 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
 
   return {
     create: (userId, topic, language) => {
+      const storage = deps.storage.forUser(userId);
+      // The profile in use now is snapshotted into the session (phase 3 A2).
+      const { profile } = Effect.runSync(activeProfile(storage));
       const sessionId = newId();
       const event: DomainEvent = {
         _tag: 'SessionCreated',
@@ -544,9 +548,9 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
         at: now(),
         sessionId,
         topic,
-        profile: { ...defaultProfile, language },
+        profile: { ...profile, language },
       };
-      appendSync(deps.storage.forUser(userId), sessionId, [event]);
+      appendSync(storage, sessionId, [event]);
       return sessionId;
     },
 

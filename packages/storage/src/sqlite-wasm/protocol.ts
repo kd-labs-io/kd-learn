@@ -19,6 +19,9 @@ export type Operation =
       readonly entries: Readonly<Partial<Record<SettingsKey, string>>>;
       readonly remove: ReadonlyArray<SettingsKey>;
     }
+  | { readonly op: 'getProfile' }
+  /** `payload` undefined removes the saved profile. */
+  | { readonly op: 'putProfile'; readonly payload: string | undefined; readonly at: number }
   | { readonly op: 'close' };
 
 export type Request = Operation & { readonly id: number };

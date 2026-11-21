@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { Effect, Fiber, Stream } from 'effect';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { StorageChange } from '../port/index.ts';
-import { portContract, sessionCreated, turnStarted } from '../testing/port-contract.ts';
+import {
+  portContract,
+  savedProfile,
+  sessionCreated,
+  turnStarted,
+} from '../testing/port-contract.ts';
 import { makeServerStorage, openServerDatabase, serverMigrations } from './index.ts';
 
 const open = (path = ':memory:', migrations = serverMigrations) =>
@@ -129,6 +134,15 @@ describe('sqlite-node: two users', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(seenByBob).toEqual([]);
     await Effect.runPromise(Fiber.interrupt(fiber));
+  });
+
+  it("neither reads nor replaces another user's profile", async () => {
+    const { alice, bob } = await setup();
+    await Effect.runPromise(alice.saveProfile({ ...savedProfile, name: 'Alice' }));
+    expect(await Effect.runPromise(bob.getProfile)).toBeUndefined();
+    await Effect.runPromise(bob.saveProfile({ ...savedProfile, name: 'Bob' }));
+    await Effect.runPromise(bob.saveProfile(undefined));
+    expect((await Effect.runPromise(alice.getProfile))?.name).toBe('Alice');
   });
 
   it('does not store guest settings', async () => {

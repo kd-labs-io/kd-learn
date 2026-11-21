@@ -3,7 +3,7 @@
 // in the client bundle.
 import type { Session } from '@kd-learn/core';
 
-export { defaultProfile } from './profile.ts';
+export { defaultProfile, resolveProfile } from './profile.ts';
 
 /**
  * True when the session needs an agent turn without learner input: the assessment is in and no
