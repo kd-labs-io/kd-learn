@@ -1,6 +1,6 @@
 # 8. Tiến độ phase 3
 
-**Trạng thái: đang làm.** Plan phần chính: [luyen-tap-graph.md](../luyen-tap-graph.md).
+**Trạng thái: xong (2026-11-22).** Cả hai tiêu chí đạt ở cả hai chế độ (khách, tài khoản) bằng Haiku thật qua UI, xem phần "Bước 12". Plan phần chính: [luyen-tap-graph.md](luyen-tap-graph.md).
 
 ## Phase 3 (cập nhật 2026-11-21)
 
@@ -19,7 +19,7 @@
 | Bước 9: màn graph | Xong (2026-11-21). Màn `/graph` ở cả ba chế độ: danh sách mệnh đề (tìm, lọc theo chủ đề, chi tiết, bỏ mệnh đề), trạng thái trích từng buổi kèm thử lại, hình graph sigma nạp lười. Route tài khoản `GET /api/account/knowledge` không có gì về bài tập |
 | Bước 10: màn luyện tập | Xong (2026-11-21). Màn `/practice` (link ở trang chủ) cho khách, demo và tài khoản qua `PracticeSource` hai cài đặt; registry renderer bốn loại; điểm, nhận xét, đáp án đúng và mức nắm vững sau khi chấm; tải lại giữa chừng giữ bài và câu trả lời. Model giả viết và chấm bài. Xem ghi chú bước 10 bên dưới |
 | Bước 11: màn sửa hồ sơ | Xong (2026-11-21). Màn `/profile` cho khách và tài khoản (`ProfileSource` hai cài đặt), mở từ hai màn cài đặt; hồ sơ mặc định chỉ đọc, nhân bản ra bản sửa được với id mới; TanStack Form kiểm bằng `SavedProfile`. Xem ghi chú bước 11 bên dưới |
-| Bước 12: kiểm tiêu chí phase | Chưa bắt đầu |
+| Bước 12: kiểm tiêu chí phase | Xong (2026-11-22). Đạt cả hai tiêu chí ở chế độ khách (buổi tiếng Việt) và tài khoản (buổi tiếng Anh) bằng Haiku thật. Xem ghi chú bước 12 bên dưới |
 
 ## Điều cần biết khi bắt đầu (từ handoff sau phase 2)
 
@@ -34,6 +34,23 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 12: kiểm tiêu chí phase bằng model thật (2026-11-22)
+
+Kịch bản Playwright tạm (không giữ trong repo) chạy bản build production với server tài khoản (cổng 4174), Haiku `claude-haiku-5-5`, key đọc từ `.env` trong kịch bản, không in, tắt trace. Mỗi chế độ: hồ sơ dạy học riêng sửa qua màn `/profile` (N = 1 câu hỏi thăm dò, M = 1 lượt mỗi bước, để buổi ngắn), học hết một buổi qua UI (trả lời, bỏ bước khi được phép), rồi mở màn graph **trong app** (không tải lại, không bấm), rồi luyện tập.
+
+| | Khách (giao diện và buổi tiếng Việt, "Tìm kiếm nhị phân") | Tài khoản (tiếng Anh, "Why ice floats on water") |
+| --- | --- | --- |
+| Buổi học | 6 câu trả lời, 5 lần bỏ bước, xong | 7 câu trả lời, xong |
+| Graph tự cập nhật | 5 mệnh đề hiện sau khoảng 9 s, không bấm gì | 3 mệnh đề hiện sau khoảng 12 s (hỏi lại danh sách extraction khi đang chạy) |
+| Mệnh đề | Đúng nội dung đã dạy, tiếng Việt tự nhiên, tự chứa (ví dụ "Tìm kiếm nhị phân áp dụng cho mảng đã được sắp xếp.") | Đúng nội dung đã dạy |
+| Luyện tập | 3 bài lấy từ graph (2 giải thích lập luận, 1 trắc nghiệm) | 2 bài (1 trắc nghiệm, 1 giải thích lập luận) |
+| Chấm | Giải thích: "Đúng một phần" 50 %, nhận xét tiếng Việt cụ thể, chỉ ra đúng phần còn thiếu; trắc nghiệm chọn bừa: sai, chấm bằng code | Giải thích: "Partly correct" 50 %, nhận xét cụ thể; trắc nghiệm chọn bừa: sai |
+| Mức nắm vững | Hộp 1/5, hạn ôn ngày hôm sau, hiện trên bài và trên màn graph | Như bên trái |
+
+- **Lần chạy:** lần đầu hỏng vì kịch bản (gửi câu trả lời khi lượt trước chưa xong nên không thấy nút bỏ bước; khoảng 77 lượt bị phí); lần hai đạt tiêu chí 1 ở cả hai chế độ, phần luyện tập hỏng vì kịch bản (bấm nút không có timeout; selector mức nắm vững khớp hai dòng); chạy lại riêng từng chế độ thì đạt hết. Tổng chi phí chưa đo chính xác; theo số lần gọi và số đo ở bước 1 và 4, ước dưới 1 USD.
+- **Ghi nhận:** ngôn ngữ của buổi lấy theo ngôn ngữ giao diện lúc tạo buổi (như phase 1–2), không theo trường `language` của hồ sơ. Ở lần chạy đầu, hồ sơ khách đặt `vi` nhưng giao diện tiếng Anh nên buổi dạy bằng tiếng Anh.
+- **Còn mở (không chặn tiêu chí):** chất lượng chấm mới thử trên một vài bài; graph thật lớn và điện thoại chưa thử (phase 6); demo chưa có test trình duyệt riêng cho luyện tập.
 
 ## Bước 9: màn graph (2026-11-21)
 
@@ -354,7 +371,7 @@ Không còn log buổi học thật từ phase 1–2 (DB khách ở OPFS của t
 - `@tanstack/db` và `@tanstack/react-db` vẫn là `1.0.0-rc.1.5` (npm, 2026-11-21).
 - Không cần live query: log kiến thức đọc một lần rồi dựng projection trong bộ nhớ (vài nghìn mệnh đề), làm mới khi có `KnowledgeChanged` (khách) hoặc khi Query làm mới (tài khoản), giống màn học. Không dùng TanStack DB ở phase 3.
 
-### Quyết định (ghi vào [luyen-tap-graph.md](../luyen-tap-graph.md))
+### Quyết định (ghi vào [luyen-tap-graph.md](luyen-tap-graph.md))
 
 - **Pipeline 3 lần gọi:** extractor → auditor (mệnh đề và cạnh, cho phép tách một mệnh đề hai ý thành hai) → merge theo ứng viên của từng mệnh đề.
 - **Quan hệ:** giữ 5 quan hệ `requires`, `implies`, `supports`, `exampleOf`, `contrastsWith`, kèm định nghĩa đọc theo câu "from RELATION to" trong prompt. Cấm chu trình trên `requires` và `implies` (chuỗi lập luận cho bài sắp xếp đi theo hai quan hệ này). `contrastsWith` không có hướng: projection coi hai chiều là một cạnh.
