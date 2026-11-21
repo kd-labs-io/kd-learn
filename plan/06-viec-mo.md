@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 3 (practice + graph, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 3 (quyết định nền, các bước, câu hỏi spike, như [archive/tai-khoan.md](archive/tai-khoan.md) của phase 2), gồm spike TanStack Charts cho màn hình graph. Bắt đầu làm thì tạo `progress/phase-3.md`.
+Phase 3 (practice + graph, [mục 4](04-phases.md)): plan phần chính ở [luyen-tap-graph.md](luyen-tap-graph.md), tiến độ ở [progress/phase-3.md](progress/phase-3.md). Bước hiện tại: bước 0 (spike hình graph, C1) và bước 1 (spike extraction với Haiku, C2, C3), làm song song được.
