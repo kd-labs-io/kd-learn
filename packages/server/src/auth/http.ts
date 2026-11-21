@@ -95,7 +95,7 @@ export const initAccounts = async (
     settings,
     ai: routedAi({
       api: options.ai,
-      acp: options.acp ?? lazyAcpLayer(),
+      acp: options.acp ?? lazyAcpLayer(options.log),
       maxConcurrent: admin.acpMaxConcurrent,
     }),
     log: options.log,

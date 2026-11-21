@@ -273,7 +273,7 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Việc kiểm nằm trong fiber của lượt, nên lượt lập plan tự nối sau lượt chấm điểm cũng bị kiểm.
   - Chỗ được trả trong `Stream.ensuring` ở mọi lối ra: xong, lỗi, defect, huỷ, quá giờ.
 - **Biến môi trường của agent:** process agent không còn nhận các biến `KD_*` (master key, mật khẩu admin, key demo). Có test cho cả ba agent.
-- **Nạp lười:** adapter ACP chỉ được nạp ở lượt ACP đầu tiên, vì lúc nạp nó tìm package agent và script bridge. Server không bật ACP không phụ thuộc vào các thứ đó. Nạp lỗi thì lượt ghi `TurnFailed` với thông báo rõ ràng.
+- **Nạp lười:** adapter ACP chỉ được nạp ở lượt ACP đầu tiên, vì lúc nạp nó tìm package agent và script bridge. Server không bật ACP không phụ thuộc vào các thứ đó. Nạp lỗi thì lượt ghi `TurnFailed` mã `AcpUnavailable` với thông báo cố định. Chi tiết lỗi (có đường dẫn trên server) chỉ ghi vào log server (`acp.unavailable`).
 - **Bản build:**
   - Mặc định không kèm ACP: `.output` 14 MB, và lượt ACP trả lỗi "The ACP adapter could not be loaded".
   - `KD_BUILD_ACP=1 pnpm build` chép `claude-agent-acp` vào `.output/server/node_modules` qua `traceDeps` của Nitro, khoảng 344 MB, vì nó kèm binary Claude Code gốc của máy build (một nền tảng). Do đó `apps/web` khai báo thêm dependency này.
@@ -286,7 +286,9 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - binary Claude Code phụ thuộc nền tảng và nặng khoảng 340 MB;
   - CLI cần đăng nhập gói thuê bao, trong khi adapter chạy agent với home rỗng;
   - opencode và Antigravity dùng bridge stdio (`stdio-bridge.ts`), mà file này chưa được đóng gói vào bản build.
-- **Test (8 mới):**
+- **Test (10 mới):**
+  - adapter không nạp được: thông báo không chứa đường dẫn server, chi tiết có trong log;
+  - huỷ stream thì process agent dừng (adapter, agent giả ghi pid);
   - lượt chạy qua agent đã bật, không lưu key, không gọi TanStack;
   - agent chưa bật, hoặc bị tắt sau khi đã có kết nối, bị từ chối mà không ghi gì;
   - giới hạn 1: lượt thứ hai thất bại ngay với `AcpBusy` (retryable) và fake không được gọi; xong lượt trước hoặc huỷ lượt thì lượt sau chạy được;

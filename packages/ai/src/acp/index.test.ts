@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -88,6 +88,26 @@ describe('runTurn (ACP)', () => {
     );
     expect(events.map((e) => e._tag)).toEqual(['TextDelta', 'TextDelta', 'TextDelta']);
     expect(existsSync(marker)).toBe(true);
+  }, 20_000);
+
+  it('stops the agent process when the stream is interrupted', async () => {
+    const pidFile = join(await mkdtemp(join(tmpdir(), 'kd-acp-test-')), 'pid');
+    await Effect.runPromise(
+      runTurn({ launch: withFake({ FAKE_HANG: '1', FAKE_PID: pidFile }) })({
+        model,
+        messages: [{ role: 'user', content: 'talk' }],
+      }).pipe(Stream.take(2), Stream.runCollect),
+    );
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive()).toBe(false);
   }, 20_000);
 });
 

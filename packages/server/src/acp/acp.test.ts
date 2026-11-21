@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { defaultProfile } from '@kd-learn/agent';
 import type { Handlers } from '../index.ts';
 import { ADMIN, make } from '../auth/test-support.ts';
+import { Effect, Stream } from 'effect';
+import { AiPort } from '@kd-learn/ai/port';
 import { gated, say, scriptedAi } from '../sessions/fake-ai.ts';
+import { lazyAcpLayer } from './router.ts';
 
 type Json = Record<string, unknown>;
 
@@ -199,5 +202,28 @@ describe('ACP for accounts', () => {
         (await call(bad.handlers.login, 'POST', '/api/auth/login', undefined, {})).status,
       ).toBe(500);
     }
+  });
+
+  it('reports an adapter that cannot load without server paths, and logs the detail', async () => {
+    const logs: unknown[] = [];
+    const layer = lazyAcpLayer(
+      (entry) => logs.push(entry),
+      () =>
+        Promise.reject(
+          new Error("Cannot find package 'x' imported from /srv/app/.output/server/_ssr/acp.mjs"),
+        ),
+    );
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const port = yield* AiPort;
+        return yield* Stream.runCollect(
+          port.runTurn({ model: { provider: 'acp', agent: 'claude-code' }, messages: [] }),
+        );
+      }).pipe(Effect.provide(layer)),
+    );
+    const shown = JSON.stringify(exit);
+    expect(shown).toContain('AcpUnavailable');
+    expect(shown).not.toContain('/srv/app');
+    expect(JSON.stringify(logs)).toContain('/srv/app');
   });
 });

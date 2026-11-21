@@ -4,6 +4,7 @@
 import { Effect, Layer, Stream } from 'effect';
 import { AiPort, ProviderError } from '@kd-learn/ai/port';
 import type { TurnRequest } from '@kd-learn/ai/port';
+import type { Logger } from '../handler.ts';
 
 export const ACP_BUSY_RETRY_MS = 5_000;
 
@@ -15,20 +16,34 @@ const portOf = Effect.gen(function* () {
  * The ACP adapter, loaded on the first ACP turn only: it resolves agent binaries and a bridge
  * script at load time, which a server without ACP must not depend on.
  */
-export const lazyAcpLayer = (): Layer.Layer<AiPort> => {
+export const lazyAcpLayer = (
+  log: Logger,
+  importAdapter: () => Promise<{ layer: () => Layer.Layer<AiPort> }> = () =>
+    import('@kd-learn/ai/acp'),
+): Layer.Layer<AiPort> => {
   let loaded: Promise<AiPort['Service']> | undefined;
   const load = () =>
-    (loaded ??= import('@kd-learn/ai/acp').then((acp) =>
-      Effect.runPromise(Effect.provide(portOf, acp.layer())),
-    ));
+    (loaded ??= importAdapter()
+      .then((acp) => Effect.runPromise(Effect.provide(portOf, acp.layer())))
+      .catch((error: unknown) => {
+        loaded = undefined;
+        // The detail names server paths: the log only, never the learner's session.
+        log({
+          event: 'acp.unavailable',
+          fields: { message: error instanceof Error ? error.message.slice(0, 300) : 'unknown' },
+        });
+        throw error;
+      }));
   return Layer.succeed(AiPort, {
     runTurn: (<A>(request: TurnRequest<A>) =>
       Stream.unwrap(
         Effect.tryPromise({
           try: load,
-          catch: (error) =>
+          catch: () =>
             new ProviderError({
-              message: `The ACP adapter could not be loaded: ${error instanceof Error ? error.message : 'unknown'}`,
+              message:
+                'ACP is not available on this server build. Ask the admin, or pick another connection.',
+              code: 'AcpUnavailable',
             }),
         }).pipe(Effect.map((port) => port.runTurn(request))),
       )) as AiPort['Service']['runTurn'],
