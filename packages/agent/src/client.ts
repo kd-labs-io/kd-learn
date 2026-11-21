@@ -11,3 +11,12 @@ export { defaultProfile } from './profile.ts';
  * recorded the assessment.
  */
 export const needsAgentTurn = (session: Session): boolean => session.state._tag === 'Planning';
+
+/** The main turn that starts without learner input: the first Prober turn, and planning. */
+export const shouldAutoStart = (session: Session): boolean => {
+  if (session.state._tag === 'Done') return false;
+  const last = session.turns.at(-1);
+  // Never after a failed or interrupted turn: a bad key would loop at the learner's cost.
+  if (last === undefined) return session.state._tag === 'Probing';
+  return last.status === 'completed' && needsAgentTurn(session);
+};

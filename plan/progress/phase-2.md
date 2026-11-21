@@ -10,7 +10,7 @@
 | Bước 1: driver SQLite server | Xong (2026-11-21). `@kd-learn/storage/sqlite-node`: `openServerDatabase`, `makeServerStorage(db).forUser(userId)`, migration riêng của server, bảng `sessions`. Xem ghi chú bước 1 bên dưới |
 | Bước 2: auth | Xong (2026-11-21). `packages/server/src/auth/`, route `/api/auth/*`, `/api/admin/invites`. Xem ghi chú bước 2 bên dưới |
 | Bước 3: key mã hoá, cài đặt theo vai | Xong (2026-11-21). `packages/server/src/settings/`, route `/api/account/*`. Xem ghi chú bước 3 bên dưới |
-| Bước 4: lượt chạy trên server | Chưa bắt đầu |
+| Bước 4: lượt chạy trên server | Xong (2026-11-21). `packages/server/src/sessions/`, route `/api/account/sessions/*`. Xem ghi chú bước 4 bên dưới |
 | Bước 5: công tắc admin | Chưa bắt đầu |
 | Bước 6: demo, ngân sách chung | Chưa bắt đầu |
 | Bước 7: ACP | Chưa bắt đầu |
@@ -153,4 +153,38 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - thiếu master key thì route tài khoản trả 500, route khách vẫn 200.
   - Chạy thật trên bản build bằng `curl`: tạo kết nối, đặt vai, xoá; key không có trong log và trong các file DB.
 - **Dọn code:** các helper route dùng chung (kiểm method, chờ tài khoản sẵn sàng, đọc JSON, lấy người dùng hiện tại) chuyển sang `src/routes.ts`; helper HTTP sang `src/http.ts`.
+
+## Bước 4: lượt chạy trên server (2026-11-21)
+
+- **API** (bảng đường dẫn ở `packages/api/src/contract.ts`), dưới `/api/account/sessions`:
+  - liệt kê và tạo buổi. Server ghi `SessionCreated` với hồ sơ mặc định và ngôn ngữ của người học.
+  - `GET /:id`: snapshot gồm `events` (mỗi event kèm `seq`) và `running`.
+  - `GET /:id/stream?after=<seq>`: SSE.
+  - `POST /:id/turns`: `send` / `retry` / `auto` / `side`, trả `202 { turnId }`.
+  - `POST /:id/turns/:turnId/cancel`.
+  - `POST /:id/skip`.
+- **Frame của stream:**
+  - `running`: frame đầu tiên, gồm các lượt đang chạy và phần chữ đã có của từng message.
+  - `log`: event đã ghi, kèm `seq`.
+  - `delta`.
+  - `turn`: `running`, `completed`, `failed` hoặc `cancelled`.
+  - Cứ 15 giây có một dòng `: ping` để proxy không đóng kết nối. `makeSseParser` bỏ qua dòng này.
+  - `seq` là vị trí trong log: liên tục từ 0, chỉ tăng. Stream đăng ký nhận tin **trước** rồi mới đọc log, và lọc trùng theo `seq` đã gửi.
+- **`sessions/runner.ts`:**
+  - **Lượt chạy:** mỗi lượt là một fiber daemon (`Effect.runFork`), không gắn với request nào. Đóng stream không huỷ lượt (đã kiểm bằng test và bằng một lượt Haiku thật trên bản build: ngắt `fetch` sau `delta` đầu tiên, lượt vẫn ghi đủ `MessageAppended`, `UsageRecorded`, `TurnCompleted`).
+  - **Giữ chỗ:** kiểm chỗ trống, đọc log, chiếu, giải model theo vai, ghi `TurnStarted` và đăng ký vào registry đều nằm trong một đoạn đồng bộ. Chỗ được trả trong `onExit` của fiber ở mọi lối ra. Mỗi buổi tối đa 1 lượt main và 1 lượt side. Bỏ qua bước dùng chung chỗ của main.
+  - **Kiểm chủ sở hữu:** registry khoá theo `(userId, sessionId)`. Mọi lối vào đọc qua `forUser` trước; log rỗng thì trả 404 trước khi ghi gì. Chỉ route tạo buổi mới sinh `sessionId`.
+  - **Model theo vai:** Prober khi đang `Probing`, Teacher sau đó, `sideChat` cho side chat. Model được giải cho **từng lượt**, kể cả lượt lập plan tự chạy nối sau lượt chấm điểm. Hàm `shouldAutoStart` chuyển từ `apps/web` sang `@kd-learn/agent/client` để client và server dùng chung. Vai chưa đặt model thì trả `409 RoleNotConfigured` và không ghi gì.
+  - **Kết thúc lượt:** mọi lượt kết thúc trong log. `InvalidTurn`, defect, quá giờ, và lô không khớp với phép chiếu đều ghi `TurnFailed` / `SideTurnFailed`. Chỉ lượt bị huỷ và lượt bị cắt do khởi động lại là để mở (thành "bị ngắt" theo quy tắc phase 1). Lô cuối lượt được kiểm với log **lúc ghi**, vì side chat có thể đã ghi xen vào.
+  - **Quá giờ:** mỗi lượt tối đa 3 phút (`turnTimeoutMs`), quá thì ghi `TurnFailed` `TurnTimeout` (retryable), để provider treo không giữ chỗ mãi.
+  - **Key:** mọi event và lỗi được xoá key đã giải trước khi ghi và trước khi phát (`scrubDeep`); defect dùng câu thông báo cố định.
+  - **Khởi động lại:** registry mới rỗng, lượt đang mở hiện là bị ngắt, `retry` chạy được.
+- **Test** (11 mới, AI giả có cổng chặn, không dùng `sleep`):
+  - Hai POST song song khi đang chạy đều nhận 409; snapshot giữa lượt có phần chữ đã có.
+  - Đóng stream giữa lượt thì lượt vẫn được ghi.
+  - Gắn lại giữa lượt: nhận phần chữ đã có, sau đó mỗi event đúng một lần (`seq` 1..4).
+  - Huỷ: provider bị interrupt, không ghi gì, chỗ được trả, `retry` chạy được.
+  - Defect và lỗi provider có chứa key thì DB và log sạch key; quá giờ; nối lượt lập plan; side chạy song song với main; vai chưa đặt.
+  - Cross-user: cả 6 route trả 404 và không tạo dòng `sessions`; khởi động lại trên cùng file DB.
+- **Giới hạn:** input của người học tối đa 4.000 ký tự (dưới trần 16 KiB của body route tài khoản).
 

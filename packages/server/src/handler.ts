@@ -280,6 +280,8 @@ export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
   /** Replaces the database file (tests). */
   readonly database?: ServerDatabase;
   readonly auth?: AuthOptions;
+  /** Upper bound on one account turn. Default 3 minutes. */
+  readonly turnTimeoutMs?: number;
 }
 
 /** Wraps a handler so an unexpected throw becomes a fixed 500, never a message with request data. */
@@ -347,6 +349,8 @@ export const createHandlers = (
       ready ??= initAccounts(accountConfig, {
         log,
         endpoints: () => config.endpoints,
+        ai: options.ai ?? tanstackLayer(),
+        ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
         ...(options.database ? { database: options.database } : {}),
         ...(options.auth ? { auth: options.auth } : {}),
       }).catch((error: unknown) => {

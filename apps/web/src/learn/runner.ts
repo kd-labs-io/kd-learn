@@ -15,7 +15,7 @@
 // The log is append-only and the projection strict, so one invalid append would brick the session.
 // Every append is therefore checked with `projectSession` first; a batch that fails is dropped.
 import { Cause, Effect, Result, Stream } from 'effect';
-import { needsAgentTurn } from '@kd-learn/agent/client';
+import { shouldAutoStart } from '@kd-learn/agent/client';
 import { streamTurn, type Frame, type ModelChoice, type TurnRequest } from '@kd-learn/api';
 import {
   canSkipStep,
@@ -23,11 +23,12 @@ import {
   projectSession,
   type DomainEvent,
   type EventLog,
-  type Session,
 } from '@kd-learn/core';
 import { StorageBusy, type StorageService } from '@kd-learn/storage/port';
 import { isLockHeld, sideLockName, turnLockName, withLock, type WithLock } from './locks';
 import { modelChoiceOf } from './model';
+
+export { shouldAutoStart };
 
 /** A failure to show. Server and provider codes pass through; the client adds the ones below. */
 export interface UiFailure {
@@ -77,15 +78,6 @@ export interface RunnerDeps {
 const idle: RunnerState = {
   main: { running: false, live: undefined, failure: undefined },
   side: { running: false, threadId: undefined, live: undefined, failure: undefined },
-};
-
-/** The main turn that starts without learner input: the first Prober turn, and planning. */
-export const shouldAutoStart = (session: Session): boolean => {
-  if (session.state._tag === 'Done') return false;
-  const last = session.turns.at(-1);
-  // Never after a failed or interrupted turn: a bad key would loop at the learner's cost.
-  if (last === undefined) return session.state._tag === 'Probing';
-  return last.status === 'completed' && needsAgentTurn(session);
 };
 
 type Mode =

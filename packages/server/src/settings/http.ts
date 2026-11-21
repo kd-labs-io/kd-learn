@@ -12,6 +12,7 @@ import type { Handler, Logger } from '../handler.ts';
 import { SECURITY_HEADERS } from '../http.ts';
 import type { Ctx, makeRouteKit } from '../routes.ts';
 import type { CurrentUser } from '../auth/service.ts';
+import { makeSessionsHandler } from '../sessions/http.ts';
 
 type Kit = ReturnType<typeof makeRouteKit>;
 
@@ -70,6 +71,8 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     }),
   );
 
+  const sessions = makeSessionsHandler(kit, log);
+
   const fallback = route('account', ['GET', 'POST', 'PUT', 'DELETE'], notFound);
 
   return (request, context) => {
@@ -79,6 +82,8 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     const one = /^connections\/([A-Za-z0-9-]{1,64})$/.exec(path);
     if (one?.[1] !== undefined) return deleteConnection(one[1])(request, context);
     if (path === 'roles') return setRoles(request, context);
+    const session = sessions(path);
+    if (session !== undefined) return session(request, context);
     return fallback(request, context);
   };
 };

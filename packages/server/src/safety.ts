@@ -56,3 +56,17 @@ export const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+
+/** Redacts `secret` in every string of a value (events are plain JSON data). */
+export const scrubDeep = <T>(value: T, secret: string | undefined): T => {
+  if (secret === undefined || secret.length < 8) return value;
+  const walk = (inner: unknown): unknown => {
+    if (typeof inner === 'string') return redact(inner, secret);
+    if (Array.isArray(inner)) return inner.map(walk);
+    if (typeof inner === 'object' && inner !== null) {
+      return Object.fromEntries(Object.entries(inner).map(([k, v]) => [k, walk(v)]));
+    }
+    return inner;
+  };
+  return walk(value) as T;
+};
