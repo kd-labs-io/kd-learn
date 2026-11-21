@@ -6,7 +6,7 @@ import SQLiteESMFactory from '@journeyapps/wa-sqlite/dist/wa-sqlite.mjs';
 import wasmUrl from '@journeyapps/wa-sqlite/dist/wa-sqlite.wasm?url';
 import * as SQLite from '@journeyapps/wa-sqlite';
 import { OPFSCoopSyncVFS } from '@journeyapps/wa-sqlite/src/examples/OPFSCoopSyncVFS.js';
-import { migrations, schemaVersion } from '../sqlite/schema.ts';
+import { guestOwner, migrations, schemaVersion } from '../sqlite/schema.ts';
 import type { AppendReply, Request, Response, WireEvent, WireSession } from './protocol.ts';
 
 type Row = Record<string, unknown>;
@@ -17,6 +17,15 @@ let handle = 0;
 let vfs: { close(): Promise<void> } | undefined;
 
 class Unavailable extends Error {}
+
+class Conflict extends Error {
+  constructor(
+    readonly expectedLastSeq: number,
+    readonly lastSeq: number,
+  ) {
+    super(`The knowledge log ends at seq ${lastSeq}, not ${expectedLastSeq}`);
+  }
+}
 
 async function run(sql: string, params: ReadonlyArray<unknown> = []): Promise<Row[]> {
   const db = sqlite3!;
@@ -109,6 +118,31 @@ async function read(sessionId: string): Promise<string[]> {
   return rows.map((row) => String(row.payload));
 }
 
+async function appendKnowledge(
+  events: ReadonlyArray<WireEvent>,
+  expectedLastSeq: number,
+): Promise<AppendReply> {
+  return transaction(async () => {
+    const [head] = await run(
+      'SELECT COALESCE(MAX(seq), -1) AS last FROM knowledge_events WHERE owner = ?',
+      [guestOwner],
+    );
+    const last = Number(head?.last ?? -1);
+    if (expectedLastSeq !== last) {
+      throw new Conflict(expectedLastSeq, last);
+    }
+    let seq = last;
+    for (const event of events) {
+      seq += 1;
+      await run(
+        'INSERT INTO knowledge_events (owner, seq, id, tag, at, payload) VALUES (?, ?, ?, ?, ?, ?)',
+        [guestOwner, seq, event.id, event.tag, event.at, event.payload],
+      );
+    }
+    return { lastSeq: seq };
+  });
+}
+
 async function list(): Promise<WireSession[]> {
   const sessions = await run(
     `SELECT session_id, MIN(at) AS created_at, MAX(at) AS updated_at, COUNT(*) AS event_count
@@ -138,6 +172,12 @@ async function handleRequest(request: Request): Promise<unknown> {
       return read(request.sessionId);
     case 'list':
       return list();
+    case 'appendKnowledge':
+      return appendKnowledge(request.events, request.expectedLastSeq);
+    case 'readKnowledge':
+      return (
+        await run('SELECT payload FROM knowledge_events WHERE owner = ? ORDER BY seq', [guestOwner])
+      ).map((row) => String(row.payload));
     case 'getSettings':
       return Object.fromEntries(
         (await run('SELECT key, value FROM settings')).map((row) => [row.key, row.value]),
@@ -183,12 +223,22 @@ self.onmessage = (event: MessageEvent<Request>) => {
     try {
       response = { id: request.id, ok: true, result: await handleRequest(request) };
     } catch (error) {
-      response = {
-        id: request.id,
-        ok: false,
-        kind: error instanceof Unavailable ? 'unavailable' : 'failure',
-        message: error instanceof Error ? error.message : String(error),
-      };
+      response =
+        error instanceof Conflict
+          ? {
+              id: request.id,
+              ok: false,
+              kind: 'conflict',
+              message: error.message,
+              expectedLastSeq: error.expectedLastSeq,
+              lastSeq: error.lastSeq,
+            }
+          : {
+              id: request.id,
+              ok: false,
+              kind: error instanceof Unavailable ? 'unavailable' : 'failure',
+              message: error instanceof Error ? error.message : String(error),
+            };
     }
     self.postMessage(response);
   });

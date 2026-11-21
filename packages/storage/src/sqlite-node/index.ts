@@ -7,6 +7,7 @@
 // Another user's session looks exactly like an unknown one (plan: 404, not 403).
 import { Effect, Queue, Stream } from 'effect';
 import {
+  KnowledgeConflict,
   StorageFailure,
   type AppendResult,
   type StorageChange,
@@ -14,11 +15,13 @@ import {
   type StorageService,
 } from '../port/index.ts';
 import {
+  decodeKnowledgeLog,
   decodeLog,
   decodeProfile,
   encodeProfile,
   summarize,
   toEventRow,
+  toKnowledgeRow,
   type SessionRow,
 } from '../sqlite/codec.ts';
 import { toStorageError, type ServerDatabase } from './database.ts';
@@ -80,6 +83,15 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
        ON CONFLICT (user_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
   );
   const removeProfile = db.prepare('DELETE FROM teaching_profiles WHERE user_id = ?');
+  const knowledgeLastSeq = db.prepare(
+    'SELECT COALESCE(MAX(seq), -1) AS last FROM knowledge_events WHERE owner = ?',
+  );
+  const knowledgeInsert = db.prepare(
+    'INSERT INTO knowledge_events (owner, seq, id, tag, at, payload) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  const knowledgeRead = db.prepare(
+    'SELECT payload FROM knowledge_events WHERE owner = ? ORDER BY seq',
+  );
 
   /** Runs a synchronous query as an Effect, mapping anything thrown to a typed storage error. */
   const run = <T>(work: () => T): Effect.Effect<T, StorageError> =>
@@ -148,6 +160,44 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
         };
         return summarize(session);
       }),
+    ),
+
+    // The knowledge log of `userId` only: the owner is never taken from the caller.
+    appendKnowledge: (events, { expectedLastSeq }) =>
+      Effect.try({
+        try: (): AppendResult => {
+          const result = transaction(() => {
+            const last = Number((knowledgeLastSeq.get(userId) as { last: number }).last);
+            if (expectedLastSeq !== last) {
+              throw new KnowledgeConflict({ expectedLastSeq, lastSeq: last });
+            }
+            let seq = last;
+            for (const event of events) {
+              const { id, tag, at, payload } = toKnowledgeRow(event);
+              seq += 1;
+              knowledgeInsert.run(userId, seq, id, tag, at, payload);
+            }
+            return { lastSeq: seq };
+          });
+          // After COMMIT only.
+          if (events.length > 0) notify(userId, { _tag: 'KnowledgeChanged' });
+          return result;
+        },
+        catch: (error) => (error instanceof KnowledgeConflict ? error : toStorageError(error)),
+      }),
+
+    readKnowledge: run(() =>
+      (knowledgeRead.all(userId) as Array<{ payload: string }>).map((r) => r.payload),
+    ).pipe(
+      Effect.flatMap((payloads) =>
+        Effect.try({
+          try: () => decodeKnowledgeLog(payloads),
+          catch: (error) =>
+            new StorageFailure({
+              message: `Stored knowledge event is not valid: ${error instanceof Error ? error.message : String(error)}`,
+            }),
+        }),
+      ),
     ),
 
     getSettings: Effect.succeed(undefined),

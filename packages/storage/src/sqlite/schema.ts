@@ -22,6 +22,31 @@ export const eventsTable: ReadonlyArray<string> = [
      BEGIN SELECT RAISE(ABORT, 'events are append-only'); END`,
 ];
 
+/**
+ * DDL of the append-only knowledge log (plan luyen-tap-graph.md A1): one log per owner. Guests have
+ * one owner (`guestOwner`); the server uses the user id. Ids are unique per owner, so one user's
+ * ids can never make another user's batch fail.
+ */
+export const knowledgeEventsTable: ReadonlyArray<string> = [
+  `CREATE TABLE knowledge_events (
+     owner TEXT NOT NULL,
+     seq INTEGER NOT NULL,
+     id TEXT NOT NULL,
+     tag TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     payload TEXT NOT NULL,
+     PRIMARY KEY (owner, seq),
+     UNIQUE (owner, id)
+   ) WITHOUT ROWID`,
+  `CREATE TRIGGER knowledge_events_no_update BEFORE UPDATE ON knowledge_events
+     BEGIN SELECT RAISE(ABORT, 'knowledge events are append-only'); END`,
+  `CREATE TRIGGER knowledge_events_no_delete BEFORE DELETE ON knowledge_events
+     BEGIN SELECT RAISE(ABORT, 'knowledge events are append-only'); END`,
+];
+
+/** The only owner of a guest database (one person per local DB). */
+export const guestOwner = 'guest';
+
 /** Guest migrations (sqlite-wasm) in order. Never edit one that has shipped: add the next one. */
 export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
   // v1: append-only event log and the guest settings.
@@ -40,6 +65,8 @@ export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
        updated_at INTEGER NOT NULL
      )`,
   ],
+  // v3: knowledge log (phase 3 step 2).
+  [...knowledgeEventsTable],
 ];
 
 /** The schema version this build of the code expects. */

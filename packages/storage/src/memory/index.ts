@@ -1,9 +1,16 @@
 // In-memory driver: tests, and the fallback when OPFS is not available (private windows, some
 // WebKit contexts). `persistent` is false so the UI can warn that nothing survives a reload.
 import { Effect, Queue, Schema, Stream } from 'effect';
-import { SavedProfile, type DomainEvent, type TeachingProfile } from '@kd-learn/core';
 import {
+  SavedProfile,
+  type DomainEvent,
+  type KnowledgeEvent,
+  type TeachingProfile,
+} from '@kd-learn/core';
+import {
+  KnowledgeConflict,
   StorageFailure,
+  type AppendResult,
   type GuestSettings,
   type SessionSummary,
   type StorageChange,
@@ -13,6 +20,8 @@ import {
 export const makeMemoryStorage = (): StorageService => {
   const sessions = new Map<string, DomainEvent[]>();
   const eventIds = new Set<string>();
+  const knowledge: KnowledgeEvent[] = [];
+  const knowledgeIds = new Set<string>();
   let settings: GuestSettings | undefined;
   let profile: TeachingProfile | undefined;
   const listeners = new Set<(change: StorageChange) => void>();
@@ -58,6 +67,27 @@ export const makeMemoryStorage = (): StorageService => {
       }
       return rows.sort((a, b) => b.updatedAt - a.updatedAt);
     }),
+
+    appendKnowledge: (events, { expectedLastSeq }) =>
+      Effect.suspend((): Effect.Effect<AppendResult, StorageFailure | KnowledgeConflict> => {
+        const lastSeq = knowledge.length - 1;
+        if (expectedLastSeq !== lastSeq) {
+          return Effect.fail(new KnowledgeConflict({ expectedLastSeq, lastSeq }));
+        }
+        const batchIds = new Set<string>();
+        for (const event of events) {
+          if (knowledgeIds.has(event.id) || batchIds.has(event.id)) {
+            return Effect.fail(new StorageFailure({ message: `Duplicate event id ${event.id}` }));
+          }
+          batchIds.add(event.id);
+        }
+        knowledge.push(...events);
+        batchIds.forEach((id) => knowledgeIds.add(id));
+        if (events.length > 0) emit({ _tag: 'KnowledgeChanged' });
+        return Effect.succeed({ lastSeq: knowledge.length - 1 });
+      }),
+
+    readKnowledge: Effect.sync(() => [...knowledge]),
 
     getSettings: Effect.sync(() => settings),
 

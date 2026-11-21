@@ -13,6 +13,12 @@ export type Operation =
   | { readonly op: 'append'; readonly sessionId: string; readonly events: ReadonlyArray<WireEvent> }
   | { readonly op: 'read'; readonly sessionId: string }
   | { readonly op: 'list' }
+  | {
+      readonly op: 'appendKnowledge';
+      readonly events: ReadonlyArray<WireEvent>;
+      readonly expectedLastSeq: number;
+    }
+  | { readonly op: 'readKnowledge' }
   | { readonly op: 'getSettings' }
   | {
       readonly op: 'putSettings';
@@ -26,7 +32,10 @@ export type Operation =
 
 export type Request = Operation & { readonly id: number };
 
-/** `unavailable`: the store could not be opened at all. `failure`: the call was rejected. */
+/**
+ * `unavailable`: the store could not be opened at all. `failure`: the call was rejected.
+ * `conflict`: `appendKnowledge` found the log at another seq than expected; nothing was written.
+ */
 export type Response =
   | { readonly id: number; readonly ok: true; readonly result: unknown }
   | {
@@ -34,6 +43,14 @@ export type Response =
       readonly ok: false;
       readonly kind: 'unavailable' | 'failure';
       readonly message: string;
+    }
+  | {
+      readonly id: number;
+      readonly ok: false;
+      readonly kind: 'conflict';
+      readonly message: string;
+      readonly expectedLastSeq: number;
+      readonly lastSeq: number;
     };
 
 export interface AppendReply {

@@ -2,7 +2,15 @@
 // (this tab or another one). Plain React and Effect, no query library (TanStack DB was rejected
 // for phase 1, plan 2.4).
 import { Effect, Stream, type Result } from 'effect';
-import { projectSession, type EventLog, type ProjectionError, type Session } from '@kd-learn/core';
+import {
+  projectKnowledge,
+  projectSession,
+  type EventLog,
+  type KnowledgeGraph,
+  type KnowledgeLog,
+  type ProjectionError,
+  type Session,
+} from '@kd-learn/core';
 import type {
   GuestSettings,
   SessionSummary,
@@ -87,5 +95,22 @@ export const useGuestSettings = (): StorageQuery<GuestSettings | undefined> =>
   useStorageQuery(
     (storage) => storage.getSettings,
     (change) => change._tag === 'SettingsChanged',
+    [],
+  );
+
+export interface KnowledgeView {
+  readonly log: KnowledgeLog;
+  /** Projection of `log` with the `core` rules. A failure means the log breaks them. */
+  readonly graph: Result.Result<KnowledgeGraph, ProjectionError>;
+}
+
+/** The local knowledge log (plan luyen-tap-graph.md A1), re-read after every knowledge commit. */
+export const useKnowledge = (): StorageQuery<KnowledgeView> =>
+  useStorageQuery(
+    (storage) =>
+      storage.readKnowledge.pipe(
+        Effect.map((log): KnowledgeView => ({ log, graph: projectKnowledge(log) })),
+      ),
+    (change) => change._tag === 'KnowledgeChanged',
     [],
   );

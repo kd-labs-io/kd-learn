@@ -4,8 +4,9 @@
 // guarded by `import.meta.env.SSR` (see apps/web/src/storage/client.ts). Then the server bundle
 // never contains it.
 import { Effect, Queue, Stream } from 'effect';
-import type { EventLog } from '@kd-learn/core';
+import type { EventLog, KnowledgeLog } from '@kd-learn/core';
 import {
+  KnowledgeConflict,
   StorageBusy,
   StorageFailure,
   StorageUnavailable,
@@ -17,11 +18,13 @@ import {
   type StorageService,
 } from '../port/index.ts';
 import {
+  decodeKnowledgeLog,
   decodeLog as decodePayloads,
   decodeProfile,
   encodeProfile,
   summarize,
   toEventRow,
+  toKnowledgeRow,
 } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 import type { AppendReply, Operation, Response, WireSession } from './protocol.ts';
@@ -73,7 +76,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
   let nextId = 1;
   const pending = new Map<
     number,
-    { resolve: (value: unknown) => void; reject: (error: Error) => void }
+    { resolve: (value: unknown) => void; reject: (error: unknown) => void }
   >();
   const failAll = (error: Error) => {
     pending.forEach((call) => call.reject(error));
@@ -85,7 +88,11 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     if (!call) return;
     pending.delete(reply.id);
     if (reply.ok) call.resolve(reply.result);
-    else {
+    else if (reply.kind === 'conflict') {
+      call.reject(
+        new KnowledgeConflict({ expectedLastSeq: reply.expectedLastSeq, lastSeq: reply.lastSeq }),
+      );
+    } else {
       call.reject(
         reply.kind === 'unavailable'
           ? new StorageUnavailable({ message: reply.message })
@@ -150,6 +157,15 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
         }),
     });
 
+  const decodeKnowledge = (payloads: ReadonlyArray<string>) =>
+    Effect.try({
+      try: (): KnowledgeLog => decodeKnowledgeLog(payloads),
+      catch: (error) =>
+        new StorageFailure({
+          message: `Stored knowledge event is not valid: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+    });
+
   const settingsEntries = (settings: GuestSettings) => {
     const all: Record<SettingsKey, string | undefined> = {
       provider: settings.provider,
@@ -190,6 +206,33 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     listSessions: call<WireSession[]>({ op: 'list' }).pipe(
       Effect.map((rows) => rows.map(summarize)),
     ),
+
+    appendKnowledge: (events, { expectedLastSeq }) =>
+      Effect.tryPromise({
+        try: () =>
+          send<AppendReply>({
+            op: 'appendKnowledge',
+            events: events.map(toKnowledgeRow),
+            expectedLastSeq,
+          }),
+        catch: (error) =>
+          error instanceof KnowledgeConflict ||
+          error instanceof StorageBusy ||
+          error instanceof StorageFailure ||
+          error instanceof StorageUnavailable
+            ? error
+            : new StorageFailure({
+                message: error instanceof Error ? error.message : String(error),
+              }),
+      }).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            if (events.length > 0) committed({ _tag: 'KnowledgeChanged' });
+          }),
+        ),
+      ),
+
+    readKnowledge: call<string[]>({ op: 'readKnowledge' }).pipe(Effect.flatMap(decodeKnowledge)),
 
     getSettings: call<Record<string, string>>({ op: 'getSettings' }).pipe(
       Effect.flatMap((stored) => {

@@ -4,12 +4,18 @@
 import { Heading } from '@astryxdesign/core/Heading';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
-import { projectSession, type DomainEvent, type SavedProfile } from '@kd-learn/core';
+import {
+  projectKnowledge,
+  projectSession,
+  type DomainEvent,
+  type KnowledgeEvent,
+  type SavedProfile,
+} from '@kd-learn/core';
 import type { GuestSettings } from '@kd-learn/storage/port';
 import { createFileRoute } from '@tanstack/react-router';
-import { Result } from 'effect';
+import { Effect, Result } from 'effect';
 import { useEffect, useState } from 'react';
-import { getStorage, runStorage, useSession, useSessionList } from '../storage';
+import { getStorage, runStorage, useKnowledge, useSession, useSessionList } from '../storage';
 
 export const Route = createFileRoute('/dev/storage')({ component: DevStorage });
 
@@ -38,6 +44,21 @@ const api = {
   getProfile: () => guard(() => runStorage((storage) => storage.getProfile)),
   saveProfile: (profile: SavedProfile | undefined) =>
     guard(() => runStorage((storage) => storage.saveProfile(profile))),
+  // Not through `runStorage`: it only carries `StorageError`, and this call may also fail with
+  // `KnowledgeConflict`.
+  appendKnowledge: (events: KnowledgeEvent[], expectedLastSeq: number) =>
+    guard(async () =>
+      Effect.runPromise((await getStorage()).appendKnowledge(events, { expectedLastSeq })),
+    ),
+  readKnowledge: () => guard(() => runStorage((storage) => storage.readKnowledge)),
+  /** Active proposition ids of the projected knowledge log, or the projection error. */
+  async knowledgeState() {
+    const log = await runStorage((storage) => storage.readKnowledge);
+    const graph = projectKnowledge(log);
+    return Result.isSuccess(graph)
+      ? Object.keys(graph.success.propositions)
+      : `error:${graph.failure._tag}`;
+  },
   /** State of the projection of a stored log, to check `core` and the store work together. */
   async state(sessionId: string) {
     const log = await runStorage((storage) => storage.readSession(sessionId));
@@ -58,6 +79,7 @@ function DevStorage() {
   const [ready, setReady] = useState(false);
   const sessions = useSessionList();
   const view = useSession(viewedSession);
+  const knowledge = useKnowledge();
 
   useEffect(() => {
     window.__kdStorage = api;
@@ -73,6 +95,11 @@ function DevStorage() {
       </Text>
       <Text id="view-events">
         {view.status === 'ready' ? `view events: ${view.data.log.length}` : 'view events: ...'}
+      </Text>
+      <Text id="knowledge-events">
+        {knowledge.status === 'ready'
+          ? `knowledge events: ${knowledge.data.log.length}`
+          : 'knowledge events: ...'}
       </Text>
     </VStack>
   );

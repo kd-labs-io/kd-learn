@@ -1,7 +1,7 @@
 // Browser tests of the local DB (plan step 5, risk 20): the real wa-sqlite driver in a real
 // Worker on OPFS, reached through the harness route `/dev/storage`.
 import { expect, test, type Page } from '@playwright/test';
-import type { DomainEvent } from '@kd-learn/core';
+import type { DomainEvent, KnowledgeEvent } from '@kd-learn/core';
 
 const profile = {
   id: 'default',
@@ -252,4 +252,51 @@ test('overlapping calls in one tab run one at a time: a failing batch cannot dam
     ]);
   }
   expect(outcome.settings).toEqual({ provider: 'gemini', model: 'flash' });
+});
+
+const proposition = (id: string): KnowledgeEvent => ({
+  _tag: 'PropositionAdded',
+  id,
+  at: 1000 + counter++,
+  propositionId: `p-${id}`,
+  text: `Claim ${id}.`,
+  topic: 'Search',
+  source: { sessionId: 's1' },
+});
+
+test('the knowledge log persists, rejects a batch with a used id, and checks the expected seq', async ({
+  page,
+}) => {
+  await openHarness(page);
+  const api = (events: KnowledgeEvent[], expectedLastSeq: number) =>
+    page.evaluate(([e, seq]) => window.__kdStorage!.appendKnowledge(e, seq), [
+      events,
+      expectedLastSeq,
+    ] as const);
+
+  expect(await api([proposition('k1'), proposition('k2')], -1)).toEqual({ lastSeq: 1 });
+  // A second writer that read the empty log is refused, and writes nothing.
+  expect(await api([proposition('k3')], -1)).toMatchObject({ error: 'KnowledgeConflict' });
+  expect(await api([proposition('k3'), proposition('k1')], 1)).toMatchObject({
+    error: 'StorageFailure',
+  });
+  // The session log is separate: the same ids are free there.
+  expect(await append(page, 'k', [turnStarted('k1')])).toEqual({ lastSeq: 0 });
+
+  await page.reload();
+  await expect(page.locator('#storage-state')).toHaveText('ready');
+  const log = (await page.evaluate(() => window.__kdStorage!.readKnowledge())) as KnowledgeEvent[];
+  expect(log.map((event) => event.id)).toEqual(['k1', 'k2']);
+  expect(await page.evaluate(() => window.__kdStorage!.knowledgeState())).toEqual(['p-k1', 'p-k2']);
+  await expect(page.locator('#knowledge-events')).toHaveText('knowledge events: 2');
+});
+
+test('a knowledge commit in one tab refreshes the other tab', async ({ context }) => {
+  const writer = await context.newPage();
+  const viewer = await context.newPage();
+  await openHarness(writer);
+  await openHarness(viewer);
+  await expect(viewer.locator('#knowledge-events')).toHaveText('knowledge events: 0');
+  await writer.evaluate((e) => window.__kdStorage!.appendKnowledge(e, -1), [proposition('t1')]);
+  await expect(viewer.locator('#knowledge-events')).toHaveText('knowledge events: 1');
 });
