@@ -18,7 +18,7 @@
 | Bước 8: model giả trả tool call | Chưa bắt đầu |
 | Bước 9: màn graph | Chưa bắt đầu |
 | Bước 10: màn luyện tập | Chưa bắt đầu |
-| Bước 11: màn sửa hồ sơ | Chưa bắt đầu |
+| Bước 11: màn sửa hồ sơ | Xong (2026-11-21). Màn `/profile` cho khách và tài khoản (`ProfileSource` hai cài đặt), mở từ hai màn cài đặt; hồ sơ mặc định chỉ đọc, nhân bản ra bản sửa được với id mới; TanStack Form kiểm bằng `SavedProfile`. Xem ghi chú bước 11 bên dưới |
 | Bước 12: kiểm tiêu chí phase | Chưa bắt đầu |
 
 ## Điều cần biết khi bắt đầu (từ handoff sau phase 2)
@@ -34,6 +34,15 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 11: màn sửa hồ sơ dạy học (2026-11-21)
+
+- **Route và file:** `/profile` (`apps/web/src/routes/profile.tsx`), màn ở `apps/web/src/profile/ProfileScreen.tsx`, lối vào `ProfileLink` ở cuối màn cài đặt khách và màn cài đặt tài khoản. Demo không có màn này: route chuyển về trang chủ.
+- **Nguồn dữ liệu:** `ProfileSource` (`apps/web/src/profile/source.ts`) theo mẫu `LessonSource`, gồm `view` (`loading` / `error` / `ready { profile, saved }`), `save`, `reset`. Khách: `useStorageQuery(getProfile)`, đọc lại khi có `ProfileChanged` (cả từ tab khác). Tài khoản: TanStack Query khoá `keys.profile(token)`; `PUT` / `DELETE` trả `ProfileResponse` nên ghi thẳng vào cache, không cần tải lại.
+- **Luồng:** chưa lưu gì thì hiện hồ sơ mặc định chỉ đọc và nút "Nhân bản". Bản sao lấy id mới (`crypto.randomUUID()`, khớp mẫu slug, không bao giờ là `default`) và tên "Default (copy)". Id giữ nguyên qua các lần lưu sau, vì log kiến thức ghi `profileId`. Đã lưu thì form sửa thẳng, có nút "Về mặc định".
+- **Kiểm giá trị:** TanStack Form (`@tanstack/react-form` 1.33.5), validator cấp form gọi `Schema.toStandardSchemaV1(SavedProfile, { parseOptions: { errors: 'all' } })`, nên giới hạn đúng như server và DB local. Lỗi gắn vào từng trường theo path; câu báo là chuỗi i18n riêng, dùng các hằng giới hạn của `core`. Sai thì nút Lưu bị khoá và có banner. N và M dùng `NumberInput` có `min` / `max`: số ngoài khoảng bị kẹp lại chứ không bị từ chối; chữ hay số lẻ mà trường từ chối (`onEntryErrorChange`) cũng khoá nút Lưu, vì giá trị đó không tới form.
+- **Test:** `validate.test.ts` (mọi trường sai đều báo, theo path). Playwright `e2e/profile.e2e.ts` (khách: đọc `SessionCreated.profile` trong request `/api/turns`) và `e2e/accounts-profile.e2e.ts` (tài khoản: đọc snapshot `GET /api/account/sessions/:id`, dải `x-forwarded-for` riêng `11.*`). Cả hai: nhân bản, prompt rỗng và thẻ ngôn ngữ sai bị chặn, lưu, tải lại vẫn còn, buổi mới chụp hồ sơ đã sửa, về mặc định. Không sửa `fake-openai.ts`.
+- **Còn mở:** trường ngôn ngữ của hồ sơ chưa có tác dụng. Cả hai chế độ vẫn thay `language` bằng ngôn ngữ giao diện khi tạo buổi (như bước 3). Màn ghi rõ điều này trong mô tả của trường. Muốn hồ sơ quyết định ngôn ngữ thì phải đổi chỗ tạo buổi. Tên để trống thì không lưu `name`, nên khi đọc lại hồ sơ hiện tên "Default" (điền từ hồ sơ mặc định).
 
 ## Bước 4: pipeline extraction (2026-11-21)
 
