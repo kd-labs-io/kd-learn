@@ -26,6 +26,7 @@ import { m } from '@kd-learn/i18n';
 import { useForm } from '@tanstack/react-form';
 import { Schema } from 'effect';
 import { useState } from 'react';
+import { errorText } from '../account/api';
 import { AppHeader } from '../app/AppHeader';
 import type { ProfileSource } from './source';
 
@@ -133,7 +134,7 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
       setDraft(undefined);
       setMessage({ status: 'success', text: m.profile_reset_done() });
     } catch (cause) {
-      setMessage({ status: 'error', text: m.profile_save_failed({ reason: reasonOf(cause) }) });
+      setMessage({ status: 'error', text: m.profile_save_failed({ reason: errorText(cause) }) });
     }
   };
 
@@ -187,7 +188,7 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
                     } catch (cause) {
                       setMessage({
                         status: 'error',
-                        text: m.profile_save_failed({ reason: reasonOf(cause) }),
+                        text: m.profile_save_failed({ reason: errorText(cause) }),
                       });
                     }
                   }}
@@ -206,8 +207,6 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
   );
 }
 
-const reasonOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
-
 function ProfileEditor({
   initial,
   isNew,
@@ -221,6 +220,17 @@ function ProfileEditor({
   onCancel: () => void;
   onReset: (() => void) | undefined;
 }) {
+  // Text a number field rejected (`abc`, `2.5`) never reaches the form: block saving on it too.
+  const [entryErrors, setEntryErrors] = useState<ReadonlySet<string>>(new Set());
+  const setEntryError = (name: string, isError: boolean) =>
+    setEntryErrors((current) => {
+      const next = new Set(current);
+      if (isError) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+  const hasEntryError = entryErrors.size > 0;
+
   const form = useForm({
     defaultValues: initial,
     validators: {
@@ -274,6 +284,7 @@ function ProfileEditor({
             min={1}
             max={MAX_PROBE_QUESTIONS}
             isIntegerOnly
+            onEntryErrorChange={(error) => setEntryError(field.name, error !== null)}
             {...errorOf(field.state.meta.errors)}
             data-testid="profile-max-probe"
           />
@@ -289,6 +300,7 @@ function ProfileEditor({
             min={1}
             max={MAX_TURNS_PER_STEP}
             isIntegerOnly
+            onEntryErrorChange={(error) => setEntryError(field.name, error !== null)}
             {...errorOf(field.state.meta.errors)}
             data-testid="profile-max-turns"
           />
@@ -313,14 +325,14 @@ function ProfileEditor({
       <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (
           <VStack gap={3}>
-            {canSubmit ? null : (
+            {canSubmit && !hasEntryError ? null : (
               <Banner status="error" title={m.profile_invalid()} data-testid="profile-invalid" />
             )}
             <HStack gap={2} wrap="wrap">
               <Button
                 label={m.profile_save()}
                 variant="primary"
-                isDisabled={!canSubmit}
+                isDisabled={!canSubmit || hasEntryError}
                 isLoading={isSubmitting}
                 onClick={() => void form.handleSubmit()}
                 data-testid="profile-save"

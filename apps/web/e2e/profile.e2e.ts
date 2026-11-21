@@ -50,6 +50,16 @@ test('duplicate the default profile, edit a prompt, and a new session snapshots 
   await page.getByLabel('Language').fill('en');
   await prompt(page, 'Prober').fill('MARKER-GUEST: ask one short question at a time.');
   await expect(page.getByTestId('profile-invalid')).toHaveCount(0);
+
+  // Text the number field rejects never reaches the form, so it blocks saving on its own.
+  const n = page.getByLabel('Probing questions (N)');
+  await n.fill('abc');
+  await n.blur();
+  await expect(n).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('profile-save')).toBeDisabled();
+  await n.fill('5');
+  await n.blur();
+  await expect(page.getByTestId('profile-invalid')).toHaveCount(0);
   await page.getByTestId('profile-save').click();
   await expect(page.getByTestId('profile-message')).toContainText('Profile saved');
   await expect(page.getByTestId('profile-reset')).toBeVisible();
@@ -70,8 +80,9 @@ test('duplicate the default profile, edit a prompt, and a new session snapshots 
   expect(created.profile.name).toBe('Default (copy)');
   expect(created.profile.prompts.prober).toContain('MARKER-GUEST');
   expect(created.profile.prompts.teacher).toBe('Teach step by step.');
+  expect(created.profile.maxProbeQuestions).toBe(5);
 
-  // Back to default: the read-only view again, and the next session snapshots the default.
+  // Back to default: the read-only view again.
   await page.goto('/profile');
   await page.getByTestId('profile-reset').click();
   await expect(page.getByTestId('profile-message')).toContainText('Back to the default');
