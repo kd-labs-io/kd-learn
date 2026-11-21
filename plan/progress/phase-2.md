@@ -13,7 +13,7 @@
 | Bước 4: lượt chạy trên server | Xong (2026-11-21). `packages/server/src/sessions/`, route `/api/account/sessions/*`. Xem ghi chú bước 4 bên dưới |
 | Bước 5: công tắc admin | Xong (2026-11-21). `packages/server/src/admin/`, route `/api/admin/*`, `/api/config`. Xem ghi chú bước 5 bên dưới |
 | Bước 6: demo với ngân sách chung | Xong (2026-11-21). `packages/server/src/demo/`. Xem ghi chú bước 6 bên dưới |
-| Bước 7: ACP | Chưa bắt đầu |
+| Bước 7: ACP | Xong (2026-11-21). `packages/server/src/acp/`. Xem ghi chú bước 7 bên dưới |
 | Bước 8: UI | Chưa bắt đầu |
 | Bước 9: Docker Compose | Chưa bắt đầu |
 | Bước 10: kiểm tiêu chí phase | Chưa bắt đầu |
@@ -254,4 +254,42 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - 1 test ở adapter: trần token đi tới request Anthropic.
   - Chạy thật trên bản build với Haiku, trần 2: hai lượt xong, lượt thứ ba trả `429 DemoQuotaExceeded`; key không có trong phản hồi hay log.
 - **Chưa làm:** đặt key demo từ UI admin (phải mã hoá bằng secret box như key của tài khoản). Ghi ở 06-viec-mo.
+
+## Bước 7: ACP cho tài khoản (2026-11-21)
+
+- **Kết nối ACP:**
+  - Tạo bằng `{ label, provider: 'acp', agent }`, với `agent` là `claude-code`, `antigravity` hoặc `opencode`. Kết nối này không có key: agent dùng phiên đăng nhập của chính nó trên server.
+  - Cột `agent` thêm ở migration v5.
+  - `GET /api/account/settings` trả thêm `acpAgents` (các agent admin đã bật), để UI ở bước 8 chỉ hiện agent dùng được.
+- **Admin:**
+  - `acpAgents` và `acpMaxConcurrent` trong `GET` / `PUT /api/admin/config`.
+  - Mặc định lấy từ env: `KD_LEARN_ACP_AGENTS` (danh sách cách nhau bằng dấu phẩy, mặc định không bật agent nào) và `KD_LEARN_ACP_MAX_CONCURRENT` (1–32, mặc định 2). Giá trị sai thì phần tài khoản không chạy.
+- **Agent chưa bật:**
+  - Tạo kết nối với agent chưa bật thì trả `409 AcpAgentDisabled`.
+  - Model được giải **ở mỗi lượt**, nên admin tắt agent sau khi đã có kết nối thì lượt cũng bị trả `409 AcpAgentDisabled` và không ghi gì.
+- **Giới hạn đồng thời:**
+  - Đếm chung cho cả server, trong bộ định tuyến AI của lượt tài khoản (`acp/router.ts`): ref ACP đi sang adapter ACP, các ref khác sang TanStack.
+  - Vượt giới hạn thì lượt thất bại ngay với `ProviderError` mã `AcpBusy` và `retryAfterMs` 5 giây, thành `TurnFailed` có `retryable`. Không xếp hàng, vì một lượt ACP có thể chạy vài phút.
+  - Việc kiểm nằm trong fiber của lượt, nên lượt lập plan tự nối sau lượt chấm điểm cũng bị kiểm.
+  - Chỗ được trả trong `Stream.ensuring` ở mọi lối ra: xong, lỗi, defect, huỷ, quá giờ.
+- **Biến môi trường của agent:** process agent không còn nhận các biến `KD_*` (master key, mật khẩu admin, key demo). Có test cho cả ba agent.
+- **Nạp lười:** adapter ACP chỉ được nạp ở lượt ACP đầu tiên, vì lúc nạp nó tìm package agent và script bridge. Server không bật ACP không phụ thuộc vào các thứ đó. Nạp lỗi thì lượt ghi `TurnFailed` với thông báo rõ ràng.
+- **Bản build:**
+  - Mặc định không kèm ACP: `.output` 14 MB, và lượt ACP trả lỗi "The ACP adapter could not be loaded".
+  - `KD_BUILD_ACP=1 pnpm build` chép `claude-agent-acp` vào `.output/server/node_modules` qua `traceDeps` của Nitro, khoảng 344 MB, vì nó kèm binary Claude Code gốc của máy build (một nền tảng). Do đó `apps/web` khai báo thêm dependency này.
+- **Chạy thật:**
+  - Trên bản build có ACP, máy local, env sạch (không có `CLAUDE*` / `ANTHROPIC*`): một lượt Claude Code (`claude-haiku-5-5`) qua API tài khoản ghi đủ `MessageAppended` và `TurnCompleted` trong 4,6 giây.
+  - Cùng lúc đó, một lượt Anthropic thường vẫn chạy tốt.
+  - Key không có trong log.
+  - Lượt ACP không có `UsageRecorded`, vì adapter không nhận số token.
+- **C3 (ACP trong Docker), chốt:** phase 2 chỉ hỗ trợ ACP khi chạy server ngoài Docker, trên máy đã cài và đăng nhập CLI của agent. Image Docker ở bước 9 không kèm ACP. Lý do:
+  - binary Claude Code phụ thuộc nền tảng và nặng khoảng 340 MB;
+  - CLI cần đăng nhập gói thuê bao, trong khi adapter chạy agent với home rỗng;
+  - opencode và Antigravity dùng bridge stdio (`stdio-bridge.ts`), mà file này chưa được đóng gói vào bản build.
+- **Test (8 mới):**
+  - lượt chạy qua agent đã bật, không lưu key, không gọi TanStack;
+  - agent chưa bật, hoặc bị tắt sau khi đã có kết nối, bị từ chối mà không ghi gì;
+  - giới hạn 1: lượt thứ hai thất bại ngay với `AcpBusy` (retryable) và fake không được gọi; xong lượt trước hoặc huỷ lượt thì lượt sau chạy được;
+  - khách không chọn được `acp`;
+  - env sai; env của agent không có `KD_*`.
 

@@ -88,6 +88,8 @@ describe('admin switches', () => {
       guestMode: true,
       demoMode: false,
       demoBudget: { limit: 0, period: 'day', used: 0 },
+      acpAgents: [],
+      acpMaxConcurrent: 2,
     });
   });
 

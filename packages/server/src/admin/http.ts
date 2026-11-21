@@ -45,6 +45,8 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
           demoMode: next.demoMode,
           demoBudgetLimit: next.demoBudget.limit,
           demoBudgetPeriod: next.demoBudget.period,
+          acpAgents: next.acpAgents.join(','),
+          acpMaxConcurrent: next.acpMaxConcurrent,
         },
       });
       return json(ctx, Schema.encodeSync(AdminConfig)(next));

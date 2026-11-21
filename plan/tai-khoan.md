@@ -132,6 +132,7 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 
 - Cài CLI của từng agent vào image thế nào; đăng nhập gói thuê bao bằng cách nào khi adapter dùng home rỗng (mount thư mục cấu hình chỉ đọc, hay chỉ hỗ trợ API key)?
 - Nếu không làm gọn được: ACP chỉ hỗ trợ khi chạy server ngoài Docker, ghi rõ trong tài liệu.
+- **Chốt ở bước 7 (2026-11-21):** theo phương án dự phòng. Image Docker không kèm ACP; xem [progress/phase-2.md](progress/phase-2.md) bước 7.
 
 ## D. Ngoài phạm vi phase 2
 

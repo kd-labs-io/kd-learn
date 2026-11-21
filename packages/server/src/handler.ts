@@ -394,6 +394,8 @@ export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
   readonly auth?: AuthOptions;
   /** Upper bound on one account turn. Default 3 minutes. */
   readonly turnTimeoutMs?: number;
+  /** The ACP adapter for account turns. Default: loaded on the first ACP turn. Tests pass a fake. */
+  readonly acp?: Layer.Layer<AiPort>;
 }
 
 /** Wraps a handler so an unexpected throw becomes a fixed 500, never a message with request data. */
@@ -465,6 +467,7 @@ export const createHandlers = (
         endpoints: () => config.endpoints,
         ai: options.ai ?? tanstackLayer(),
         ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
+        ...(options.acp ? { acp: options.acp } : {}),
         ...(options.database ? { database: options.database } : {}),
         ...(options.auth ? { auth: options.auth } : {}),
       }).catch((error: unknown) => {

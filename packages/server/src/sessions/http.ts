@@ -65,6 +65,12 @@ export const makeSessionsHandler = (kit: Kit, log: Logger) => {
               ErrorCode.KeyUnreadable,
               'The saved key cannot be read any more. Enter it again.',
             );
+          case 'AgentDisabled':
+            return ctx.reject(
+              409,
+              ErrorCode.AcpAgentDisabled,
+              'The agent of this connection is not enabled on this server any more.',
+            );
           case 'UnknownEndpoint':
             return ctx.reject(
               409,

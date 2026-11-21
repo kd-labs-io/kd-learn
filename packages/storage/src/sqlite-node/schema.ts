@@ -88,4 +88,6 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
        used INTEGER NOT NULL
      ) WITHOUT ROWID`,
   ],
+  // v5: ACP connections (plan step 7, A9): the agent id; such a row has no key.
+  [`ALTER TABLE connections ADD COLUMN agent TEXT`],
 ];

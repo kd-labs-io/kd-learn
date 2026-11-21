@@ -2,6 +2,7 @@
 // an admin never set falls back to the environment default.
 import type { ModelRef } from '@kd-learn/ai/port';
 import type {
+  AcpAgent,
   AdminConfig,
   AdminUser,
   PublicConfig,
@@ -17,6 +18,8 @@ export interface SwitchDefaults {
   readonly registration: RegistrationMode;
   readonly guestMode: boolean;
   readonly demoMode: boolean;
+  readonly acpAgents: ReadonlyArray<AcpAgent>;
+  readonly acpMaxConcurrent: number;
 }
 
 export interface AdminService {
@@ -25,6 +28,8 @@ export interface AdminService {
   readonly config: () => AdminConfig;
   /** What the public config says: demo counts as on only when it can run. */
   readonly publicConfig: () => PublicConfig;
+  readonly acpAgents: () => ReadonlyArray<AcpAgent>;
+  readonly acpMaxConcurrent: () => number;
   readonly updateConfig: (change: UpdateAdminConfigRequest) => AdminConfig;
   readonly users: () => ReadonlyArray<AdminUser>;
   /** Undefined when there is no such user. */
@@ -64,10 +69,20 @@ export const makeAdmin = (
     guestMode: bool(read('guestMode'), defaults.guestMode),
     demoMode: bool(read('demoMode'), defaults.demoMode),
   });
+  const acpAgents = (): ReadonlyArray<AcpAgent> => {
+    const stored = read('acpAgents');
+    return stored === undefined ? defaults.acpAgents : (JSON.parse(stored) as AcpAgent[]);
+  };
+  const acpMaxConcurrent = () => {
+    const stored = read('acpMaxConcurrent');
+    return stored === undefined ? defaults.acpMaxConcurrent : Number(stored);
+  };
   const config = (): AdminConfig => {
     const model = demo.model();
     return {
       ...switches(),
+      acpAgents: acpAgents(),
+      acpMaxConcurrent: acpMaxConcurrent(),
       demoBudget: demo.budget.status(),
       // Provider and model name only: the key never leaves the server.
       ...(model === undefined || model.provider === 'acp'
@@ -106,6 +121,8 @@ export const makeAdmin = (
     switches,
     config,
     publicConfig,
+    acpAgents,
+    acpMaxConcurrent,
     updateConfig: (change) => {
       database.transaction(() => {
         if (change.registration !== undefined && registrationModes.includes(change.registration)) {
@@ -115,6 +132,12 @@ export const makeAdmin = (
         if (change.demoMode !== undefined) q.put.run('demoMode', String(change.demoMode));
         if (change.demoBudgetLimit !== undefined) demo.budget.setLimit(change.demoBudgetLimit);
         if (change.demoBudgetPeriod !== undefined) demo.budget.setPeriod(change.demoBudgetPeriod);
+        if (change.acpAgents !== undefined) {
+          q.put.run('acpAgents', JSON.stringify([...new Set(change.acpAgents)]));
+        }
+        if (change.acpMaxConcurrent !== undefined) {
+          q.put.run('acpMaxConcurrent', String(change.acpMaxConcurrent));
+        }
       });
       return config();
     },
