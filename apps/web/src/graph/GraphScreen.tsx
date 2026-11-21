@@ -17,10 +17,10 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import type { EdgeView, GraphView, PropositionView } from '@kd-learn/api';
-import type { Relation } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
+import { relationText } from './relation';
 import type { KnowledgeSource, PendingExtraction } from './source';
 
 const GraphFigure = lazy(() => import('./GraphFigure'));
@@ -28,21 +28,6 @@ const GraphFigure = lazy(() => import('./GraphFigure'));
 /** Rows shown before "Show more": a long list stays cheap to render. */
 const PAGE = 100;
 const ALL_TOPICS = '';
-
-export const relationText = (relation: Relation) => {
-  switch (relation) {
-    case 'requires':
-      return m.graph_relation_requires();
-    case 'implies':
-      return m.graph_relation_implies();
-    case 'supports':
-      return m.graph_relation_supports();
-    case 'exampleOf':
-      return m.graph_relation_exampleOf();
-    case 'contrastsWith':
-      return m.graph_relation_contrastsWith();
-  }
-};
 
 const masteryText = (p: PropositionView) =>
   p.mastery === undefined ? m.graph_mastery_none() : m.graph_mastery({ box: p.mastery.box });
@@ -88,6 +73,9 @@ function ReadyGraph({
   const [topic, setTopic] = useState(ALL_TOPICS);
   const [limit, setLimit] = useState(PAGE);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  // The figure needs WebGL and the DOM: never rendered (nor its chunk loaded) on the server.
+  const [client, setClient] = useState(false);
+  useEffect(() => setClient(true), []);
 
   const byId = useMemo(
     () => new Map(graph.propositions.map((p) => [p.propositionId, p])),
@@ -193,7 +181,7 @@ function ReadyGraph({
               data-testid="graph-more"
             />
           ) : null}
-          {graph.propositions.length > 0 ? (
+          {client ? (
             <Suspense fallback={null}>
               <GraphFigure
                 graph={graph}

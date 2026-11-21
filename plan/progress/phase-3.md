@@ -16,7 +16,7 @@
 | Bước 6: registry bài tập, Practitioner | Xong (2026-11-21). Sự kiện luyện tập trong log kiến thức, mức nắm vững theo hộp Leitner, registry bốn loại, hàm chọn bài, Practitioner (một lần gọi ra cả bộ bài, chấm theo ba mức). C4 với Haiku: chấm ổn định 21/21, không bị đánh lừa 9/9, khoảng $0,004 cả lần kiểm. Xem ghi chú bước 6 bên dưới |
 | Bước 7: luyện tập trên server | Xong (2026-11-21) |
 | Bước 8: model giả trả tool call | Xong (2026-11-21). `apps/web/e2e/fake-openai.ts` trả structured output (extractor, auditor, merge) và tool call (`submit_assessment` khi có `#assess`, `create_plan` ở lượt lập plan, `complete_step` khi có `#done`), đếm lần gọi theo key. Hai test e2e mới. Xem ghi chú bước 8 bên dưới |
-| Bước 9: màn graph | Chưa bắt đầu |
+| Bước 9: màn graph | Xong (2026-11-21). Màn `/graph` ở cả ba chế độ: danh sách mệnh đề (tìm, lọc theo chủ đề, chi tiết, bỏ mệnh đề), trạng thái trích từng buổi kèm thử lại, hình graph sigma nạp lười. Route tài khoản `GET /api/account/knowledge` không có gì về bài tập |
 | Bước 10: màn luyện tập | Xong (2026-11-21). Màn `/practice` (link ở trang chủ) cho khách, demo và tài khoản qua `PracticeSource` hai cài đặt; registry renderer bốn loại; điểm, nhận xét, đáp án đúng và mức nắm vững sau khi chấm; tải lại giữa chừng giữ bài và câu trả lời. Model giả viết và chấm bài. Xem ghi chú bước 10 bên dưới |
 | Bước 11: màn sửa hồ sơ | Xong (2026-11-21). Màn `/profile` cho khách và tài khoản (`ProfileSource` hai cài đặt), mở từ hai màn cài đặt; hồ sơ mặc định chỉ đọc, nhân bản ra bản sửa được với id mới; TanStack Form kiểm bằng `SavedProfile`. Xem ghi chú bước 11 bên dưới |
 | Bước 12: kiểm tiêu chí phase | Chưa bắt đầu |
@@ -34,6 +34,30 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 9: màn graph (2026-11-21)
+
+- **Route tài khoản:**
+  - `GET /api/account/knowledge` trả `GraphView` (`packages/api/src/knowledge.ts`): mệnh đề đang hiệu lực, mới nhất trước, kèm mức nắm vững (box, số lần, điểm gần nhất, hạn ôn); cạnh đang hiệu lực. Không có gì về bài tập (không id bài, không đáp án), nên màn graph không lộ đáp án luyện tập (việc để lại từ bước 5).
+  - `POST /api/account/knowledge/propositions/:id/retire` ghi `PropositionRetired` bằng checked append, trả graph sau khi bỏ; id không có hoặc đã bỏ thì `404`. Id mệnh đề là chuỗi bất kỳ (`PropositionId`), nên đoạn đường dẫn được mã hoá và giải mã, không lọc bằng regex ký tự.
+  - Client: `accountClient.knowledge()`, `retireProposition(id)`.
+- **`KnowledgeSource`** (`apps/web/src/graph/source.ts`), hai cài đặt:
+  - khách và demo: đọc log kiến thức local (`useKnowledge`, đọc lại khi có `KnowledgeChanged`, cả từ tab khác), dựng cùng `GraphView` bằng `toGraphView`. Bỏ mệnh đề bằng checked append, **không** chờ khoá `kd-learn:knowledge` (nếu chờ thì nút bị treo suốt một lần trích); lô của extraction tự khớp với graph lúc ghi.
+  - tài khoản: TanStack Query. Danh sách extraction chỉ hỏi lại (1,5 s) khi còn buổi `queued` / `running`, không hỏi khi rảnh (chi phí `list()` ghi ở bước 5); khi một buổi hết chạy thì đọc lại graph.
+- **Trạng thái trích:** buổi đang trích hiện spinner; buổi lỗi hiện banner và nút "Thử lại"; buổi khách có lần thử `started` mà tab này không chạy (tab đóng giữa chừng) và buổi tài khoản đã xong mà chưa từng trích (lúc đó chưa có model) hiện nút "Rút ngay".
+- **Danh sách** (đường chính, và là đường duy nhất cho bàn phím và trình đọc màn hình): tìm không phân biệt dấu, lọc theo chủ đề, chi tiết (nguồn theo tên buổi, cạnh ra / vào bấm được để nhảy, mức nắm vững), bỏ mệnh đề có xác nhận. **Không dùng TanStack Virtual:** Astryx không có danh sách ảo, còn danh sách ảo cần `div` và style vị trí động; thay bằng hiện 100 dòng mỗi lần và nút "Xem thêm". Xét lại khi graph thật có vài nghìn mệnh đề.
+- **Hình graph** (`GraphFigure.tsx`), theo kết luận C1:
+  - sigma 4.0.6 + graphology 0.26.0 + ForceAtlas2 0.10.1; nạp bằng `lazy(import())` và chỉ sau khi mount, nên không chạy khi SSR; chunk riêng khoảng 111 KiB gzip.
+  - bố cục ForceAtlas2 đồng bộ dưới 800 mệnh đề, từ 800 trở lên chạy trong Web Worker 3 s; giữ vị trí cũ khi graph đổi.
+  - mặc định chỉ hiện lân cận 2 bước của mệnh đề đang chọn (trạng thái `isHidden`), nút "Toàn bộ graph"; màu theo chủ đề lấy từ token (`--color-accent`, `--color-info`, ...), đổi qua phần tử thăm dò và canvas 1x1 sang `rgba` vì token có thể là `light-dark()` / `oklch()`.
+  - kéo node bằng `enableNodeDrag` có sẵn của sigma 4; bấm node thì chọn trong danh sách. Cần `itemSizesReference: 'screen'`: mặc định (`positions`) làm node to theo độ trải của bố cục, với 2 node thì phủ kín khung.
+  - WebGL lỗi (máy không có WebGL 2) thì hiện một dòng chữ, danh sách vẫn đủ. Hình có `aria-hidden`.
+  - Đã xem bằng mắt (ảnh chụp từ Playwright Chromium): mũi tên, nhãn cạnh, node chọn to hơn. Chưa thử graph lớn thật và điện thoại.
+- **Điều hướng:** nút "Kiến thức" trên header ở mọi chế độ (cả demo).
+- **Test:**
+  - server `knowledge/graph-route.test.ts` (3): không lộ gì về bài tập, mức nắm vững, cạnh; bỏ mệnh đề kéo theo cạnh, id có ký tự đặc biệt, `404`, `405`; tách người dùng, `401`.
+  - Playwright `e2e/graph.e2e.ts`, cả khách và tài khoản: học hết một buổi trong trình duyệt bằng model giả, model giả **giữ** lần gọi trích đầu (key có `slow-extract`) tới khi màn graph đã mở, rồi màn tự hiện hai mệnh đề, không tải lại, không bấm. Thêm: chi tiết có cạnh `requires`, tìm thu hẹp danh sách, bỏ mệnh đề còn sau khi tải lại. Mọi kiểm tra dựa trên danh sách, không dựa trên canvas.
+- **Để lại:** khách: buổi đã xong nhưng chưa từng trích (không có key lúc xong) không hiện nút "Rút ngay" vì phải đọc log từng buổi; có thể thêm ở màn học.
 
 ## Bước 10: màn luyện tập (2026-11-21)
 

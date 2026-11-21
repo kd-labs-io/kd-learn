@@ -34,8 +34,11 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "effect": "catalog:",
+    "graphology": "0.26.0",
+    "graphology-layout-forceatlas2": "0.10.1",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "sigma": "4.0.6"
   },
   "devDependencies": {
     "@astryxdesign/build": "catalog:",
