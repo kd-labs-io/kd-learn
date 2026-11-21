@@ -2,7 +2,7 @@
 import { Effect } from 'effect';
 import type { Layer } from 'effect';
 import type { AiPort } from '@kd-learn/ai/port';
-import { openServerDatabase } from '@kd-learn/storage/sqlite-node';
+import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { createHandlers } from '../index.ts';
 import type { LogEntry } from '../index.ts';
 
@@ -15,6 +15,8 @@ export interface MakeOptions {
   readonly acp?: Layer.Layer<AiPort>;
   /** A database file instead of memory, to reopen it like a restart. */
   readonly dbPath?: string;
+  /** A database the test keeps a handle on (to seed it). */
+  readonly database?: ServerDatabase;
 }
 
 export const make = (env: Record<string, string> = {}, options: MakeOptions = {}) => {
@@ -30,7 +32,9 @@ export const make = (env: Record<string, string> = {}, options: MakeOptions = {}
     },
     {
       log: (entry) => logs.push(entry),
-      database: Effect.runSync(openServerDatabase({ path: options.dbPath ?? ':memory:' })),
+      database:
+        options.database ??
+        Effect.runSync(openServerDatabase({ path: options.dbPath ?? ':memory:' })),
       ...(options.ai ? { ai: options.ai } : {}),
       ...(options.acp ? { acp: options.acp } : {}),
       ...(options.turnTimeoutMs ? { turnTimeoutMs: options.turnTimeoutMs } : {}),

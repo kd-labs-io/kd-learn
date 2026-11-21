@@ -14,7 +14,7 @@
 | Bước 4: pipeline extraction (agent) | Xong (2026-11-21). `runExtraction` trong `agent` (3 lần gọi, bỏ merge khi không có ứng viên), `fitKnowledgeBatch` trong `core` để khớp lô với graph lúc ghi; kiểm bằng Haiku thật trên 2 buổi tiếng Việt: khoảng $0,009 mỗi buổi, merge gộp đúng 3 mệnh đề trùng. Xem ghi chú bước 4 bên dưới |
 | Bước 5: extraction trên server | Xong (2026-11-21). Route khách / demo `POST /api/knowledge/extract` (SSE, không trạng thái), job tài khoản móc vào chỗ ghi lô của runner (cả lượt lẫn bỏ bước cuối), hàng đợi theo người dùng, `Interrupted` lúc khởi động, `GET` / `POST /api/account/knowledge/extractions`; client khách tự trích một lần dưới Web Lock `kd-learn:knowledge`. Demo: giữ 3 lần gọi, trần 16.384 token ra. Xem ghi chú bước 5 bên dưới |
 | Bước 6: registry bài tập, Practitioner | Xong (2026-11-21). Sự kiện luyện tập trong log kiến thức, mức nắm vững theo hộp Leitner, registry bốn loại, hàm chọn bài, Practitioner (một lần gọi ra cả bộ bài, chấm theo ba mức). C4 với Haiku: chấm ổn định 21/21, không bị đánh lừa 9/9, khoảng $0,004 cả lần kiểm. Xem ghi chú bước 6 bên dưới |
-| Bước 7: luyện tập trên server | Chưa bắt đầu |
+| Bước 7: luyện tập trên server | Xong (2026-11-21) |
 | Bước 8: model giả trả tool call | Chưa bắt đầu |
 | Bước 9: màn graph | Chưa bắt đầu |
 | Bước 10: màn luyện tập | Chưa bắt đầu |
@@ -71,6 +71,41 @@
 - **Kiểm giá trị:** TanStack Form (`@tanstack/react-form` 1.33.5), validator cấp form gọi `Schema.toStandardSchemaV1(SavedProfile, { parseOptions: { errors: 'all' } })`, nên giới hạn đúng như server và DB local. Lỗi gắn vào từng trường theo path; câu báo là chuỗi i18n riêng, dùng các hằng giới hạn của `core`. Sai thì nút Lưu bị khoá và có banner. N và M dùng `NumberInput` có `min` / `max`: số ngoài khoảng bị kẹp lại chứ không bị từ chối; chữ hay số lẻ mà trường từ chối (`onEntryErrorChange`) cũng khoá nút Lưu, vì giá trị đó không tới form.
 - **Test:** `validate.test.ts` (mọi trường sai đều báo, theo path). Playwright `e2e/profile.e2e.ts` (khách: đọc `SessionCreated.profile` trong request `/api/turns`) và `e2e/accounts-profile.e2e.ts` (tài khoản: đọc snapshot `GET /api/account/sessions/:id`, dải `x-forwarded-for` riêng `11.*`). Cả hai: nhân bản, prompt rỗng và thẻ ngôn ngữ sai bị chặn, lưu, tải lại vẫn còn, buổi mới chụp hồ sơ đã sửa, về mặc định. Không sửa `fake-openai.ts`.
 - **Còn mở:** trường ngôn ngữ của hồ sơ chưa có tác dụng. Cả hai chế độ vẫn thay `language` bằng ngôn ngữ giao diện khi tạo buổi (như bước 3). Màn ghi rõ điều này trong mô tả của trường. Muốn hồ sơ quyết định ngôn ngữ thì phải đổi chỗ tạo buổi. Tên để trống thì không lưu `name`, nên khi đọc lại hồ sơ hiện tên "Default" (điền từ hồ sơ mặc định).
+
+## Bước 7: luyện tập trên server (2026-11-21)
+
+**Khách / demo** (`packages/server/src/practice/guest.ts`, mount `Handlers.practice`, route web `api.practice.$.ts`), không trạng thái, trả JSON (một lần gọi, không có chữ để stream):
+
+- `POST /api/practice/issue`: `{model, profile, slice, targets}`. `slice` là mệnh đề đích, lân cận và cạnh giữa chúng (tối đa 200 mệnh đề, 400 cạnh); `targets` (1–10) do client chọn bằng `selectExercises`. Server kiểm id của target có trong lát rồi mới gọi; trả `{events}` = `PracticeStarted` + một `ExerciseIssued` mỗi bài viết được (id mới do server tạo), client ghi bằng checked append. Không viết được bài nào thì 409 `NothingToRun`.
+- `POST /api/practice/grade`: `{model, profile, exerciseId, content, answer}`, chỉ loại chấm bằng model; loại chấm bằng code trả 400, không gọi (client tự chấm bằng `gradeByCode`). Trả `{events: [ExerciseGraded]}` có `profileId`.
+- Cùng cổng như `/api/turns`: công tắc khách, cổng demo, từ chối `baseURL`, endpoint theo id; demo tối đa 256 KiB. Demo dùng hồ sơ của server, giữ ngôn ngữ của người học. Lỗi model: 502 với mã và thông báo từ `failureOf` (đã xoá key); defect: 500 thông báo cố định, log chỉ ghi mã; ngắt kết nối thì huỷ lời gọi provider (test), demo vẫn tính lời gọi đã bắt đầu.
+- Demo vẫn phải gửi đủ `profile` dù server chỉ lấy ngôn ngữ.
+- Chưa có heartbeat: lời gọi viết bài dài (Haiku khoảng vài giây) chạy trong một request JSON.
+
+**Ngân sách demo:** ra bài giữ chỗ 1 lần gọi (0 nếu cả bộ toàn bài sắp xếp, dựng bằng code), chấm bằng model 1, chấm bằng code không qua server. Quyết toán sau lời gọi bằng `meteredAi`. Output có cấu trúc không có tool là đúng một lời gọi (TanStack bỏ qua vòng agent), nên đếm khớp. Trần token ra theo vai: `DEMO_ROLE_OUTPUT_CAPS` trong `demo/metered.ts` (`practitioner: 8000`; bước 5 thêm `extractor`); `meteredAi` giờ lấy số nhỏ hơn giữa trần của request và trần demo, nên viết bài chạy với 8.000, chấm với 4.000 như Practitioner tự đặt; lượt học không đặt trần nên vẫn 2.048.
+
+**Tài khoản** (`practice/account.ts`, `practice/http.ts`), dưới `/api/account/practice`:
+
+| Route | Việc |
+| --- | --- |
+| `GET /` | các lượt đang mở |
+| `POST /` | bắt đầu (`{count?, types?}`): chọn bài, gọi Practitioner, ghi `PracticeStarted` + `ExerciseIssued` một lô; 201 |
+| `GET /:practiceId` | một lượt, mở hay đã kết thúc |
+| `POST /:practiceId/end` | `PracticeEnded`; lượt đã kết thúc thì trả như cũ |
+| `POST /exercises/:exerciseId/answer` | ghi `AnswerSubmitted` trước, rồi chấm |
+| `POST /exercises/:exerciseId/grade` | chấm câu trả lời đã lưu (sau lỗi hay mất kết nối); đã chấm thì trả điểm cũ, không gọi |
+
+- Mọi đọc ghi qua `forUser(userId)`; id của người khác trả 404. Ghi bằng `appendKnowledgeChecked`, lô dựng lại theo graph lúc ghi: bài có mệnh đề / cạnh vừa bị bỏ thì loại, không còn bài nào thì 409; hai lần chấm cùng lúc giữ điểm đầu.
+- **Ẩn đáp án:** bài trả về dựng bằng danh sách trường cho phép theo loại (`PublicExerciseContent`), không có `correctIndex`, `constraints`, `reference`, và cũng không có `propositionIds` / `edgeIds` (cùng với graph thì lộ đáp án: mệnh đề mà câu trắc nghiệm hỏi, các cạnh của bài sắp xếp); sau khi chấm mới có `solution` (nội dung đầy đủ) và hai trường đó.
+- Lời gọi model không gắn với request: đóng kết nối thì vẫn viết / chấm xong, kết quả nằm trong log (test). Trần thời gian dùng `turnTimeoutMs` (mặc định 3 phút), hết giờ 504 `TurnTimeout`. Một người chỉ có một lần bắt đầu chạy cùng lúc (409 `TurnInProgress`), tránh bấm hai lần trả hai lần.
+- Model: vai `practitioner` qua `resolveModel` (không đặt thì dùng `teacher`), kể cả khi cả bộ là bài sắp xếp; lỗi cấu hình dùng chung bảng mã với lượt học (`modelUnavailable` trong `sessions/http.ts`): `RoleNotConfigured` → 409. Chấm bằng code không cần model. Dùng chung lớp AI có định tuyến ACP với lượt học (đếm chỗ ACP chung).
+- Lỗi model: 502 với mã của provider; câu trả lời vẫn được giữ.
+
+**Client có kiểu** (`accountClient` trong `@kd-learn/api`, hợp đồng ở `packages/api/src/practice.ts`): khách `issueExercises`, `gradeAnswer`; tài khoản `practices`, `practice`, `startPractice`, `endPractice`, `answerExercise`, `gradeExercise`.
+
+**Test** (`practice/practice.test.ts`): lô ra bài dựng được trên log của client; loại chấm bằng code bị từ chối không gọi; kiểm request trước khi gọi; key khách và key demo không có trong phản hồi và log (rủi ro 19); demo trừ 1 / 0 / 1 lần gọi, dùng prompt và trần của server, hết ngân sách không gọi; tài khoản ẩn đáp án, chấm bằng code không gọi, `RoleNotConfigured`, cross-user (rủi ro 26), đóng kết nối vẫn viết và chấm xong, chấm lỗi giữ câu trả lời và chấm lại được.
+
+Không chạy model thật: cách gọi model không đổi so với bước 6 (cùng output có cấu trúc, cùng adapter). Chất lượng chấm tiếng Việt vẫn chưa thử (để bước 12).
 
 ## Bước 4: pipeline extraction (2026-11-21)
 

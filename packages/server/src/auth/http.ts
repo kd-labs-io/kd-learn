@@ -22,6 +22,7 @@ import {
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeExtractionJobs, type ExtractionJobs } from '../knowledge/jobs.ts';
+import { makePracticeService, type PracticeService } from '../practice/account.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
 import { makeLazyAcp, routedAi } from '../acp/router.ts';
@@ -47,6 +48,8 @@ export interface Accounts {
   readonly sessions: SessionRunner;
   /** Extraction jobs of account sessions (phase 3 A3). */
   readonly extractions: ExtractionJobs;
+  /** Practice on the knowledge log (phase 3 A7). */
+  readonly practice: PracticeService;
   readonly admin: AdminService;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
@@ -101,6 +104,7 @@ export const initAccounts = async (
   const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
   const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
   const storage = makeServerStorage(database);
+  // One routed layer for turns, extraction and practice, so the ACP slot count covers all.
   const ai = routedAi({
     api: options.ai,
     acp: options.acp ?? lazyAcp!.layer,
@@ -117,6 +121,13 @@ export const initAccounts = async (
     onSessionCompleted: extractions.sessionCompleted,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
+  const practice = makePracticeService({
+    storage,
+    settings,
+    ai,
+    log: options.log,
+    ...(options.turnTimeoutMs === undefined ? {} : { timeoutMs: options.turnTimeoutMs }),
+  });
   const acpAvailable = lazyAcp === undefined ? () => Promise.resolve(true) : lazyAcp.available;
   return {
     database,
@@ -125,6 +136,7 @@ export const initAccounts = async (
     settings,
     sessions,
     extractions,
+    practice,
     admin,
     demo,
     acpAvailable,

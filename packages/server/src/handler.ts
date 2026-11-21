@@ -34,6 +34,7 @@ import type { AuthOptions } from './auth/service.ts';
 import { makeRouteKit } from './routes.ts';
 import { makeSettingsHandler } from './settings/http.ts';
 import { handleExtract } from './knowledge/extract-route.ts';
+import { makePracticeHandler } from './practice/guest.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
 export type LogFields = Readonly<Record<string, string | number | boolean>>;
@@ -382,6 +383,8 @@ export interface Handlers extends AccountHandlers {
   readonly turns: Handler;
   /** `POST /api/knowledge/extract` (guest and demo extraction, phase 3 A3). */
   readonly extract: Handler;
+  /** `POST /api/practice/issue` and `POST /api/practice/grade` (guest and demo). */
+  readonly practice: Handler;
   readonly endpoints: Handler;
   /** Everything under `/api/account/` (settings, connections, roles, sessions). */
   readonly account: Handler;
@@ -454,6 +457,7 @@ export const createHandlers = (
     return {
       turns: broken,
       extract: broken,
+      practice: broken,
       endpoints: broken,
       config: broken,
       ...accountsBroken,
@@ -463,7 +467,8 @@ export const createHandlers = (
   // Accounts are optional: a bad account variable breaks only the account routes, and the guest
   // routes keep working with the environment defaults. The database opens on the first request
   // that needs it.
-  let accountRoutes: Omit<Handlers, 'turns' | 'extract' | 'endpoints' | 'config'> = accountsBroken;
+  let accountRoutes: Omit<Handlers, 'turns' | 'extract' | 'practice' | 'endpoints' | 'config'> =
+    accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
   let demo: (() => Promise<DemoGate>) | undefined;
@@ -534,6 +539,7 @@ export const createHandlers = (
   return {
     turns: wrap((request) => handleTurns(request, deps)),
     extract: wrap((request) => handleExtract(request, deps)),
+    practice: wrap(makePracticeHandler(deps)),
     endpoints: wrap((request) => handleEndpoints(request, deps)),
     config: wrap(publicConfig),
     register: wrap(accountRoutes.register),
