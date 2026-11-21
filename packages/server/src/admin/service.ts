@@ -3,6 +3,7 @@
 import type { ModelRef } from '@kd-learn/ai/port';
 import type {
   AcpAgent,
+  AcpModels,
   AdminConfig,
   AdminUser,
   PublicConfig,
@@ -19,18 +20,21 @@ export interface SwitchDefaults {
   readonly guestMode: boolean;
   readonly demoMode: boolean;
   readonly acpAgents: ReadonlyArray<AcpAgent>;
+  readonly acpModels: AcpModels;
   readonly acpMaxConcurrent: number;
 }
 
 export interface AdminService {
   /** The three switches as the admin set them. */
   readonly switches: () => PublicConfig;
-  readonly config: () => AdminConfig;
+  /** Without `acpAvailable`, which the route adds (it needs a load attempt). */
+  readonly config: () => Omit<AdminConfig, 'acpAvailable'>;
   /** What the public config says: demo counts as on only when it can run. */
   readonly publicConfig: () => PublicConfig;
   readonly acpAgents: () => ReadonlyArray<AcpAgent>;
+  readonly acpModels: () => AcpModels;
   readonly acpMaxConcurrent: () => number;
-  readonly updateConfig: (change: UpdateAdminConfigRequest) => AdminConfig;
+  readonly updateConfig: (change: UpdateAdminConfigRequest) => Omit<AdminConfig, 'acpAvailable'>;
   readonly users: () => ReadonlyArray<AdminUser>;
   /** Undefined when there is no such user. */
   readonly user: (userId: string) => AdminUser | undefined;
@@ -73,15 +77,20 @@ export const makeAdmin = (
     const stored = read('acpAgents');
     return stored === undefined ? defaults.acpAgents : (JSON.parse(stored) as AcpAgent[]);
   };
+  const acpModels = (): AcpModels => {
+    const stored = read('acpModels');
+    return stored === undefined ? defaults.acpModels : (JSON.parse(stored) as AcpModels);
+  };
   const acpMaxConcurrent = () => {
     const stored = read('acpMaxConcurrent');
     return stored === undefined ? defaults.acpMaxConcurrent : Number(stored);
   };
-  const config = (): AdminConfig => {
+  const config = (): Omit<AdminConfig, 'acpAvailable'> => {
     const model = demo.model();
     return {
       ...switches(),
       acpAgents: acpAgents(),
+      acpModels: acpModels(),
       acpMaxConcurrent: acpMaxConcurrent(),
       demoBudget: demo.budget.status(),
       // Provider and model name only: the key never leaves the server.
@@ -122,6 +131,7 @@ export const makeAdmin = (
     config,
     publicConfig,
     acpAgents,
+    acpModels,
     acpMaxConcurrent,
     updateConfig: (change) => {
       database.transaction(() => {
@@ -134,6 +144,13 @@ export const makeAdmin = (
         if (change.demoBudgetPeriod !== undefined) demo.budget.setPeriod(change.demoBudgetPeriod);
         if (change.acpAgents !== undefined) {
           q.put.run('acpAgents', JSON.stringify([...new Set(change.acpAgents)]));
+        }
+        if (change.acpModels !== undefined) {
+          const unique: Record<string, ReadonlyArray<string>> = {};
+          for (const [agent, models] of Object.entries(change.acpModels)) {
+            unique[agent] = [...new Set(models.map((model) => model.trim()).filter(Boolean))];
+          }
+          q.put.run('acpModels', JSON.stringify(unique));
         }
         if (change.acpMaxConcurrent !== undefined) {
           q.put.run('acpMaxConcurrent', String(change.acpMaxConcurrent));

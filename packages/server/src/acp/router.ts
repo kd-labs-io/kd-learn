@@ -20,7 +20,23 @@ export const lazyAcpLayer = (
   log: Logger,
   importAdapter: () => Promise<{ layer: () => Layer.Layer<AiPort> }> = () =>
     import('@kd-learn/ai/acp'),
-): Layer.Layer<AiPort> => {
+): Layer.Layer<AiPort> => makeLazyAcp(log, importAdapter).layer;
+
+/**
+ * The lazy ACP layer, plus `available`: whether this build can load the adapter (for the admin
+ * screen). The answer is kept for the process, since the build does not change while it runs.
+ */
+export const makeLazyAcp = (
+  log: Logger,
+  importAdapter: () => Promise<{ layer: () => Layer.Layer<AiPort> }> = () =>
+    import('@kd-learn/ai/acp'),
+): { readonly layer: Layer.Layer<AiPort>; readonly available: () => Promise<boolean> } => {
+  let probed: Promise<boolean> | undefined;
+  const available = () =>
+    (probed ??= importAdapter().then(
+      () => true,
+      () => false,
+    ));
   let loaded: Promise<AiPort['Service']> | undefined;
   const load = () =>
     (loaded ??= importAdapter()
@@ -34,7 +50,7 @@ export const lazyAcpLayer = (
         });
         throw error;
       }));
-  return Layer.succeed(AiPort, {
+  const layer = Layer.succeed(AiPort, {
     runTurn: (<A>(request: TurnRequest<A>) =>
       Stream.unwrap(
         Effect.tryPromise({
@@ -48,6 +64,7 @@ export const lazyAcpLayer = (
         }).pipe(Effect.map((port) => port.runTurn(request))),
       )) as AiPort['Service']['runTurn'],
   });
+  return { layer, available };
 };
 
 export const routedAi = (options: {

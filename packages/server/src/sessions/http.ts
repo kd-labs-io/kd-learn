@@ -71,6 +71,12 @@ export const makeSessionsHandler = (kit: Kit, log: Logger) => {
               ErrorCode.AcpAgentDisabled,
               'The agent of this connection is not enabled on this server any more.',
             );
+          case 'ModelNotAllowed':
+            return ctx.reject(
+              409,
+              ErrorCode.AcpModelNotAllowed,
+              `The admin no longer allows the model of the role ${result.result.role}.`,
+            );
           case 'UnknownEndpoint':
             return ctx.reject(
               409,

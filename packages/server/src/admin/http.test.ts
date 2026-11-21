@@ -89,7 +89,9 @@ describe('admin switches', () => {
       demoMode: false,
       demoBudget: { limit: 0, period: 'day', used: 0 },
       acpAgents: [],
+      acpModels: {},
       acpMaxConcurrent: 2,
+      acpAvailable: expect.any(Boolean),
     });
   });
 

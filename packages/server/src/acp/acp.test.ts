@@ -5,7 +5,7 @@ import { ADMIN, make } from '../auth/test-support.ts';
 import { Effect, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import { gated, say, scriptedAi } from '../sessions/fake-ai.ts';
-import { lazyAcpLayer } from './router.ts';
+import { lazyAcpLayer, makeLazyAcp } from './router.ts';
 
 type Json = Record<string, unknown>;
 
@@ -37,7 +37,10 @@ const until = async (check: () => Promise<boolean>) => {
 
 const setup = async (
   acpPrograms: Parameters<typeof scriptedAi>[0],
-  env: Record<string, string> = { KD_LEARN_ACP_AGENTS: 'claude-code' },
+  env: Record<string, string> = {
+    KD_LEARN_ACP_AGENTS: 'claude-code',
+    KD_LEARN_ACP_MODELS: '{"claude-code":["claude-haiku-5-5"]}',
+  },
 ) => {
   const api = scriptedAi([]);
   const acp = scriptedAi(acpPrograms);
@@ -121,7 +124,10 @@ describe('ACP for accounts', () => {
       'AcpAgentDisabled',
     );
 
-    await t.adminConfig({ acpAgents: ['claude-code'] });
+    await t.adminConfig({
+      acpAgents: ['claude-code'],
+      acpModels: { 'claude-code': ['claude-haiku-5-5'] },
+    });
     await t.useAgent();
     await t.adminConfig({ acpAgents: [] });
     const id = await t.newSession();
@@ -140,6 +146,7 @@ describe('ACP for accounts', () => {
       [first.program, say('Second.'), gated('Third', '').program, say('Fourth.')],
       {
         KD_LEARN_ACP_AGENTS: 'claude-code',
+        KD_LEARN_ACP_MODELS: '{"claude-code":["claude-haiku-5-5"]}',
         KD_LEARN_ACP_MAX_CONCURRENT: '1',
       },
     );
@@ -196,12 +203,66 @@ describe('ACP for accounts', () => {
   });
 
   it('rejects a bad agent list or limit in the environment', async () => {
-    for (const env of [{ KD_LEARN_ACP_AGENTS: 'cursor' }, { KD_LEARN_ACP_MAX_CONCURRENT: '0' }]) {
+    for (const env of [
+      { KD_LEARN_ACP_AGENTS: 'cursor' },
+      { KD_LEARN_ACP_MAX_CONCURRENT: '0' },
+      { KD_LEARN_ACP_MODELS: '["claude-haiku-5-5"]' },
+      { KD_LEARN_ACP_MODELS: '{"cursor":["x"]}' },
+    ]) {
       const bad = make(env);
       expect(
         (await call(bad.handlers.login, 'POST', '/api/auth/login', undefined, {})).status,
       ).toBe(500);
     }
+  });
+
+  it('only lets a role pick a model on the admin list, checked again on every turn (risk 30)', async () => {
+    const t = await setup([say('Hello.')]);
+    const settings = (await (await t.account('GET', 'settings')).json()) as Json;
+    expect(settings.acpModels).toEqual({ 'claude-code': ['claude-haiku-5-5'] });
+
+    const created = (await (
+      await t.account('POST', 'connections', { label: 'CC', provider: 'acp', agent: 'claude-code' })
+    ).json()) as { id: string };
+    const pricey = { connectionId: created.id, model: 'claude-opus-5-5' };
+    const refused = await t.account('PUT', 'roles', { roles: { prober: pricey } });
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
+      'AcpModelNotAllowed',
+    );
+    // Nothing was saved: the whole map is refused.
+    expect(((await (await t.account('GET', 'settings')).json()) as Json).roles).toEqual({});
+
+    await t.useAgent();
+    await t.adminConfig({ acpModels: { 'claude-code': ['claude-sonnet-5-5'] } });
+    const id = await t.newSession();
+    const start = await t.account('POST', `sessions/${id}/turns`, { kind: 'auto' });
+    expect(start.status).toBe(409);
+    expect(((await start.json()) as { error: { code: string } }).error.code).toBe(
+      'AcpModelNotAllowed',
+    );
+    expect((await t.snapshot(id)).events.map((e) => e.event._tag)).toEqual(['SessionCreated']);
+    expect(t.acp.requests).toHaveLength(0);
+  });
+
+  it('tells the admin whether this build can load the ACP adapter', async () => {
+    const loaded = makeLazyAcp(
+      () => undefined,
+      () => Promise.resolve({ layer: () => scriptedAi([]).layer }),
+    );
+    const missing = makeLazyAcp(
+      () => undefined,
+      () => Promise.reject(new Error('Cannot find package')),
+    );
+    expect(await loaded.available()).toBe(true);
+    expect(await missing.available()).toBe(false);
+
+    const t = await setup([]);
+    const config = (await (await t.adminConfig({})).json()) as Json;
+    expect(config).toMatchObject({
+      acpAvailable: true,
+      acpModels: { 'claude-code': ['claude-haiku-5-5'] },
+    });
   });
 
   it('reports an adapter that cannot load without server paths, and logs the detail', async () => {

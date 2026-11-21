@@ -22,7 +22,7 @@ import {
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
-import { lazyAcpLayer, routedAi } from '../acp/router.ts';
+import { makeLazyAcp, routedAi } from '../acp/router.ts';
 import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
@@ -44,6 +44,8 @@ export interface Accounts {
   readonly admin: AdminService;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
+  /** Whether this build can load the ACP adapter. */
+  readonly acpAvailable: () => Promise<boolean>;
 }
 
 /**
@@ -83,25 +85,34 @@ export const initAccounts = async (
       guestMode: config.guestMode,
       demoMode: config.demoMode,
       acpAgents: config.acpAgents,
+      acpModels: config.acpModels,
       acpMaxConcurrent: config.acpMaxConcurrent,
     },
     { budget, model: demoModel },
   );
   const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
-  const settings = makeSettings(database, box, options.endpoints, admin.acpAgents);
+  const settings = makeSettings(
+    database,
+    box,
+    options.endpoints,
+    admin.acpAgents,
+    admin.acpModels,
+  );
+  const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
   const sessions = makeSessionRunner({
     storage: makeServerStorage(database),
     settings,
     ai: routedAi({
       api: options.ai,
-      acp: options.acp ?? lazyAcpLayer(options.log),
+      acp: options.acp ?? lazyAcp!.layer,
       maxConcurrent: admin.acpMaxConcurrent,
     }),
     log: options.log,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
-  return { database, auth, settings, sessions, admin, demo };
+  const acpAvailable = lazyAcp === undefined ? () => Promise.resolve(true) : lazyAcp.available;
+  return { database, auth, settings, sessions, admin, demo, acpAvailable };
 };
 
 export interface AccountHandlers {
