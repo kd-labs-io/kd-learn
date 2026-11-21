@@ -137,8 +137,13 @@ test('reload in the middle of a turn shows it as interrupted, and retry sends th
   await expect(page.getByTestId('turn-interrupted')).toHaveCount(0);
   await expect(page.getByTestId('plan-steps')).toBeVisible();
   // the retry carried the same input once, and the answer shows once
-  expect(server.requests[2]!.log.at(-1)).toMatchObject({ _tag: 'TurnStarted', input: 'my careful answer' });
-  await expect(page.getByTestId('msg-user').filter({ hasText: 'my careful answer' })).toHaveCount(1);
+  expect(server.requests[2]!.log.at(-1)).toMatchObject({
+    _tag: 'TurnStarted',
+    input: 'my careful answer',
+  });
+  await expect(page.getByTestId('msg-user').filter({ hasText: 'my careful answer' })).toHaveCount(
+    1,
+  );
 });
 
 test('a lost connection keeps the turn open and offers a retry', async ({ page }) => {
@@ -185,13 +190,15 @@ test('a turn running in another tab is not sent twice', async ({ page, context }
 });
 
 test('server errors say what to do next', async ({ page }) => {
-  let code: 'HistoryTooLarge' | 'UnknownEndpoint' | undefined;
+  let tooLarge = false;
   await mockTurns(page, async (request, route) => {
-    if (code === undefined || request.log.at(-1)?._tag !== 'TurnStarted') return undefined;
+    if (!tooLarge || request.log.at(-1)?._tag !== 'TurnStarted') return undefined;
     await route.fulfill({
-      status: code === 'HistoryTooLarge' ? 413 : 400,
+      status: 413,
       contentType: 'application/json',
-      body: JSON.stringify({ error: { code, message: 'x', retryable: false } }),
+      body: JSON.stringify({
+        error: { code: 'HistoryTooLarge', message: 'x', retryable: false },
+      }),
     });
     return 'handled';
   });
@@ -199,7 +206,7 @@ test('server errors say what to do next', async ({ page }) => {
   await startSession(page);
   await expect(tutorMessages(page)).toHaveCount(1);
 
-  code = 'HistoryTooLarge';
+  tooLarge = true;
   await answer(page, 'one');
   const failed = page.getByTestId('turn-failed');
   await expect(failed).toHaveAttribute('data-code', 'HistoryTooLarge');
@@ -240,7 +247,9 @@ test('without a key nothing is sent or written', async ({ page }) => {
   await expect(page.getByTestId('turn-interrupted')).toHaveCount(0);
 });
 
-test('the side chat answers about the current step and keeps out of the lesson', async ({ page }) => {
+test('the side chat answers about the current step and keeps out of the lesson', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   const server = await mockTurns(page);
   await saveSettings(page);
@@ -255,7 +264,11 @@ test('the side chat answers about the current step and keeps out of the lesson',
   await expect(side.getByTestId('side-messages')).toContainText('Short side answer.');
   const request = server.requests.at(-1)!;
   expect(request.turn).toEqual({ kind: 'side', threadId: 'step:one' });
-  expect(request.log.at(-1)).toMatchObject({ role: 'user', content: 'What is a fraction?', stepId: 'one' });
+  expect(request.log.at(-1)).toMatchObject({
+    role: 'user',
+    content: 'What is a fraction?',
+    stepId: 'one',
+  });
   // the question is not in the main conversation
   await expect(page.getByTestId('conversation')).not.toContainText('What is a fraction?');
 
@@ -274,7 +287,9 @@ test('on a phone the plan folds away, the side chat is a drawer and nothing over
   await answer(page, 'Not much');
   await expect(tutorMessages(page).last()).toContainText('Energy is');
 
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.getByRole('button', { name: 'Plan' }).click();
   await expect(page.getByTestId('plan-step-one')).toBeVisible();
 
@@ -284,7 +299,9 @@ test('on a phone the plan folds away, the side chat is a drawer and nothing over
   await side.getByLabel('Your question').fill('Quick question');
   await side.getByTestId('side-send').click();
   await expect(side).toContainText('Short side answer.');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
 });
 
 test('settings: save, keep after reload, delete the key', async ({ page }) => {

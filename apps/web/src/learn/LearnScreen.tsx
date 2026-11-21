@@ -137,7 +137,7 @@ export function LearnScreen({ sessionId }: { sessionId: string }) {
                   onClick={home}
                   data-testid="nav-home"
                 />
-                <Heading level={1} maxLines={1} data-testid="session-topic">
+                <Heading level={3} accessibilityLevel={1} maxLines={1} data-testid="session-topic">
                   {session.topic}
                 </Heading>
               </HStack>

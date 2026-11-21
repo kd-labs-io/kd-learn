@@ -101,7 +101,12 @@ export function replyFor(request: Request): Json[] {
           plan: {
             nodes: [
               { id: 'one', title: 'First idea', goal: 'Grasp the first idea', dependsOn: [] },
-              { id: 'two', title: 'Second idea', goal: 'Grasp the second idea', dependsOn: ['one'] },
+              {
+                id: 'two',
+                title: 'Second idea',
+                goal: 'Grasp the second idea',
+                dependsOn: ['one'],
+              },
             ],
           },
         }),
@@ -112,7 +117,12 @@ export function replyFor(request: Request): Json[] {
     case 'Teaching': {
       const stepId = session.state.stepId!;
       if (turn.input !== 'ok') {
-        return [say('Not quite, try again.'), message('Not quite, try again.'), completed(), doneFrame];
+        return [
+          say('Not quite, try again.'),
+          message('Not quite, try again.'),
+          completed(),
+          doneFrame,
+        ];
       }
       const last = session.plan!.nodes.at(-1)!.id === stepId;
       return [
@@ -140,7 +150,10 @@ export interface TurnRoute {
  */
 export async function mockTurns(
   page: Page,
-  override?: (request: Request, route: Route) => Promise<'handled' | undefined> | 'handled' | undefined,
+  override?: (
+    request: Request,
+    route: Route,
+  ) => Promise<'handled' | undefined> | 'handled' | undefined,
 ): Promise<TurnRoute> {
   const seen: Array<Request> = [];
   await page.route('**/api/turns', async (route) => {
