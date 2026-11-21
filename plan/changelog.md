@@ -63,3 +63,4 @@
 - **Cập nhật:** 2026-11-21: mục 7 chuyển sang bước 9 và 10 phase 3 sau khi xong bước 7 và 8
 - **Cập nhật:** 2026-11-21: xong bước 10 phase 3 (màn luyện tập `/practice` cho khách, demo và tài khoản qua `PracticeSource`; registry renderer bốn loại; điểm, nhận xét, đáp án đúng, mức nắm vững sau khi chấm; tải lại giữ lượt; `ExerciseView.mastery` và `PracticeList.propositionCount`; model giả viết và chấm bài; e2e khách và tài khoản); rủi ro 4, 33 cập nhật
 - **Cập nhật:** 2026-11-21: xong bước 9 phase 3 (màn `/graph` ở cả ba chế độ: danh sách mệnh đề tìm / lọc / chi tiết / bỏ mệnh đề, trạng thái trích kèm thử lại, hình graph sigma nạp lười chỉ ở client; route `GET /api/account/knowledge` không lộ bài tập; danh sách thay TanStack Virtual bằng trang 100 dòng); rủi ro 36 ghi lại
+- **Cập nhật:** 2026-11-21: mục 7 chuyển sang bước 12 phase 3 sau khi xong bước 9 và 10
