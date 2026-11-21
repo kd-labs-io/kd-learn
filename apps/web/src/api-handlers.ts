@@ -9,3 +9,12 @@ export const apiHandlers = (): Promise<Handlers> => {
   handlers ??= import('@kd-learn/server').then((server) => server.createHandlers(process.env));
   return handlers;
 };
+
+/**
+ * The socket peer of the current request, for rate limiting. Never the X-Forwarded-For header:
+ * the server package decides whether to trust that (KD_LEARN_TRUST_PROXY).
+ */
+export const requestContext = async (): Promise<{ clientAddress: string | undefined }> => {
+  const { getRequestIP } = await import('@tanstack/react-start/server');
+  return { clientAddress: getRequestIP() };
+};

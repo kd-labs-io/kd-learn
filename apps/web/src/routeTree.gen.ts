@@ -15,6 +15,8 @@ import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
 import { Route as SSessionIdRouteImport } from './routes/s.$sessionId'
+import { Route as ApiAdminInvitesRouteImport } from './routes/api.admin.invites'
+import { Route as ApiAuthActionRouteImport } from './routes/api.auth.$action'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const SSessionIdRoute = SSessionIdRouteImport.update({
   path: '/s/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminInvitesRoute = ApiAdminInvitesRouteImport.update({
+  id: '/api/admin/invites',
+  path: '/api/admin/invites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthActionRoute = ApiAuthActionRouteImport.update({
+  id: '/api/auth/$action',
+  path: '/api/auth/$action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/admin/invites': typeof ApiAdminInvitesRoute
+  '/api/auth/$action': typeof ApiAuthActionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/admin/invites': typeof ApiAdminInvitesRoute
+  '/api/auth/$action': typeof ApiAuthActionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +87,8 @@ export interface FileRoutesById {
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
+  '/api/admin/invites': typeof ApiAdminInvitesRoute
+  '/api/auth/$action': typeof ApiAuthActionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +99,8 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/admin/invites'
+    | '/api/auth/$action'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +109,8 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/admin/invites'
+    | '/api/auth/$action'
   id:
     | '__root__'
     | '/'
@@ -97,6 +119,8 @@ export interface FileRouteTypes {
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
+    | '/api/admin/invites'
+    | '/api/auth/$action'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +130,8 @@ export interface RootRouteChildren {
   ApiTurnsRoute: typeof ApiTurnsRoute
   DevStorageRoute: typeof DevStorageRoute
   SSessionIdRoute: typeof SSessionIdRoute
+  ApiAdminInvitesRoute: typeof ApiAdminInvitesRoute
+  ApiAuthActionRoute: typeof ApiAuthActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/invites': {
+      id: '/api/admin/invites'
+      path: '/api/admin/invites'
+      fullPath: '/api/admin/invites'
+      preLoaderRoute: typeof ApiAdminInvitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$action': {
+      id: '/api/auth/$action'
+      path: '/api/auth/$action'
+      fullPath: '/api/auth/$action'
+      preLoaderRoute: typeof ApiAuthActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTurnsRoute: ApiTurnsRoute,
   DevStorageRoute: DevStorageRoute,
   SSessionIdRoute: SSessionIdRoute,
+  ApiAdminInvitesRoute: ApiAdminInvitesRoute,
+  ApiAuthActionRoute: ApiAuthActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
