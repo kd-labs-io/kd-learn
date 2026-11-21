@@ -19,6 +19,7 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
   - `event`: một domain event hoàn chỉnh. Client ghi thêm vào DB local.
   - `error`: lỗi có kiểu (`ProviderError`, `HistoryTooLarge`, ...).
   - `done`: lượt đã kết thúc.
+- Mọi event có `id` (do bên ghi tạo) và `at` (epoch ms). Event đầu tiên của log là `SessionCreated {sessionId, topic, profile}`: nó chụp lại hồ sơ dạy học để log tự đủ nghĩa, server không phải biết hồ sơ từ nơi khác (chốt ở bước 2).
 - Phase 1, `agent` không dùng port `storage`. Port đó chỉ được client dùng. Sang phase 2, server tài khoản dùng chung port này.
 
 ### A2. Từ `TurnEvent` sang domain event
@@ -35,6 +36,8 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 
 - Trước khi gửi request, client ghi `TurnStarted {turnId, input}`, nên câu trả lời của người học không bao giờ mất.
 - Lượt có `TurnStarted` mà chưa có `TurnCompleted` hay `TurnFailed` thì coi là bị ngắt. Màn hình hiện "lượt bị ngắt" kèm nút thử lại (gửi lại cùng input).
+- Thử lại ghi một `TurnStarted` mới với cùng input. Lượt cũ vẫn mở nhưng bị lượt sau thay thế, chỉ lượt mở cuối cùng được coi là bị ngắt.
+- Lịch sử gửi cho model (`Session.history`) chỉ gồm các lượt đã `TurnCompleted`, nên lượt bị ngắt hay lỗi không để lại dấu vết và thử lại không bị trùng input.
 - Phần chữ đang stream dở lúc tải lại thì bỏ.
 - Event chỉ được ghi khi đã hoàn chỉnh. Mỗi lượt ghi trong một transaction.
 
@@ -46,7 +49,9 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
   - **Teacher:**
     - Lập plan bằng tool `create_plan`, sinh `PlanCreated`. Plan là một DAG, mỗi node gồm `id`, tiêu đề, mục tiêu, `dependsOn`. `core` kiểm DAG không có chu trình; plan sai thì trả `ToolError` để model sửa.
     - Dạy bằng chữ stream. Khi người học đã nắm bước hiện tại, Teacher gọi `complete_step`, sinh `StepCompleted`.
-- **Chọn bước tiếp theo** (hàm thuần trong `core`): node đầu tiên mà mọi `dependsOn` đã xong. Mọi node xong thì sinh `SessionCompleted`.
+- **Chọn bước tiếp theo** (hàm thuần trong `core`): node đầu tiên (theo thứ tự trong plan) mà mọi `dependsOn` đã xong. Bước bị bỏ qua (`StepSkipped`) tính là đã giải quyết. Mọi node xong thì sinh `SessionCompleted`, bên ghi thêm nó trong cùng transaction với event giải quyết bước cuối; giữa hai event đó `Teaching.stepId` là rỗng.
+- **Đếm N và M:** projection đếm số lượt hoàn tất mà không chuyển trạng thái (không có assessment, plan, `StepCompleted`) trong `probing` (so với N) và trong từng bước (so với M). `canSkipStep` trả đúng khi đạt M. Projection không chặn `StepSkipped` khi chưa đạt M, UI mới quyết định.
+- **Projection chặt:** log đến từ client nên không tin. Event sai thứ tự (`PlanCreated` ngoài `planning`, `StepCompleted` không phải bước hiện tại, plan có chu trình, event của lượt không tồn tại hay đã kết thúc, thêm lượt sau `done`) trả `ProjectionError` kèm vị trí event.
 - **Lối thoát:**
   - Nếu một bước kéo quá M lượt, người học bấm được "sang bước sau" (event `StepSkipped`).
   - Người học sửa được plan trước khi bắt đầu dạy. Phần này để sau phase 1.
