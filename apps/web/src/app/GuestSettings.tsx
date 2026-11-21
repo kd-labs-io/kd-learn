@@ -11,6 +11,7 @@ import { m } from '@kd-learn/i18n';
 import type { GuestProvider, GuestSettings } from '@kd-learn/storage/port';
 import { useEffect, useState } from 'react';
 import { AppHeader } from './AppHeader';
+import { ProfileLink } from '../profile/ProfileLink';
 import { useEndpoints, useStoragePersistent } from '../learn/hooks';
 import { runStorage, useGuestSettings } from '../storage';
 
@@ -189,6 +190,8 @@ export function GuestSettings() {
                 />
               )}
             </HStack>
+
+            <ProfileLink />
           </VStack>
         </LayoutContent>
       }

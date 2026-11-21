@@ -25,6 +25,7 @@ import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
+import { ProfileLink } from '../profile/ProfileLink';
 import { errorCode, errorText, keys, useAccountApi } from './api';
 
 type Provider = ConnectionInfo['provider'];
@@ -110,6 +111,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
                   endpoints={endpoints.data ?? []}
                 />
                 <Roles token={token} settings={settings.data} />
+                <ProfileLink />
               </>
             )}
           </VStack>
