@@ -1,12 +1,14 @@
 // A fake ACP agent for adapter tests. Behaviour comes from env:
 // FAKE_CALLS: JSON array of [toolName, args] calls made in order through the kd-learn MCP server.
 // FAKE_HANG=1: stream text until cancelled. FAKE_MARKER: file written when session/cancel arrives.
+// FAKE_PID: file the agent writes its process id to at start.
 import { writeFileSync } from 'node:fs';
 import { Readable, Writable } from 'node:stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
+if (process.env.FAKE_PID) writeFileSync(process.env.FAKE_PID, String(process.pid));
 const calls = JSON.parse(process.env.FAKE_CALLS ?? '[]') as Array<[string, unknown]>;
 let mcp: { url: string; headers: Record<string, string> } | undefined;
 let cancelled = false;

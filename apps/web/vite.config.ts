@@ -8,6 +8,10 @@ import { defineConfig, type Plugin } from 'vite';
 // - default: SSR server for Docker (`.output/`)
 // - KD_BUILD_TARGET=spa: static SPA for Capacitor
 const spa = process.env.KD_BUILD_TARGET === 'spa';
+// KD_BUILD_ACP=1: ship claude-agent-acp next to the server, so Claude Code can run over ACP
+// (plan step 7). Off by default: it brings the native Claude Code binary of the build machine
+// (about 340 MB, one platform only). Without it an ACP turn fails with a clear message.
+const acp = process.env.KD_BUILD_ACP === '1';
 
 // Astryx's post-build layer split looks for the StyleX CSS in each environment's
 // output folder. Start and Nitro also build server environments that emit no
@@ -46,7 +50,7 @@ export default defineConfig({
         ? { spa: { enabled: true, prerender: { outputPath: '/index.html', crawlLinks: false } } }
         : {},
     ),
-    ...(spa ? [] : [nitro()]),
+    ...(spa ? [] : [nitro(acp ? { traceDeps: ['@agentclientprotocol/claude-agent-acp*'] } : {})]),
     // StyleX for kd-learn components; splits Astryx and product CSS into layers.
     ...astryx(),
     // React's plugin must come after Start's.

@@ -39,6 +39,13 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
       const input = await decode(ctx, CreateConnectionRequest);
       if (input instanceof Response) return input;
       const result = ctx.accounts.settings.createConnection(user.id, input);
+      if (result._tag === 'AgentDisabled') {
+        return ctx.reject(
+          409,
+          ErrorCode.AcpAgentDisabled,
+          'This agent is not enabled on this server.',
+        );
+      }
       if (result._tag === 'UnknownEndpoint') {
         return ctx.reject(
           400,

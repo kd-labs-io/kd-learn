@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./port": "./src/port/index.ts",
+    "./acp": "./src/acp/index.ts",
     "./tanstack": "./src/tanstack/index.ts"
   },
   "scripts": {

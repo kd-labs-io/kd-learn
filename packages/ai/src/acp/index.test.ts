@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Effect, Exit, Schema, Stream } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { tool, type ModelRef } from '../port/index.ts';
-import { runTurn, type Launch } from './index.ts';
+import { agentEnv, launchFor, runTurn, type Launch } from './index.ts';
 
 const fakeAgent = fileURLToPath(new URL('../../test/fake-agent.ts', import.meta.url));
 const model: ModelRef = { provider: 'acp', agent: 'claude-code' };
@@ -89,4 +89,44 @@ describe('runTurn (ACP)', () => {
     expect(events.map((e) => e._tag)).toEqual(['TextDelta', 'TextDelta', 'TextDelta']);
     expect(existsSync(marker)).toBe(true);
   }, 20_000);
+
+  it('stops the agent process when the stream is interrupted', async () => {
+    const pidFile = join(await mkdtemp(join(tmpdir(), 'kd-acp-test-')), 'pid');
+    await Effect.runPromise(
+      runTurn({ launch: withFake({ FAKE_HANG: '1', FAKE_PID: pidFile }) })({
+        model,
+        messages: [{ role: 'user', content: 'talk' }],
+      }).pipe(Stream.take(2), Stream.runCollect),
+    );
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive()).toBe(false);
+  }, 20_000);
+});
+
+describe('agent environment', () => {
+  it("keeps kd-learn's own variables (master key, admin password, demo key) from agents", () => {
+    const env = agentEnv({
+      PATH: '/usr/bin',
+      HOME: '/home/kd',
+      KD_LEARN_SECRET_KEY: 'secret',
+      KD_LEARN_ADMIN_PASSWORD: 'admin-password',
+      KD_LEARN_DEMO_API_KEY: 'sk-demo',
+      KD_OPENAI_COMPATIBLE_ENDPOINTS: '[]',
+    });
+    expect(env).toEqual({ PATH: '/usr/bin', HOME: '/home/kd' });
+    for (const agent of ['claude-code', 'antigravity', 'opencode'] as const) {
+      process.env.KD_LEARN_SECRET_KEY = 'secret-in-process';
+      const launch = launchFor({ provider: 'acp', agent }, '/tmp/home');
+      delete process.env.KD_LEARN_SECRET_KEY;
+      expect(Object.keys(launch.env).filter((name) => name.startsWith('KD_'))).toEqual([]);
+    }
+  });
 });

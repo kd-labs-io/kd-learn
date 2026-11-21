@@ -22,6 +22,7 @@ import {
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
+import { lazyAcpLayer, routedAi } from '../acp/router.ts';
 import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
@@ -54,6 +55,8 @@ export const initAccounts = async (
   options: {
     readonly endpoints: () => ReadonlyArray<Endpoint>;
     readonly ai: Layer.Layer<AiPort>;
+    /** The ACP adapter; tests pass a fake. */
+    readonly acp?: Layer.Layer<AiPort>;
     readonly turnTimeoutMs?: number;
     readonly database?: ServerDatabase;
     readonly auth?: AuthOptions;
@@ -70,24 +73,34 @@ export const initAccounts = async (
     const outcome = await auth.ensureAdmin(config.admin.email, config.admin.password);
     options.log({ event: 'accounts.admin', fields: { outcome } });
   }
-  const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
-  const settings = makeSettings(database, box, options.endpoints);
-  const sessions = makeSessionRunner({
-    storage: makeServerStorage(database),
-    settings,
-    ai: options.ai,
-    log: options.log,
-    ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
-  });
   const budget = makeDemoBudget(database, config.demo);
   const demoModel = () => resolveDemoModel(config.demo.model, options.endpoints());
   const admin = makeAdmin(
     database,
     auth,
-    { registration: config.registration, guestMode: config.guestMode, demoMode: config.demoMode },
+    {
+      registration: config.registration,
+      guestMode: config.guestMode,
+      demoMode: config.demoMode,
+      acpAgents: config.acpAgents,
+      acpMaxConcurrent: config.acpMaxConcurrent,
+    },
     { budget, model: demoModel },
   );
   const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
+  const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
+  const settings = makeSettings(database, box, options.endpoints, admin.acpAgents);
+  const sessions = makeSessionRunner({
+    storage: makeServerStorage(database),
+    settings,
+    ai: routedAi({
+      api: options.ai,
+      acp: options.acp ?? lazyAcpLayer(options.log),
+      maxConcurrent: admin.acpMaxConcurrent,
+    }),
+    log: options.log,
+    ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
+  });
   return { database, auth, settings, sessions, admin, demo };
 };
 

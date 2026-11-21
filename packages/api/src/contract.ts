@@ -124,6 +124,10 @@ export const ErrorCode = {
   DemoModeDisabled: 'DemoModeDisabled',
   /** The shared demo budget of this period is used up (plan A8). */
   DemoQuotaExceeded: 'DemoQuotaExceeded',
+  /** The admin has not enabled this ACP agent, or disabled it since (plan A9). */
+  AcpAgentDisabled: 'AcpAgentDisabled',
+  /** Every ACP agent slot of the server is in use (plan A9). Retryable. */
+  AcpBusy: 'AcpBusy',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -226,6 +230,10 @@ export type ModelRole = typeof ModelRole.Type;
 const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80));
 
 /** `POST /api/account/connections`. ACP connections come with step 7. */
+/** Agent CLIs driven over ACP (plan A9). Account mode only; the admin enables each one. */
+export const AcpAgent = Schema.Literals(['claude-code', 'antigravity', 'opencode']);
+export type AcpAgent = typeof AcpAgent.Type;
+
 export const CreateConnectionRequest = Schema.Union([
   Schema.Struct({ label: Label, provider: Schema.Literal('anthropic'), apiKey: Secret }),
   Schema.Struct({ label: Label, provider: Schema.Literal('gemini'), apiKey: Secret }),
@@ -235,14 +243,17 @@ export const CreateConnectionRequest = Schema.Union([
     endpointId: EndpointId,
     apiKey: Secret,
   }),
+  /** No key: the agent uses its own login on the server. */
+  Schema.Struct({ label: Label, provider: Schema.Literal('acp'), agent: AcpAgent }),
 ]);
 export type CreateConnectionRequest = typeof CreateConnectionRequest.Type;
 
 export const ConnectionInfo = Schema.Struct({
   id: Schema.NonEmptyString,
   label: Schema.String,
-  provider: Schema.Literals(['anthropic', 'gemini', 'openai-compatible']),
+  provider: Schema.Literals(['anthropic', 'gemini', 'openai-compatible', 'acp']),
   endpointId: Schema.optionalKey(EndpointId),
+  agent: Schema.optionalKey(AcpAgent),
   hasKey: Schema.Boolean,
   /** Last 4 characters of the key, to tell keys apart. */
   keyLast4: Schema.optionalKey(Schema.String),
@@ -269,6 +280,8 @@ export type SetRolesRequest = typeof SetRolesRequest.Type;
 export const AccountSettings = Schema.Struct({
   connections: Schema.Array(ConnectionInfo),
   roles: RoleModels,
+  /** ACP agents the admin enabled: the ones a new connection may use. */
+  acpAgents: Schema.Array(AcpAgent),
 });
 export type AccountSettings = typeof AccountSettings.Type;
 
@@ -407,6 +420,9 @@ export const AdminConfig = Schema.Struct({
   demoBudget: DemoBudget,
   /** The demo model from the environment, without its key; absent when none is set. */
   demoModel: Schema.optionalKey(Schema.String),
+  acpAgents: Schema.Array(AcpAgent),
+  /** Agent processes that may run at once, for every user together. */
+  acpMaxConcurrent: Schema.Int,
 });
 export type AdminConfig = typeof AdminConfig.Type;
 
@@ -419,6 +435,10 @@ export const UpdateAdminConfigRequest = Schema.Struct({
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000_000)),
   ),
   demoBudgetPeriod: Schema.optionalKey(DemoBudgetPeriod),
+  acpAgents: Schema.optionalKey(Schema.Array(AcpAgent)),
+  acpMaxConcurrent: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(32)),
+  ),
 });
 export type UpdateAdminConfigRequest = typeof UpdateAdminConfigRequest.Type;
 

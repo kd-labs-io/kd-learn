@@ -66,15 +66,22 @@ export interface Launch {
   readonly sessionMeta?: Record<string, unknown>;
 }
 
+/**
+ * The server's environment without kd-learn's own variables: the master key, the admin password
+ * and the demo key must not reach an agent process (or anything it runs).
+ */
+export const agentEnv = (env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(env).filter(([name]) => !/^KD_/i.test(name)));
+
 /** How to start each agent isolated from the server user's own agent setup. */
-const launchFor = (ref: AcpRef, home: string): Launch => {
+export const launchFor = (ref: AcpRef, home: string): Launch => {
   switch (ref.agent) {
     case 'claude-code':
       return {
         command: process.execPath,
         args: [claudeAgentPath],
         env: {
-          ...process.env,
+          ...agentEnv(),
           // claude-agent-acp overrides `options.model` with its own pick; ANTHROPIC_MODEL wins over it.
           ...(ref.model ? { ANTHROPIC_MODEL: ref.model } : {}),
           // Without this, every claude.ai connector of the account joins the context (~500k tokens).
@@ -102,14 +109,14 @@ const launchFor = (ref: AcpRef, home: string): Launch => {
         command: 'agy',
         // Own data dir: no user hooks, and transcripts stay out of the server user's home.
         args: ['acp', '--gemini-dir', join(home, '.gemini')],
-        env: { ...process.env, ...(ref.apiKey ? { GEMINI_API_KEY: ref.apiKey } : {}) },
+        env: { ...agentEnv(), ...(ref.apiKey ? { GEMINI_API_KEY: ref.apiKey } : {}) },
       };
     case 'opencode':
       return {
         command: 'opencode',
         args: ['acp'],
         env: {
-          ...process.env,
+          ...agentEnv(),
           // Deny every built-in permission; only kd-learn MCP tools stay allowed.
           OPENCODE_CONFIG_CONTENT: JSON.stringify({
             ...(ref.model ? { model: ref.model } : {}),

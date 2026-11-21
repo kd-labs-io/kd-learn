@@ -1,5 +1,6 @@
 // Account configuration from the environment (plan tai-khoan.md A4). Messages name the variable,
 // never its value.
+import type { AcpAgent } from '@kd-learn/api';
 import { ConfigError } from '../config.ts';
 import { loadDemoConfig, type DemoConfig } from '../demo/config.ts';
 import { loadMasterKey } from '../settings/secret-box.ts';
@@ -26,7 +27,38 @@ export interface AccountConfig {
   /** Demo mode until an admin changes it (`KD_LEARN_DEMO_MODE`, default off). */
   readonly demoMode: boolean;
   readonly demo: DemoConfig;
+  /** ACP agents enabled until an admin changes it (`KD_LEARN_ACP_AGENTS`, default none). */
+  readonly acpAgents: ReadonlyArray<AcpAgent>;
+  /** `KD_LEARN_ACP_MAX_CONCURRENT`, default 2. */
+  readonly acpMaxConcurrent: number;
 }
+
+const acpAgentIds: ReadonlyArray<AcpAgent> = ['claude-code', 'antigravity', 'opencode'];
+
+const acpAgentsFrom = (raw: string | undefined): ReadonlyArray<AcpAgent> => {
+  const ids = (raw ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id !== '');
+  for (const id of ids) {
+    if (!acpAgentIds.includes(id as AcpAgent)) {
+      throw new ConfigError({
+        message: 'KD_LEARN_ACP_AGENTS must list claude-code, antigravity or opencode.',
+      });
+    }
+  }
+  return [...new Set(ids as AcpAgent[])];
+};
+
+const acpMaxFrom = (raw: string | undefined): number => {
+  const value = raw?.trim() ?? '';
+  if (value === '') return 2;
+  const n = Number(value);
+  if (!/^\d+$/.test(value) || n < 1 || n > 32) {
+    throw new ConfigError({ message: 'KD_LEARN_ACP_MAX_CONCURRENT must be 1 to 32.' });
+  }
+  return n;
+};
 
 /** `on`/`off`, `true`/`false`, `1`/`0`; empty gives `fallback`. */
 export const switchFrom = (name: string, raw: string | undefined, fallback: boolean): boolean => {
@@ -47,6 +79,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * - `KD_LEARN_REGISTRATION`: `open`, `invite` (default) or `closed`.
  * - `KD_LEARN_TRUST_PROXY`: `1` or `true` behind a reverse proxy.
  * - `KD_LEARN_GUEST_MODE`, `KD_LEARN_DEMO_MODE`: `on` / `off`, defaults until an admin changes them.
+ * - `KD_LEARN_ACP_AGENTS`: comma list of ACP agents enabled by default; `KD_LEARN_ACP_MAX_CONCURRENT`.
  * - `KD_LEARN_SECRET_KEY`: required, 32 bytes in base64. Without it the account routes refuse to
  *   run (guest mode does not need it).
  */
@@ -85,6 +118,8 @@ export const loadAccountConfig = (
     guestMode: switchFrom('KD_LEARN_GUEST_MODE', env.KD_LEARN_GUEST_MODE, true),
     demoMode: switchFrom('KD_LEARN_DEMO_MODE', env.KD_LEARN_DEMO_MODE, false),
     demo: loadDemoConfig(env),
+    acpAgents: acpAgentsFrom(env.KD_LEARN_ACP_AGENTS),
+    acpMaxConcurrent: acpMaxFrom(env.KD_LEARN_ACP_MAX_CONCURRENT),
   };
 };
 

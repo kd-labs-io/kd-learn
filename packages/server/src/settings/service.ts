@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ModelRef } from '@kd-learn/ai/port';
 import type {
+  AcpAgent,
   ConnectionInfo,
   CreateConnectionRequest,
   ModelRole,
@@ -18,7 +19,8 @@ export const modelRoles: ReadonlyArray<ModelRole> = ['prober', 'teacher', 'sideC
 
 export type CreateConnectionResult =
   | { readonly _tag: 'Ok'; readonly connection: ConnectionInfo }
-  | { readonly _tag: 'UnknownEndpoint' };
+  | { readonly _tag: 'UnknownEndpoint' }
+  | { readonly _tag: 'AgentDisabled' };
 
 export type SetRolesResult = { readonly _tag: 'Ok' } | { readonly _tag: 'UnknownConnection' };
 
@@ -28,12 +30,15 @@ export type ResolveResult =
   /** The endpoint of the connection is no longer allowed by the server. */
   | { readonly _tag: 'UnknownEndpoint'; readonly role: ModelRole }
   /** The master key changed, or the row was tampered with. */
-  | { readonly _tag: 'KeyUnreadable'; readonly role: ModelRole };
+  | { readonly _tag: 'KeyUnreadable'; readonly role: ModelRole }
+  /** The ACP agent of the connection is not enabled (any more). */
+  | { readonly _tag: 'AgentDisabled'; readonly role: ModelRole };
 
 export interface SettingsService {
   readonly get: (userId: string) => {
     readonly connections: ReadonlyArray<ConnectionInfo>;
     readonly roles: RoleModels;
+    readonly acpAgents: ReadonlyArray<AcpAgent>;
   };
   readonly createConnection: (
     userId: string,
@@ -52,6 +57,7 @@ interface ConnectionRow {
   label: string;
   provider: ConnectionInfo['provider'];
   endpoint_id: string | null;
+  agent: string | null;
   key_sealed: string | null;
   key_version: number | null;
   key_last4: string | null;
@@ -67,6 +73,7 @@ const toInfo = (row: ConnectionRow): ConnectionInfo => ({
   label: row.label,
   provider: row.provider,
   ...(row.endpoint_id === null ? {} : { endpointId: row.endpoint_id }),
+  ...(row.agent === null ? {} : { agent: row.agent as AcpAgent }),
   hasKey: row.key_sealed !== null,
   ...(row.key_last4 === null ? {} : { keyLast4: row.key_last4 }),
   createdAt: Number(row.created_at),
@@ -76,22 +83,25 @@ export const makeSettings = (
   database: ServerDatabase,
   box: SecretBox,
   endpoints: () => ReadonlyArray<Endpoint>,
+  /** ACP agents the admin enabled, read on every call. */
+  acpAgents: () => ReadonlyArray<AcpAgent> = () => [],
   now: () => number = Date.now,
 ): SettingsService => {
   const { db } = database;
   const q = {
     connections: db.prepare(
-      `SELECT id, label, provider, endpoint_id, key_sealed, key_version, key_last4, created_at
+      `SELECT id, label, provider, endpoint_id, agent, key_sealed, key_version, key_last4, created_at
          FROM connections WHERE user_id = ? ORDER BY created_at, id`,
     ),
     connection: db.prepare(
-      `SELECT id, label, provider, endpoint_id, key_sealed, key_version, key_last4, created_at
+      `SELECT id, label, provider, endpoint_id, agent, key_sealed, key_version, key_last4, created_at
          FROM connections WHERE user_id = ? AND id = ?`,
     ),
     insert: db.prepare(
       `INSERT INTO connections
-         (id, user_id, label, provider, endpoint_id, key_sealed, key_version, key_last4, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, label, provider, endpoint_id, agent, key_sealed, key_version, key_last4,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     remove: db.prepare('DELETE FROM connections WHERE user_id = ? AND id = ?'),
     roles: db.prepare('SELECT role, connection_id, model FROM role_models WHERE user_id = ?'),
@@ -120,27 +130,34 @@ export const makeSettings = (
     get: (userId) => ({
       connections: (q.connections.all(userId) as unknown as ConnectionRow[]).map(toInfo),
       roles: rolesOf(userId),
+      acpAgents: acpAgents(),
     }),
 
     createConnection: (userId, input) => {
-      const endpointId = input.provider === 'openai-compatible' ? input.endpointId : null;
-      if (endpointId !== null && !endpoints().some((e) => e.id === endpointId)) {
-        return { _tag: 'UnknownEndpoint' };
-      }
       const id = randomUUID();
-      const sealed = box.seal(input.apiKey, sealContext(userId, id));
-      const last4 = input.apiKey.length >= 12 ? input.apiKey.slice(-4) : null;
-      q.insert.run(
-        id,
-        userId,
-        input.label,
-        input.provider,
-        endpointId,
-        sealed,
-        box.version,
-        last4,
-        now(),
-      );
+      if (input.provider === 'acp') {
+        if (!acpAgents().includes(input.agent)) return { _tag: 'AgentDisabled' };
+        q.insert.run(id, userId, input.label, 'acp', null, input.agent, null, null, null, now());
+      } else {
+        const endpointId = input.provider === 'openai-compatible' ? input.endpointId : null;
+        if (endpointId !== null && !endpoints().some((e) => e.id === endpointId)) {
+          return { _tag: 'UnknownEndpoint' };
+        }
+        const sealed = box.seal(input.apiKey, sealContext(userId, id));
+        const last4 = input.apiKey.length >= 12 ? input.apiKey.slice(-4) : null;
+        q.insert.run(
+          id,
+          userId,
+          input.label,
+          input.provider,
+          endpointId,
+          null,
+          sealed,
+          box.version,
+          last4,
+          now(),
+        );
+      }
       const row = q.connection.get(userId, id) as unknown as ConnectionRow;
       return { _tag: 'Ok', connection: toInfo(row) };
     },
@@ -178,6 +195,12 @@ export const makeSettings = (
           : (q.connection.get(userId, choice.connection_id) as unknown as
               ConnectionRow | undefined);
       if (choice === undefined || row === undefined) return { _tag: 'RoleNotConfigured', role };
+      if (row.provider === 'acp') {
+        const agent = row.agent as AcpAgent;
+        // Checked per turn: the admin may disable an agent after the connection was made.
+        if (!acpAgents().includes(agent)) return { _tag: 'AgentDisabled', role };
+        return { _tag: 'Ok', model: { provider: 'acp', agent, model: choice.model } };
+      }
       const apiKey =
         row.key_sealed === null || row.key_version === null
           ? undefined
