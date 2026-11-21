@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 (tài khoản + triển khai): đã lập plan phần chính ([tai-khoan.md](tai-khoan.md)), chưa bắt đầu; chưa có `progress/phase-2.md`
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 (tài khoản + triển khai): đang làm, plan phần chính ở [tai-khoan.md](tai-khoan.md), tiến độ ở [progress/phase-2.md](progress/phase-2.md)
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 
@@ -24,7 +24,7 @@ Số mục giữ nguyên làm ID ổn định: "mục 2.4", "rủi ro 12" vẫn 
 | 5       | [05-rui-ro.md](05-rui-ro.md)       | Rủi ro, việc cần kiểm chứng, kết quả đã kiểm                                                  |
 | 6–7     | [06-viec-mo.md](06-viec-mo.md)     | Câu hỏi chưa chốt, bước tiếp theo                                                             |
 | —       | [tai-khoan.md](tai-khoan.md)       | Plan phần chính phase 2: quyết định nền, các bước, câu hỏi spike                              |
-| 8       | `progress/`                        | Tiến độ phase đang làm, mỗi phase một file (`phase-<n>.md`); hiện chưa có                                 |
+| 8       | `progress/`                        | Tiến độ phase đang làm, mỗi phase một file (`phase-<n>.md`); hiện có `phase-2.md`                               |
 | —       | [archive/](archive/)               | Phần đã xong: phase đã đóng, rủi ro đã đóng, plan chủ đề đã xong. Chỉ đọc khi cần tra lịch sử |
 
 ## Quy ước
