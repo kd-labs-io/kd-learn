@@ -20,7 +20,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 - Port `storage` thêm `appendKnowledge(events)` (một lô, nguyên tử), `readKnowledge()` và thay đổi `KnowledgeChanged` trong `StorageChange`. Driver server cấp qua `forUser(userId)`, lọc bên trong driver như A3 phase 2 ([rủi ro 26](05-rui-ro.md)). Không có hàm nào nhận `owner` từ bên ngoài.
 - **Event của graph:** `PropositionAdded`, `PropositionRevised`, `PropositionsMerged` (gộp hai mệnh đề đã có), `PropositionRetired` (người học bỏ một mệnh đề sai), `EdgeAdded`, `EdgeRemoved`, cộng các event của extraction (`ExtractionStarted`, `SessionExtracted`, `ExtractionFailed`, A3) và luyện tập (A7).
   - **Mệnh đề:** câu tự đứng được một mình (không "nó", "như trên"), kèm nguồn (`sessionId`, `stepId` nếu có) và chủ đề.
-  - **Cạnh:** có hướng, quan hệ thuộc một tập đóng (ví dụ `requires`, `implies`, `supports`, `exampleOf`; chốt ở bước 1) kèm nhãn chữ. Chuỗi lập luận là đường đi theo cạnh.
+  - **Cạnh:** có hướng, kèm nhãn chữ. Quan hệ thuộc tập đóng `requires`, `implies`, `supports`, `exampleOf`, `contrastsWith` (chốt ở bước 1), đọc theo câu "from RELATION to". Cấm chu trình trên `requires` và `implies`; chuỗi lập luận là đường đi theo hai quan hệ này. `contrastsWith` không có hướng: hai chiều là một cạnh.
   - Projection chặt như log buổi học: event tham chiếu mệnh đề không có, hay cạnh tạo chu trình trên quan hệ có thứ tự, thì trả `ProjectionError`; client chạy projection trước mỗi lần ghi và bỏ lô không hợp lệ.
 
 ### A2. Hồ sơ dạy học sửa được
@@ -38,7 +38,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
   1. **Extractor:** đọc bản ghi buổi học (plan, đánh giá, các lượt đã `TurnCompleted`), đề xuất mệnh đề và cạnh mới.
   2. **Auditor:** kiểm từng đề xuất với bản ghi: đúng không, có thật được dạy hay người học thể hiện không, có tự đứng được không. Bỏ hoặc sửa câu.
   3. **Merge:** so đề xuất còn lại với các mệnh đề đã có gần nhất (A4): trùng thì gộp vào mệnh đề cũ (thêm nguồn, có thể `PropositionRevised`), mới thì thêm, kèm cạnh tới mệnh đề cũ.
-- Cách gộp, số lần gọi, có nên gộp auditor vào extractor không: chốt ở spike (C2). Hình dạng event không phụ thuộc kết quả đó.
+- **Chốt ở bước 1 (2026-11-21):** ba lần gọi riêng. Auditor kiểm cả mệnh đề lẫn cạnh trong một lần gọi (đảo chiều, đổi quan hệ, bỏ cạnh lặp) và được tách một mệnh đề hai ý thành hai. Merge nhận mỗi mệnh đề mới kèm danh sách ứng viên của nó (A4), không nhận cả lát chung. Kết quả đo ở [progress/phase-3.md](progress/phase-3.md) bước 1.
 - **Chạy khi nào:** sau `SessionCompleted`. Buổi chưa xong không tự trích; người học bấm "trích ngay" được (cắt được nếu quá lớn).
 - **Idempotent theo buổi:** toàn bộ kết quả một lần trích ghi trong **một lô** của log kiến thức, kết thúc bằng `SessionExtracted {sessionId, extractionId, profileId}`. Projection từ chối `SessionExtracted` thứ hai cho cùng buổi (cả lô bị bỏ). Hai tab hay hai request cùng trích một buổi thì lô sau bị từ chối, không có mệnh đề trùng.
 - **Ghi lần thử trước khi gọi model**, như `TurnStarted`: `ExtractionStarted {sessionId, extractionId}` vào log kiến thức. Lần thử có `ExtractionStarted` mà chưa có `SessionExtracted` hay `ExtractionFailed` (và không còn chạy) là "bị ngắt". Lỗi ghi `ExtractionFailed {sessionId, extractionId, code, retryable}`.
@@ -55,8 +55,10 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 ### A4. Lát graph gửi theo request
 
 - Graph vài nghìn mệnh đề không vừa giới hạn request (1 MiB khách, 256 KiB demo). Merge chỉ cần các mệnh đề **gần** với nội dung buổi học.
-- Hàm thuần trong `core` chọn tối đa K mệnh đề gần nhất với nội dung buổi (chủ đề, tên và mục tiêu các bước, đánh giá) và cắt theo số byte. Cách đo "gần" (từ vựng, không embedding) và K chốt ở spike (C2).
-- Khách và demo: **client** chạy hàm này trên log kiến thức local và gửi lát đó kèm log buổi học. Tài khoản: server chạy cùng hàm trên DB. Hai chế độ dùng cùng một code, nên kết quả merge chỉ khác do dữ liệu.
+- Chọn hai tầng, cả hai là hàm thuần trong `core`, đo "gần" theo từ vựng (tập từ bỏ stopword, cosine nhị phân; không embedding):
+  1. **Lát của buổi:** tối đa 200 mệnh đề gần nhất với nội dung buổi (chủ đề, tên và mục tiêu các bước, đánh giá), cắt theo số byte.
+  2. **Ứng viên:** sau auditor, mỗi mệnh đề mới lấy K = 5 mệnh đề gần nhất trong lát; merge chỉ thấy các ứng viên này (chốt ở bước 1: gửi cả lát chung thì merge không ổn định và bỏ sót mệnh đề trùng).
+- Khách và demo: **client** chạy tầng 1 trên log kiến thức local và gửi lát kèm log buổi học; server chạy tầng 2. Tài khoản: server chạy cả hai tầng trên DB. Hai chế độ dùng cùng code, nên kết quả merge chỉ khác do dữ liệu.
 - Embedding cần port mới và có thể cần provider khác: ngoài phạm vi phase 3 (D), trừ khi spike C2 cho thấy chọn theo từ vựng bỏ sót quá nhiều.
 - Server kiểm lát nhận được như mọi dữ liệu từ client: decode bằng schema, id mệnh đề trong kết quả merge phải thuộc lát đã gửi.
 
@@ -94,8 +96,8 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 
 ### A8. Demo
 
-- **Demo dùng được graph và luyện tập (chốt 2026-11-21)**, tính chung ngân sách demo (A8 phase 2): extraction tốn số lần gọi của pipeline (khoảng 3, theo C2), ra bài một lần, chấm bằng model một lần, chấm bằng code không tốn.
-- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
+- **Demo dùng được graph và luyện tập (chốt 2026-11-21)**, tính chung ngân sách demo (A8 phase 2): extraction tốn 3 lần gọi (bước 1), ra bài một lần, chấm bằng model một lần, chấm bằng code không tốn.
+- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Trần 2.048 token ra không đủ cho extraction (đo được tới 4,4k, phần lớn là thinking): vai `extractor` có trần riêng (đề xuất 8.192), làm ở bước 5. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
 
 ### A9. Màn hình graph
 
