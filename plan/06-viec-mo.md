@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 3 (practice + graph, [mục 4](04-phases.md)): plan phần chính ở [luyen-tap-graph.md](luyen-tap-graph.md), tiến độ ở [progress/phase-3.md](progress/phase-3.md). Bước 0–11 đã xong (hình graph: sigma + graphology; log kiến thức; hồ sơ dạy học v2 và vai mới; pipeline extraction; extraction trên server và client khách; registry bài tập, mức nắm vững, Practitioner; luyện tập trên server; model giả e2e trả tool call và structured output; màn graph; màn luyện tập; màn sửa hồ sơ). Bước hiện tại: bước 12 (kiểm tiêu chí phase bằng model thật, rồi đóng phase 3).
+Phase 4 (nguồn học + việc nền, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 4 (quyết định nền, các bước, câu hỏi spike, như [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md) của phase 3): PDF, import ghi chú, research web với port tìm kiếm, job của tài khoản sống sót khi server khởi động lại. Bắt đầu làm thì tạo `progress/phase-4.md`.

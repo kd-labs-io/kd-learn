@@ -1,10 +1,10 @@
 # Plan phần chính phase 3: practice + graph
 
 - **Ngày lập:** 2026-11-21
-- **Phạm vi:** phase 3 ([mục 4](04-phases.md)): Practitioner, registry loại bài tập, extractor / auditor / merge, màn hình graph (spike TanStack Charts), hồ sơ dạy học sửa được
+- **Phạm vi:** phase 3 ([mục 4](../04-phases.md)): Practitioner, registry loại bài tập, extractor / auditor / merge, màn hình graph (spike TanStack Charts), hồ sơ dạy học sửa được
 - **Xong khi:** graph tự cập nhật sau buổi học, luyện tập lấy bài từ graph
-- **Trạng thái:** đang làm, tiến độ ở [progress/phase-3.md](progress/phase-3.md)
-- **Nền đã có:** event log append-only và projection trong `core` ([mục 3.5](03-kien-truc.md)), port AI ([mục 3.3](03-kien-truc.md)), hai chế độ lưu (khách: DB local, server không trạng thái; tài khoản: SQLite server, lượt chạy tách khỏi request, [archive/tai-khoan.md](archive/tai-khoan.md) A1–A3), model theo vai cho tài khoản (A6 phase 2), demo có ngân sách chung (A8 phase 2)
+- **Trạng thái:** xong (2026-11-22), tiến độ ở [phase-3.md](phase-3.md)
+- **Nền đã có:** event log append-only và projection trong `core` ([mục 3.5](../03-kien-truc.md)), port AI ([mục 3.3](../03-kien-truc.md)), hai chế độ lưu (khách: DB local, server không trạng thái; tài khoản: SQLite server, lượt chạy tách khỏi request, [archive/tai-khoan.md](tai-khoan.md) A1–A3), model theo vai cho tài khoản (A6 phase 2), demo có ngân sách chung (A8 phase 2)
 
 Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi người (A1), demo dùng được graph và luyện tập, tính chung ngân sách (A8), làm đủ bốn loại bài tập đầu tiên (A6).
 
@@ -17,7 +17,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 - **Bảng riêng**, không dùng chung `events`: `knowledge_events (owner, seq, id, tag, at, payload)`, khoá `(owner, seq)`, cùng trigger chặn sửa / xoá. DDL đặt cạnh `eventsTable` trong `packages/storage/src/sqlite/schema.ts`.
   - Khách: migration v3 của danh sách khách (v2 là hồ sơ, bước 3), `owner` là hằng số (DB local chỉ có một người).
   - Server: migration v7 trong danh sách riêng của server, `owner` là `user_id`.
-- Port `storage` thêm `appendKnowledge(events, { expectedLastSeq })` (một lô, nguyên tử; `expectedLastSeq` bắt buộc, log đã đi tiếp thì `KnowledgeConflict`, không ghi gì; mọi chỗ ghi dùng `appendKnowledgeChecked`), `readKnowledge` và thay đổi `KnowledgeChanged` trong `StorageChange`. Driver server cấp qua `forUser(userId)`, lọc bên trong driver như A3 phase 2 ([rủi ro 26](05-rui-ro.md)). Không có hàm nào nhận `owner` từ bên ngoài.
+- Port `storage` thêm `appendKnowledge(events, { expectedLastSeq })` (một lô, nguyên tử; `expectedLastSeq` bắt buộc, log đã đi tiếp thì `KnowledgeConflict`, không ghi gì; mọi chỗ ghi dùng `appendKnowledgeChecked`), `readKnowledge` và thay đổi `KnowledgeChanged` trong `StorageChange`. Driver server cấp qua `forUser(userId)`, lọc bên trong driver như A3 phase 2 ([rủi ro 26](../05-rui-ro.md)). Không có hàm nào nhận `owner` từ bên ngoài.
 - **Event của graph:** `PropositionAdded`, `PropositionSourced` (thêm nguồn cho mệnh đề đã có, thêm ở bước 2), `PropositionRevised`, `PropositionsMerged` (gộp hai mệnh đề đã có), `PropositionRetired` (người học bỏ một mệnh đề sai), `EdgeAdded`, `EdgeRemoved`, cộng các event của extraction (`ExtractionStarted`, `SessionExtracted`, `ExtractionFailed`, A3) và luyện tập (A7).
   - **Mệnh đề:** câu tự đứng được một mình (không "nó", "như trên"), kèm nguồn (`sessionId`, `stepId` nếu có) và chủ đề.
   - **Cạnh:** có hướng, kèm nhãn chữ. Quan hệ thuộc tập đóng `requires`, `implies`, `supports`, `exampleOf`, `contrastsWith` (chốt ở bước 1), đọc theo câu "from RELATION to". Cấm chu trình trên `requires` và `implies`, đọc về cùng chiều "trước → sau" (`A implies B`: A trước; `A requires B`: B trước); chuỗi lập luận là đường đi theo hai quan hệ này. `contrastsWith` không có hướng: hai chiều là một cạnh.
@@ -30,7 +30,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 - **Hồ sơ mặc định** nằm trong code (`agent`), chỉ đọc. Người dùng nhân bản rồi sửa bản sao; có nút "về mặc định". Một hồ sơ đang dùng cho mỗi người.
 - **Lưu:** khách ở bảng mới trong DB local (migration v2 của khách), tài khoản ở bảng của server theo `user_id`. Validate bằng Effect Schema cả ở client và server; giới hạn độ dài prompt.
 - **Lúc nào dùng hồ sơ nào:** buổi học mới chụp hồ sơ đang dùng vào `SessionCreated` (như phase 1). Extraction và luyện tập dùng hồ sơ đang dùng lúc chạy; event kết quả ghi `profileId` để tra lại.
-- **Demo:** server luôn thay hồ sơ bằng hồ sơ của mình ([rủi ro 29](05-rui-ro.md)), kể cả cho extraction và luyện tập. Demo không có màn sửa hồ sơ.
+- **Demo:** server luôn thay hồ sơ bằng hồ sơ của mình ([rủi ro 29](../05-rui-ro.md)), kể cả cho extraction và luyện tập. Demo không có màn sửa hồ sơ.
 
 ### A3. Extraction: extractor → auditor → merge
 
@@ -38,11 +38,11 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
   1. **Extractor:** đọc bản ghi buổi học (plan, đánh giá, các lượt đã `TurnCompleted`), đề xuất mệnh đề và cạnh mới.
   2. **Auditor:** kiểm từng đề xuất với bản ghi: đúng không, có thật được dạy hay người học thể hiện không, có tự đứng được không. Bỏ hoặc sửa câu.
   3. **Merge:** so đề xuất còn lại với các mệnh đề đã có gần nhất (A4): trùng thì gộp vào mệnh đề cũ (thêm nguồn, có thể `PropositionRevised`), mới thì thêm, kèm cạnh tới mệnh đề cũ.
-- **Chốt ở bước 1 (2026-11-21):** ba lần gọi riêng. Auditor kiểm cả mệnh đề lẫn cạnh trong một lần gọi (đảo chiều, đổi quan hệ, bỏ cạnh lặp) và được tách một mệnh đề hai ý thành hai. Merge nhận mỗi mệnh đề mới kèm danh sách ứng viên của nó (A4), không nhận cả lát chung. Kết quả đo ở [progress/phase-3.md](progress/phase-3.md) bước 1.
+- **Chốt ở bước 1 (2026-11-21):** ba lần gọi riêng. Auditor kiểm cả mệnh đề lẫn cạnh trong một lần gọi (đảo chiều, đổi quan hệ, bỏ cạnh lặp) và được tách một mệnh đề hai ý thành hai. Merge nhận mỗi mệnh đề mới kèm danh sách ứng viên của nó (A4), không nhận cả lát chung. Kết quả đo ở [progress/phase-3.md](phase-3.md) bước 1.
 - **Chạy khi nào:** sau `SessionCompleted`. Buổi chưa xong không tự trích; người học bấm "trích ngay" được (cắt được nếu quá lớn).
 - **Idempotent theo buổi:** toàn bộ kết quả một lần trích ghi trong **một lô** của log kiến thức, kết thúc bằng `SessionExtracted {sessionId, extractionId, profileId}`. Projection từ chối `SessionExtracted` thứ hai cho cùng buổi (cả lô bị bỏ). Hai tab hay hai request cùng trích một buổi thì lô sau bị từ chối, không có mệnh đề trùng.
 - **Ghi lần thử trước khi gọi model**, như `TurnStarted`: `ExtractionStarted {sessionId, extractionId}` vào log kiến thức. Lần thử có `ExtractionStarted` mà chưa có `SessionExtracted` hay `ExtractionFailed` (và không còn chạy) là "bị ngắt". Lỗi ghi `ExtractionFailed {sessionId, extractionId, code, retryable}`.
-- **Không tự chạy lại sau lỗi hay bị ngắt:** chỉ tự chạy khi buổi đã `SessionCompleted` **và chưa có `ExtractionStarted` nào**. Sau lỗi hay bị ngắt chỉ có nút thử lại (giống quy tắc của lượt, [mục 3.5](03-kien-truc.md)). Vậy mỗi buổi tự trích tối đa một lần.
+- **Không tự chạy lại sau lỗi hay bị ngắt:** chỉ tự chạy khi buổi đã `SessionCompleted` **và chưa có `ExtractionStarted` nào**. Sau lỗi hay bị ngắt chỉ có nút thử lại (giống quy tắc của lượt, [mục 3.5](../03-kien-truc.md)). Vậy mỗi buổi tự trích tối đa một lần.
 - **Buổi xong trước phase 3:** không tự trích ở cả hai chế độ (tự trích chỉ do sự kiện "buổi vừa xong" kích hoạt, không quét lại log cũ). Màn graph liệt kê các buổi đã xong mà chưa trích, kèm nút trích từng buổi.
 - **Điểm kích hoạt:** `SessionCompleted` có hai đường ghi: lô của lượt (tool `complete_step` ở bước cuối) và lô bỏ bước cuối (`StepSkipped`, không có lượt). Server: cả hai nằm trong `packages/server/src/sessions/runner.ts`; móc vào chỗ ghi lô, không vào từng đường. Khách: cả hai nằm trong runner của client (`apps/web/src/learn/runner.ts`).
 - **Tài khoản:** server tự khởi chạy extraction ngay sau khi ghi lô có `SessionCompleted`, trong fiber tách khỏi request, như lượt. Đóng tab vẫn chạy.
@@ -69,7 +69,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 - Tài khoản có từ phase 2 chưa đặt hai vai này. Vai mới chưa đặt thì **dùng model của `teacher`**; route do người dùng gọi (luyện tập) mà cả hai chưa đặt thì trả `409 RoleNotConfigured` như phase 2. Job extraction không có người gọi nên xử lý riêng (A3).
 - Prompt của auditor và merge vẫn là prompt riêng trong hồ sơ (A2), chỉ dùng chung model.
 - Khách giữ một model cho mọi vai (A6 phase 2). `MessageAppended.agent` không đổi: luyện tập không ghi `MessageAppended` (A7).
-- ACP: hai vai mới chọn model trong danh sách admin cho phép, như mọi vai ([rủi ro 30](05-rui-ro.md)).
+- ACP: hai vai mới chọn model trong danh sách admin cho phép, như mọi vai ([rủi ro 30](../05-rui-ro.md)).
 
 ### A6. Registry loại bài tập
 
@@ -106,15 +106,15 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 - Danh sách đủ để thấy "graph tự cập nhật"; hình graph nằm ngoài đường tiêu chí xong, nên **cắt trước** nếu thư viện không đạt.
 - Thư viện cho hình graph chốt ở spike (C1): TanStack Charts nếu đạt, không thì thư viện graph chuyên dụng. Nạp lười, chỉ chạy phía client. Màu lấy từ token Astryx qua `var(--...)`.
 - Cùng mẫu với màn học: một interface nguồn dữ liệu (`KnowledgeSource`), hai cài đặt (khách đọc DB local và nghe `KnowledgeChanged`; tài khoản dùng TanStack Query, làm mới khi extraction xong). Live query của TanStack DB: chỉ dùng nếu C3 cho thấy cần.
-- **Chốt ở bước 9 (2026-11-21):** danh sách không dùng TanStack Virtual: hiện 100 dòng mỗi lần và nút "Xem thêm" (danh sách ảo với Astryx phải tự đo dòng và đặt vị trí qua `xstyle` động; chưa đáng khi graph thật còn nhỏ). Xét lại khi graph thật có vài nghìn mệnh đề. Hình graph: sigma 4 theo C1 ([progress/phase-3.md](progress/phase-3.md) bước 9).
+- **Chốt ở bước 9 (2026-11-21):** danh sách không dùng TanStack Virtual: hiện 100 dòng mỗi lần và nút "Xem thêm" (danh sách ảo với Astryx phải tự đo dòng và đặt vị trí qua `xstyle` động; chưa đáng khi graph thật còn nhỏ). Xét lại khi graph thật có vài nghìn mệnh đề. Hình graph: sigma 4 theo C1 ([progress/phase-3.md](phase-3.md) bước 9).
 
 ## B. Các bước
 
-Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model test bằng `AiPort` giả; kiểm bằng model thật tối đa một lần mỗi bước (Haiku `claude-haiku-5-5`, xem chi phí trước). Mọi route mới có test cross-user ([rủi ro 26](05-rui-ro.md)) và test key không lộ ở đường khách ([rủi ro 19](05-rui-ro.md)).
+Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model test bằng `AiPort` giả; kiểm bằng model thật tối đa một lần mỗi bước (Haiku `claude-haiku-5-5`, xem chi phí trước). Mọi route mới có test cross-user ([rủi ro 26](../05-rui-ro.md)) và test key không lộ ở đường khách ([rủi ro 19](../05-rui-ro.md)).
 
 | # | Bước | Package | Xong khi |
 | --- | --- | --- | --- |
-| 0 | Spike hình graph (C1) | spike | Trả lời đủ C1; chốt thư viện, ghi vào [mục 2.5](02-ky-thuat.md) |
+| 0 | Spike hình graph (C1) | spike | Trả lời đủ C1; chốt thư viện, ghi vào [mục 2.5](../02-ky-thuat.md) |
 | 1 | Spike extraction với Haiku (C2, C3) | spike | Trả lời đủ C2, C3; chốt pipeline (số lần gọi), tập quan hệ của cạnh, cách chọn lát và K; đo token mỗi buổi |
 | 2 | Log kiến thức: schema event, projection graph, chặn trích hai lần, hàm chọn lát (A1, A3, A4); bảng `knowledge_events` ở cả hai driver, port, `forUser` | core, storage | Test projection (event sai thứ tự, chu trình, `SessionExtracted` trùng); bộ test port chạy trên cả hai driver; test hai người dùng: không đọc, không ghi được log kiến thức của người kia |
 | 3 | Hồ sơ dạy học v2 và vai mới: trường mới tuỳ chọn, lưu hồ sơ ở hai chế độ, API hồ sơ tài khoản, `practitioner` / `extractor` trong contract và cài đặt (A2, A5) | core, agent, storage, server, api, web | Log phase 1–2 (fixture) vẫn dựng được; hồ sơ sai schema bị từ chối ở client và server; demo luôn dùng hồ sơ của server; vai mới chưa đặt model thì dùng model của `teacher`, cả hai chưa đặt thì luyện tập trả `RoleNotConfigured` |
@@ -138,7 +138,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model 
 
 ## C. Câu hỏi cho spike
 
-Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
+Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](../05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
 
 **C1. Hình graph (bước 0):**
 
@@ -173,4 +173,4 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 - Job extraction sống sót khi server khởi động lại: phase 4.
 - Nguồn học (PDF, ghi chú) đưa vào graph: phase 4.
 - Model theo vai cho khách: vẫn để sau (A6 phase 2).
-- Tóm tắt lịch sử buổi học dài và duyệt luồng side chat cũ: vẫn ở [mục 6](06-viec-mo.md), không thuộc phase 3.
+- Tóm tắt lịch sử buổi học dài và duyệt luồng side chat cũ: vẫn ở [mục 6](../06-viec-mo.md), không thuộc phase 3.
