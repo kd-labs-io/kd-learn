@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
+import { PracticeLink } from '../practice/PracticeLink';
 import { formatDate } from '../app/GuestHome';
 import { errorText, keys, useAccountApi } from './api';
 
@@ -75,6 +76,8 @@ export function AccountHome({ token }: { token: string }) {
                 data-testid="need-roles"
               />
             ) : null}
+
+            <PracticeLink />
 
             <VStack gap={3}>
               <Heading level={2}>{m.home_new_title()}</Heading>

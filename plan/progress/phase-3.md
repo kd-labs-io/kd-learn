@@ -17,7 +17,7 @@
 | Bước 7: luyện tập trên server | Xong (2026-11-21) |
 | Bước 8: model giả trả tool call | Xong (2026-11-21). `apps/web/e2e/fake-openai.ts` trả structured output (extractor, auditor, merge) và tool call (`submit_assessment` khi có `#assess`, `create_plan` ở lượt lập plan, `complete_step` khi có `#done`), đếm lần gọi theo key. Hai test e2e mới. Xem ghi chú bước 8 bên dưới |
 | Bước 9: màn graph | Chưa bắt đầu |
-| Bước 10: màn luyện tập | Chưa bắt đầu |
+| Bước 10: màn luyện tập | Xong (2026-11-21). Màn `/practice` (link ở trang chủ) cho khách, demo và tài khoản qua `PracticeSource` hai cài đặt; registry renderer bốn loại; điểm, nhận xét, đáp án đúng và mức nắm vững sau khi chấm; tải lại giữa chừng giữ bài và câu trả lời. Model giả viết và chấm bài. Xem ghi chú bước 10 bên dưới |
 | Bước 11: màn sửa hồ sơ | Xong (2026-11-21). Màn `/profile` cho khách và tài khoản (`ProfileSource` hai cài đặt), mở từ hai màn cài đặt; hồ sơ mặc định chỉ đọc, nhân bản ra bản sửa được với id mới; TanStack Form kiểm bằng `SavedProfile`. Xem ghi chú bước 11 bên dưới |
 | Bước 12: kiểm tiêu chí phase | Chưa bắt đầu |
 
@@ -34,6 +34,21 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 10: màn luyện tập (2026-11-21)
+
+- **Màn** `/practice` (`apps/web/src/practice/`, route `routes/practice.tsx`), link `PracticeLink` ở trang chủ khách / demo và tài khoản. Một lượt mỗi lúc: lượt đang mở (mới nhất) được mở lại, kể cả sau khi tải lại vì nó nằm trong log; không có thì nút bắt đầu (5 bài). Graph trống thì báo trống và nút về trang chủ; khách chưa có key thì nút sang cài đặt.
+- **`PracticeSource`** (`source.ts`): `view` (loading / error / ready với số mệnh đề, lượt đang mở, `needsKey`), `start(types)`, `answer`, `grade` (chấm lại), `end`. Cả hai chế độ hiện cùng một `PracticeView`: `publicContent`, `exerciseView`, `practiceView`, `practiceList` chuyển từ server sang `@kd-learn/api`, nên khách cũng ẩn đáp án tới khi chấm.
+  - **Khách / demo** (`guest-practice.ts`, TypeScript thuần, có test trên memory storage): chọn bài bằng `selectExercises` với các loại registry vẽ được, gửi lát (mệnh đề đích, lân cận, cạnh giữa chúng, trong trần 200 / 400) tới `issueExercises`, ghi lô bằng checked append. Trả lời: ghi `AnswerSubmitted` trước; chấm bằng code thì `ExerciseGraded` cùng lô, chấm bằng model thì gọi `gradeAnswer` sau rồi ghi (lần chấm đầu thắng). Mỗi lần đọc-dựng-ghi chạy dưới `KNOWLEDGE_LOCK` (`queuedLock`), lời gọi model nằm ngoài khoá. Demo gửi `{provider: 'demo'}` và hồ sơ mặc định theo ngôn ngữ của người học. Đã có lượt đang mở thì `start` trả lượt đó, không ra bộ thứ hai.
+  - **Tài khoản**: TanStack Query trên `GET /api/account/practice` (`keys.practices`); mỗi hành động gọi route rồi tải lại danh sách (server có thể đã lưu một phần, ví dụ câu trả lời khi chấm lỗi).
+- **Hợp đồng** thêm: `ExerciseView.mastery` (mức nắm vững hiện tại của các mệnh đề bài kiểm, theo merge tới mệnh đề còn lại, bỏ mệnh đề đã xoá), chỉ có sau khi chấm, cùng lúc với `solution`; `PracticeList.propositionCount` cho trạng thái trống. Test server kiểm cả hai.
+- **Renderer** (`renderers.tsx`): bảng theo `ExerciseTypeId`, mỗi loại có `label`, `Body` (nháp câu trả lời, chưa lưu tới khi nộp), `Solution` tuỳ chọn. Trắc nghiệm: `RadioList`, sau khi chấm hiện đáp án đúng. Trả lời ngắn, giải thích: `TextArea`. Sắp xếp: danh sách có nút lên / xuống (không kéo thả), nộp được ngay thứ tự đang hiện; sau khi chấm hiện một thứ tự đúng (sắp xếp topo theo `constraints`). Chấm bằng code không có nhận xét nên đáp án đúng thay nhận xét.
+- **Model giả** (`e2e/fake-openai.ts`): schema có `exercises` là viết bài (mỗi key có `correct` thì là trắc nghiệm, đáp án đúng là `Fake right option <key>`), có `level` là chấm (`#wrong` → `incorrect`, `#partial` → `partial`, còn lại `correct`). Câu trả lời extraction giữ nguyên.
+- **E2E** (`e2e/practice.e2e.ts`, server tài khoản cổng 4174):
+  - khách: graph dựng bằng `appendKnowledge` của `/dev/storage` từ `src/practice/fixtures.ts` (chuỗi 3 mệnh đề, một cặp, hai mệnh đề lẻ: đúng bốn loại bài), key là endpoint `fake`. Làm cả bộ: trắc nghiệm đúng lên hộp 2, trả lời ngắn sai về hộp 1, tải lại giữa chừng giữ lượt, bài và câu trả lời, kết thúc lượt;
+  - tài khoản: graph từ một buổi chạy hết bằng API rồi server tự trích (2 mệnh đề, 1 cạnh: một bài giải thích lập luận), tải lại trước khi trả lời, chấm `partial` thì hộp 1 cho cả hai mệnh đề, kết thúc lượt.
+  - Không thử demo trong trình duyệt: ngân sách demo dùng chung với `accounts.e2e.ts` (test đó tạm hạ trần); đường demo có test đơn vị (model `demo`, hồ sơ mặc định).
+- **Còn mở cho bước 12:** chất lượng chấm tiếng Việt với model thật; ghi của khách chờ sau một extraction đang chạy vì extractor giữ khoá suốt lượt trích (vài giây với Haiku); đóng tab khi đang chấm bằng model để lại bài "đã trả lời, chưa chấm", người học bấm chấm lại.
 
 ## Bước 8: model giả trả tool call và structured output (2026-11-21)
 

@@ -15,10 +15,12 @@
 import { Schema } from 'effect';
 import {
   EdgeId,
+  type Exercise,
   ExerciseAnswer,
   ExerciseContent,
   ExerciseTypeId,
   Feedback,
+  type KnowledgeGraph,
   KnowledgeLog,
   maxPropositionLength,
   PropositionId,
@@ -143,6 +145,16 @@ export const ExerciseGradeView = Schema.Struct({
   gradedAt: Schema.Number,
 });
 
+/** Mastery of one proposition an exercise tests, as it is after the grade. */
+export const MasteryView = Schema.Struct({
+  propositionId: PropositionId,
+  box: Schema.Int,
+  attempts: Schema.Int,
+  lastScore: Score,
+  dueAt: Schema.Number,
+});
+export type MasteryView = typeof MasteryView.Type;
+
 export const ExerciseView = Schema.Struct({
   exerciseId: Schema.NonEmptyString,
   practiceId: Schema.NonEmptyString,
@@ -160,6 +172,11 @@ export const ExerciseView = Schema.Struct({
    */
   propositionIds: Schema.optionalKey(Schema.Array(PropositionId)),
   edgeIds: Schema.optionalKey(Schema.Array(EdgeId)),
+  /**
+   * Mastery of the propositions it tests, as the graph has it now (A7), once graded. Absent for a
+   * proposition retired since; a merged one shows the proposition it was merged into.
+   */
+  mastery: Schema.optionalKey(Schema.Array(MasteryView)),
 });
 export type ExerciseView = typeof ExerciseView.Type;
 
@@ -171,5 +188,102 @@ export const PracticeView = Schema.Struct({
 });
 export type PracticeView = typeof PracticeView.Type;
 
-export const PracticeList = Schema.Struct({ practices: Schema.Array(PracticeView) });
+export const PracticeList = Schema.Struct({
+  practices: Schema.Array(PracticeView),
+  /** Active propositions of the graph: 0 means there is nothing to practice yet. */
+  propositionCount: Schema.Int,
+});
 export type PracticeList = typeof PracticeList.Type;
+
+// Views of the projected graph, shared by the server (account) and the web app (guest), so both
+// modes hide the same fields.
+
+/** The learner-facing part of a content, picked field by field so an answer key cannot slip out. */
+export const publicContent = (content: ExerciseContent): PublicExerciseContent => {
+  switch (content.type) {
+    case 'multipleChoice':
+      return { type: content.type, question: content.question, options: content.options };
+    case 'shortAnswer':
+    case 'explainReasoning':
+      return { type: content.type, question: content.question };
+    case 'orderChain':
+      return {
+        type: content.type,
+        items: content.items.map(({ propositionId, text }) => ({ propositionId, text })),
+      };
+  }
+};
+
+/** Follows merges to the proposition kept; undefined for a retired one. */
+const activeId = (graph: KnowledgeGraph, id: PropositionId): PropositionId | undefined => {
+  let current = id;
+  for (let i = 0; i < 100; i++) {
+    if (graph.propositions[current] !== undefined) return current;
+    const gone = graph.inactive[current];
+    if (gone?._tag !== 'Merged') return undefined;
+    current = gone.into;
+  }
+  return undefined;
+};
+
+const masteryOf = (graph: KnowledgeGraph, exercise: Exercise): ReadonlyArray<MasteryView> => {
+  const seen = new Set<PropositionId>();
+  const out: Array<MasteryView> = [];
+  for (const id of exercise.propositionIds) {
+    const active = activeId(graph, id);
+    if (active === undefined || seen.has(active)) continue;
+    seen.add(active);
+    const mastery = graph.mastery[active];
+    if (mastery === undefined) continue;
+    out.push({
+      propositionId: active,
+      box: mastery.box,
+      attempts: mastery.attempts,
+      lastScore: mastery.lastScore,
+      dueAt: mastery.dueAt,
+    });
+  }
+  return out;
+};
+
+export const exerciseView = (graph: KnowledgeGraph, exercise: Exercise): ExerciseView => ({
+  exerciseId: exercise.exerciseId,
+  practiceId: exercise.practiceId,
+  type: exercise.type,
+  content: publicContent(exercise.content),
+  issuedAt: exercise.issuedAt,
+  ...(exercise.answer === undefined ? {} : { answer: exercise.answer }),
+  ...(exercise.answeredAt === undefined ? {} : { answeredAt: exercise.answeredAt }),
+  ...(exercise.grade === undefined
+    ? {}
+    : {
+        grade: exercise.grade,
+        solution: exercise.content,
+        propositionIds: exercise.propositionIds,
+        edgeIds: exercise.edgeIds,
+        mastery: masteryOf(graph, exercise),
+      }),
+});
+
+export const practiceView = (
+  graph: KnowledgeGraph,
+  practiceId: string,
+): PracticeView | undefined => {
+  const practice = graph.practices[practiceId];
+  if (practice === undefined) return undefined;
+  return {
+    practiceId,
+    startedAt: practice.startedAt,
+    ...(practice.endedAt === undefined ? {} : { endedAt: practice.endedAt }),
+    exercises: practice.exerciseIds.map((id) => exerciseView(graph, graph.exercises[id]!)),
+  };
+};
+
+/** The open practices, oldest first, and the size of the graph. */
+export const practiceList = (graph: KnowledgeGraph): PracticeList => ({
+  practices: Object.values(graph.practices)
+    .filter((p) => p.endedAt === undefined)
+    .sort((a, b) => a.startedAt - b.startedAt)
+    .map((p) => practiceView(graph, p.practiceId)!),
+  propositionCount: Object.keys(graph.propositions).length,
+});

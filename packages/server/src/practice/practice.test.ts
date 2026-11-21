@@ -450,6 +450,7 @@ describe('account practice', () => {
       'reference',
       'propositionIds',
       'edgeIds',
+      'mastery',
     ]) {
       expect(text).not.toContain(hidden);
     }
@@ -458,8 +459,12 @@ describe('account practice', () => {
     // The teacher's model, since no practitioner role is set.
     expect(t.fake.requests[0]).toMatchObject({ model: { apiKey: ACCOUNT_KEY } });
 
-    const list = (await (await a.call('GET', 'practice')).json()) as { practices: View[] };
+    const list = (await (await a.call('GET', 'practice')).json()) as {
+      practices: View[];
+      propositionCount: number;
+    };
     expect(list.practices.map((p) => p.practiceId)).toEqual([view.practiceId]);
+    expect(list.propositionCount).toBe(4);
 
     const mc = view.exercises.find((e) => e.type === 'multipleChoice')!;
     const options = mc.content.options as string[];
@@ -470,6 +475,8 @@ describe('account practice', () => {
     expect(await answered.json()).toMatchObject({
       grade: { score: 1 },
       solution: { correctIndex: options.indexOf('Right') },
+      // A first right answer: box 2 (A7).
+      mastery: [{ box: 2, attempts: 1, lastScore: 1 }],
     });
     expect(t.fake.requests).toHaveLength(1);
 
@@ -624,5 +631,9 @@ describe('account practice', () => {
       ),
     );
     expect(await codeOf(await a.call('POST', 'practice', {}))).toBe('NothingToRun');
+    expect(await (await a.call('GET', 'practice')).json()).toEqual({
+      practices: [],
+      propositionCount: 0,
+    });
   });
 });
