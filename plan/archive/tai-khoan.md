@@ -1,10 +1,10 @@
 # Plan phần chính phase 2: tài khoản + triển khai
 
 - **Ngày lập:** 2026-11-21
-- **Phạm vi:** phase 2 ([mục 4](04-phases.md)): SQLite server, auth bằng token, key mã hoá, công tắc admin, demo có hạn mức, UI chọn model theo vai, backend ACP, Docker Compose
+- **Phạm vi:** phase 2 ([mục 4](../04-phases.md)): SQLite server, auth bằng token, key mã hoá, công tắc admin, demo có hạn mức, UI chọn model theo vai, backend ACP, Docker Compose
 - **Xong khi:** hai tài khoản dữ liệu riêng; đóng tab buổi học vẫn chạy tiếp; demo dừng đúng hạn mức
-- **Trạng thái:** đang làm, tiến độ ở [progress/phase-2.md](progress/phase-2.md). Bước 0 xong: `node:sqlite`, auth tự viết, Bearer
-- **Nền đã có:** lõi dạy học của khách ([mục 3.5](03-kien-truc.md)), port AI ([mục 3.3](03-kien-truc.md)), port `storage` và `migrations` dùng chung trong `packages/storage/src/sqlite/schema.ts`
+- **Trạng thái:** xong (2026-11-21), tiến độ và kết quả ở [phase-2.md](phase-2.md). Driver `node:sqlite`, auth tự viết, Bearer
+- **Nền đã có:** lõi dạy học của khách ([mục 3.5](../03-kien-truc.md)), port AI ([mục 3.3](../03-kien-truc.md)), port `storage` và `migrations` dùng chung trong `packages/storage/src/sqlite/schema.ts`
 
 Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khách A6, ngân sách demo A8) đã chốt ngày 2026-11-21.
 
@@ -14,7 +14,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 
 - Với tài khoản, event log nằm ở DB server và **server là bên ghi duy nhất**: server tạo `sessionId`, `id` của event và tự ghi `TurnStarted`, `SideMessageAppended` của người học. Client không gửi log lên.
 - Projection, vòng agent, định dạng event giữ nguyên như phase 1. Chỉ khác ai ghi và lúc nào ghi.
-- Khách giữ nguyên đường phase 1 (`POST /api/turns`, server không trạng thái). Hai chế độ tách hẳn, không sync, không import ([mục 2.2](02-san-pham.md)).
+- Khách giữ nguyên đường phase 1 (`POST /api/turns`, server không trạng thái). Hai chế độ tách hẳn, không sync, không import ([mục 2.2](../02-san-pham.md)).
 
 ### A2. Lượt chạy tách khỏi request
 
@@ -40,7 +40,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 - Đăng nhập bằng email + mật khẩu. Token opaque, lưu dạng hash trong DB, có hạn và thu hồi được (đăng xuất, admin khoá tài khoản).
 - Capacitor không dùng được cookie cùng origin, nên API nhận `Authorization: Bearer`. Bản web dùng cookie `HttpOnly` hay cũng Bearer: chốt ở spike (C2), cân nhắc XSS (rủi ro 21, phase 5) và CSRF.
 - Đăng ký theo công tắc admin: mở / theo lời mời (mã mời dùng một lần, có hạn) / đóng. Giới hạn số lần đăng nhập sai.
-- Đăng nhập không cho biết email có tồn tại không. Đăng ký thì không giấu được (chưa có xác minh email): email đã có trả `EmailTaken`, nhưng chỉ sau khi đã qua công tắc và mã mời, nên chỉ người được phép đăng ký mới dò được (bước 2, [progress/phase-2.md](progress/phase-2.md)).
+- Đăng nhập không cho biết email có tồn tại không. Đăng ký thì không giấu được (chưa có xác minh email): email đã có trả `EmailTaken`, nhưng chỉ sau khi đã qua công tắc và mã mời, nên chỉ người được phép đăng ký mới dò được (bước 2, [progress/phase-2.md](phase-2.md)).
 - **Admin đầu tiên (chốt 2026-11-21):** lấy từ env lúc khởi động (`KD_LEARN_ADMIN_EMAIL`, `KD_LEARN_ADMIN_PASSWORD`, đã có trong `.env`; chỉ tạo khi DB chưa có admin). Không dùng "người đăng ký đầu tiên là admin" vì server vừa mở ra Internet là ai cũng giành được.
 
 ### A5. Key mã hoá
@@ -48,7 +48,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 - Key provider của tài khoản mã hoá AES-256-GCM bằng `node:crypto`, IV ngẫu nhiên mỗi bản ghi, có `keyVersion` để đổi master key sau này.
 - Master key lấy từ env `KD_LEARN_SECRET_KEY` (32 byte, base64). Thiếu hoặc sai độ dài thì phần tài khoản không chạy: mọi route tài khoản trả `500 ServerMisconfigured`, log nêu tên biến. Chế độ khách vẫn chạy, vì không cần key này (bước 3).
 - Mất master key thì mọi key đã lưu không giải mã được; người dùng nhập lại. Ghi rõ trong tài liệu triển khai.
-- Key không bao giờ trả về client (API chỉ báo "đã có key", tối đa 4 ký tự cuối), không vào log, lỗi hay `TurnFailed`. Mở rộng test của [rủi ro 19](05-rui-ro.md) sang đường tài khoản.
+- Key không bao giờ trả về client (API chỉ báo "đã có key", tối đa 4 ký tự cuối), không vào log, lỗi hay `TurnFailed`. Mở rộng test của [rủi ro 19](../05-rui-ro.md) sang đường tài khoản.
 
 ### A6. Model theo vai
 
@@ -58,7 +58,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 
 ### A7. Công tắc admin
 
-- Ba công tắc ([mục 2.2](02-san-pham.md)): đăng ký (mở / lời mời / đóng), chế độ khách, chế độ demo. Kèm cấu hình demo (A8) và danh sách agent ACP được bật (A9).
+- Ba công tắc ([mục 2.2](../02-san-pham.md)): đăng ký (mở / lời mời / đóng), chế độ khách, chế độ demo. Kèm cấu hình demo (A8) và danh sách agent ACP được bật (A9).
 - Lưu trong DB server, sửa qua UI admin. **Server chặn**, không chỉ ẩn ở UI: tắt khách thì `POST /api/turns` trả `403 GuestModeDisabled`.
 - Danh sách endpoint tương thích OpenAI vẫn lấy từ env như phase 1 (đưa vào UI admin là việc sau, D).
 
@@ -67,17 +67,17 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 - Cùng đường với khách (DB local, server không trạng thái), nhưng request mang `{provider: 'demo'}` không có key; **server chọn provider, model, key** theo cấu hình admin. Client không chọn được model.
 - **Ngân sách trần chung (chốt 2026-11-21):** một ngân sách cho **tổng mọi người dùng demo**, không chia theo từng người. Hết ngân sách thì không ai dùng được demo nữa, cho tới khi ngân sách được đặt lại hoặc admin nâng trần.
 - **Cấu hình:** admin đặt trần và chu kỳ đặt lại (ngày / tháng / không đặt lại) trong UI admin; giá trị mặc định lúc khởi động lấy từ env (`KD_LEARN_DEMO_BUDGET`, `KD_LEARN_DEMO_BUDGET_PERIOD`). Trần bằng 0 nghĩa là demo đóng.
-- **Đơn vị:** số lần gọi model (một lượt có gọi tool tốn hai lần, xem [archive/phase-1.md](archive/phase-1.md) bước 8), cộng trần token cho mỗi lượt. Side chat tính chung. Không cần định danh người dùng demo.
+- **Đơn vị:** số lần gọi model (một lượt có gọi tool tốn hai lần, xem [archive/phase-1.md](phase-1.md) bước 8), cộng trần token cho mỗi lượt. Side chat tính chung. Không cần định danh người dùng demo.
 - Bộ đếm lưu bền trong DB server. Giữ chỗ nguyên tử **trước** khi gọi provider; hết ngân sách thì trả `DemoQuotaExceeded` và không gọi provider; UI báo demo đã hết lượt. Số lần gọi thực tế quyết toán cuối lượt.
 - UI admin hiện đã dùng bao nhiêu trên trần trong chu kỳ hiện tại.
-- **Model demo (chốt ở bước 6, 2026-11-21):** provider, model, key lấy từ env (`KD_LEARN_DEMO_PROVIDER`, `KD_LEARN_DEMO_MODEL`, `KD_LEARN_DEMO_API_KEY`, `KD_LEARN_DEMO_ENDPOINT`). UI admin chỉ đặt công tắc và ngân sách. Công tắc khách và demo độc lập. Chi tiết giữ chỗ và quyết toán ở [progress/phase-2.md](progress/phase-2.md) bước 6.
+- **Model demo (chốt ở bước 6, 2026-11-21):** provider, model, key lấy từ env (`KD_LEARN_DEMO_PROVIDER`, `KD_LEARN_DEMO_MODEL`, `KD_LEARN_DEMO_API_KEY`, `KD_LEARN_DEMO_ENDPOINT`). UI admin chỉ đặt công tắc và ngân sách. Công tắc khách và demo độc lập. Chi tiết giữ chỗ và quyết toán ở [progress/phase-2.md](phase-2.md) bước 6.
 
 ### A9. Backend ACP
 
-- Chỉ cho tài khoản, admin bật từng agent (Claude Code, opencode, Antigravity CLI). Adapter đã có ([mục 3.3](03-kien-truc.md)).
+- Chỉ cho tài khoản, admin bật từng agent (Claude Code, opencode, Antigravity CLI). Adapter đã có ([mục 3.3](../03-kien-truc.md)).
 - Giới hạn số process agent chạy đồng thời trên server; vượt thì xếp hàng hoặc trả lỗi rõ ràng.
 - **Model (chốt 2026-11-21, rủi ro 30):** vai dùng kết nối ACP chỉ chọn được model trong danh sách admin cho phép theo từng agent (`KD_LEARN_ACP_MODELS`, sửa trong màn admin). Server kiểm khi đặt vai và ở mỗi lượt.
-- Cài CLI và đăng nhập trong container là câu hỏi spike (C3), vì adapter chạy agent với home là thư mục tạm rỗng. Giữ nguyên [rủi ro 8, 16, 17](05-rui-ro.md).
+- Cài CLI và đăng nhập trong container là câu hỏi spike (C3), vì adapter chạy agent với home là thư mục tạm rỗng. Giữ nguyên [rủi ro 8, 16, 17](../05-rui-ro.md).
 
 ### A10. Triển khai
 
@@ -86,11 +86,11 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 
 ## B. Các bước
 
-Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model test bằng `AiPort` giả; kiểm bằng model thật tối đa một lần mỗi bước (1 lượt Haiku, xem model và chi phí trước). Theo dõi tiếp [rủi ro 18](05-rui-ro.md) ở các lượt thật.
+Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model test bằng `AiPort` giả; kiểm bằng model thật tối đa một lần mỗi bước (1 lượt Haiku, xem model và chi phí trước). Theo dõi tiếp [rủi ro 18](../05-rui-ro.md) ở các lượt thật.
 
 | # | Bước | Package | Xong khi |
 | --- | --- | --- | --- |
-| 0 | Spike driver SQLite server và thư viện auth (C1, C2) | spike | Trả lời đủ C1, C2; chốt driver và thư viện auth, ghi vào [mục 2.4](02-ky-thuat.md), đóng việc ở [mục 6](06-viec-mo.md) |
+| 0 | Spike driver SQLite server và thư viện auth (C1, C2) | spike | Trả lời đủ C1, C2; chốt driver và thư viện auth, ghi vào [mục 2.4](../02-ky-thuat.md), đóng việc ở [mục 6](../06-viec-mo.md) |
 | 1 | Driver SQLite server: migration riêng, `forUser`, bảng `sessions`, các service ngoài port (A3) | storage, server | Chạy lại bộ test của port trên driver mới; test hai người dùng: người này không đọc, không liệt kê, không ghi được buổi của người kia |
 | 2 | Auth: đăng ký theo công tắc, mã mời, đăng nhập, token, đăng xuất, admin đầu tiên, giới hạn đăng nhập sai, `CurrentUser` cho route | server, api, web | Test hợp đồng; token hết hạn / thu hồi bị từ chối; đăng ký đóng thì bị chặn; mật khẩu không vào log |
 | 3 | Key mã hoá và cài đặt tài khoản: kết nối, model theo vai (A5, A6) | server, api | DB chỉ chứa ciphertext; key không có trong phản hồi, log, lỗi; thiếu `KD_LEARN_SECRET_KEY` thì không khởi động |
@@ -112,7 +112,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model 
 
 ## C. Câu hỏi cho spike
 
-Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
+Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](../05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
 
 **C1. Driver SQLite server:**
 
@@ -133,7 +133,7 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 
 - Cài CLI của từng agent vào image thế nào; đăng nhập gói thuê bao bằng cách nào khi adapter dùng home rỗng (mount thư mục cấu hình chỉ đọc, hay chỉ hỗ trợ API key)?
 - Nếu không làm gọn được: ACP chỉ hỗ trợ khi chạy server ngoài Docker, ghi rõ trong tài liệu.
-- **Chốt ở bước 7 (2026-11-21):** theo phương án dự phòng. Image Docker không kèm ACP; xem [progress/phase-2.md](progress/phase-2.md) bước 7.
+- **Chốt ở bước 7 (2026-11-21):** theo phương án dự phòng. Image Docker không kèm ACP; xem [progress/phase-2.md](phase-2.md) bước 7.
 
 ## D. Ngoài phạm vi phase 2
 
@@ -142,4 +142,4 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 - Practitioner, extractor, UI sửa hồ sơ dạy học: phase 3.
 - Model theo vai cho khách, danh sách endpoint tương thích OpenAI trong UI admin: sau phase 2 nếu cần.
 - Đặt lại mật khẩu qua email, OAuth, nhiều instance server, sao lưu tự động.
-- Tóm tắt lịch sử dài: [mục 6](06-viec-mo.md).
+- Tóm tắt lịch sử dài: [mục 6](../06-viec-mo.md).

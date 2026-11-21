@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0–9 xong; bước hiện tại: bước 10 (kiểm tiêu chí phase trên stack Compose bằng model thật). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).
+Phase 3 (practice + graph, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 3 (quyết định nền, các bước, câu hỏi spike, như [archive/tai-khoan.md](archive/tai-khoan.md) của phase 2), gồm spike TanStack Charts cho màn hình graph. Bắt đầu làm thì tạo `progress/phase-3.md`.
