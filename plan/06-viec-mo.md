@@ -11,4 +11,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 1: spike port AI xong ([archive/spike-port-ai.md](archive/spike-port-ai.md)), còn chạy nốt 8 lượt Claude Code. Tiếp theo là phần chính của phase 1 ([mục 4](04-phases.md)). Tiến độ ở [progress/phase-1.md](progress/phase-1.md).
+Phase 1: spike port AI xong ([archive/spike-port-ai.md](archive/spike-port-ai.md)). Tiếp theo là phần chính của phase 1 ([mục 4](04-phases.md)). Tiến độ ở [progress/phase-1.md](progress/phase-1.md).

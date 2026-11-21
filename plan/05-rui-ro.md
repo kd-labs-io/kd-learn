@@ -3,7 +3,7 @@
 
 | # | Rủi ro | Cách xử lý |
 | --- | --- | --- |
-| 1 | Output có cấu trúc qua ACP không đủ tin cậy | **Đã kiểm chứng (2026-11-21): đạt, chờ 8 lượt Claude Code.** Tool `submit_result` validate bằng Effect Schema, cho sửa một lần. opencode và Antigravity CLI 20/20 lượt hợp lệ, Claude Code 12/12 (8 lượt còn lại dính giới hạn gói). Tool có sẵn của agent bị chặn ở cả ba. Chi tiết ở [spike port AI](archive/spike-port-ai.md) |
+| 1 | Output có cấu trúc qua ACP không đủ tin cậy | **Đã kiểm chứng (2026-11-21): đạt.** Tool `submit_result` validate bằng Effect Schema, cho sửa một lần. Cả ba agent (Claude Code, opencode, Antigravity CLI) 20/20 lượt hợp lệ, không lượt nào cần sửa. Tool có sẵn của agent bị chặn ở cả ba. Chi tiết ở [spike port AI](archive/spike-port-ai.md) |
 | 2 | Ranh giới giữa stream của TanStack AI và Effect | **Đã kiểm chứng (2026-11-17): đạt.** Adapter tự viết trong `packages/ai/src/tanstack` chuyển stream sang `Stream` của Effect; huỷ Stream thì abort request (có test). Chi tiết ở [spike port AI](archive/spike-port-ai.md) |
 | 3 | Khách phải gửi lại lịch sử buổi học mỗi lượt | Giới hạn kích thước request, thiết kế cách tóm tắt lịch sử dài. Chưa thiết kế |
 | 4 | Việc nền của khách dừng khi đóng tab | Research và PDF ở chế độ khách phải chạy lại được sau khi bị ngắt |
