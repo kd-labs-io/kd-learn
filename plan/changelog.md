@@ -18,3 +18,4 @@
 - **Cập nhật:** 2026-11-17: xong phần A của spike port AI (TanStack AI), rủi ro 2 đạt; thêm `packages/ai` (mục 5, 8, spike port AI)
 - **Cập nhật:** 2026-11-21: xong phần B của spike port AI (ACP), rủi ro 1 đạt (cả ba agent 20/20); chốt hình dạng port (mục 3.3), cập nhật mục 2.4, thêm rủi ro 15, 16; đóng spike, chuyển `spike-port-ai.md` vào `archive/` (mục 2.4, 3.3, 5, 6, 7, 8)
 - **Cập nhật:** 2026-11-21: sửa adapter ACP cho Claude Code (model bị ghi đè, connector claude.ai làm phình ngữ cảnh); sửa kết quả spike: cả 20 lượt Claude Code chạy Opus; cập nhật rủi ro 16, thêm rủi ro 17 (mục 5, spike port AI)
+- **Cập nhật:** 2026-11-21: adapter ACP không còn ghi transcript của Claude Code vào `~/.claude/projects`; email tài khoản không tắt được với gói thuê bao (rủi ro 17). Script spike in model và chi phí mỗi lượt (mục 5)
