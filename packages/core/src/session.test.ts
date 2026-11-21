@@ -56,6 +56,7 @@ const usage = (turnId: string, inputTokens: number, outputTokens: number): Domai
   _tag: 'UsageRecorded',
   ...meta(),
   turnId,
+  model: 'test-model',
   inputTokens,
   outputTokens,
 });
@@ -91,13 +92,27 @@ const sessionDone = (turnId: string): DomainEvent => ({
   ...meta(),
   turnId,
 });
-const side = (threadId: string, role: 'user' | 'assistant', content: string): DomainEvent => ({
+const side = (
+  threadId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  usage?: { model: string; inputTokens: number; outputTokens: number },
+): DomainEvent => ({
   _tag: 'SideMessageAppended',
   ...meta(),
   threadId,
   messageId: `sm${counter}`,
   role,
   content,
+  ...(usage ? { usage } : {}),
+});
+const sideFailed = (threadId: string): DomainEvent => ({
+  _tag: 'SideTurnFailed',
+  ...meta(),
+  threadId,
+  code: 'ProviderError',
+  message: 'rate limited',
+  retryable: true,
 });
 
 const project = (...events: Array<DomainEvent>): Session => {
@@ -205,6 +220,25 @@ describe('projectSession', () => {
       sessionDone('t4'),
     );
     expect(s.state).toEqual({ _tag: 'Done' });
+  });
+
+  it('adds side chat usage to the total and ignores a side failure', () => {
+    const before = project(created(), started('t1', 'hi'), usage('t1', 3, 4), done('t1'));
+    const s = project(
+      created(),
+      started('t1', 'hi'),
+      usage('t1', 3, 4),
+      done('t1'),
+      side('th', 'user', 'q'),
+      sideFailed('th'),
+      side('th', 'user', 'q'),
+      side('th', 'assistant', 'a', { model: 'm', inputTokens: 5, outputTokens: 6 }),
+    );
+    expect(before.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
+    expect(s.usage).toEqual({ inputTokens: 8, outputTokens: 10 });
+    expect(s.state).toEqual(before.state);
+    expect(s.history).toEqual(before.history);
+    expect(s.sideThreads['th']).toHaveLength(3);
   });
 
   it('builds history from completed turns only and sums usage', () => {

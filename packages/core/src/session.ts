@@ -273,8 +273,16 @@ export const projectSession = (
           content: event.content,
           ...(event.stepId === undefined ? {} : { stepId: event.stepId }),
         });
+        if (event.usage !== undefined) {
+          inputTokens += event.usage.inputTokens;
+          outputTokens += event.usage.outputTokens;
+        }
         break;
       }
+
+      case 'SideTurnFailed':
+        // Changes no state: the UI reads the log to offer a retry.
+        break;
     }
   }
 

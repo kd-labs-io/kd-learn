@@ -350,6 +350,9 @@ importers:
 
   packages/agent:
     dependencies:
+      '@kd-learn/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@kd-learn/core':
         specifier: workspace:*
         version: link:../core

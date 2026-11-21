@@ -28,9 +28,9 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 | --- | --- |
 | `TextDelta` | Không lưu. Khi lượt kết thúc, gộp thành một `MessageAppended` |
 | `ToolCall` / `ToolResult` của tool chuyển trạng thái | Tool tự sinh event có nghĩa (A4). Không lưu bản ghi gọi tool thô |
-| `Usage` | Cộng dồn trong lượt, ghi một `UsageRecorded` ở cuối lượt |
+| `Usage` | Cộng dồn trong lượt, ghi một `UsageRecorded` (kèm tên model) ở cuối lượt |
 | `Finish` | `TurnCompleted` |
-| Lỗi | `TurnFailed` (mã lỗi, có thử lại được không) |
+| Lỗi | `TurnFailed` (mã lỗi, có thử lại được không). Lượt lỗi chỉ để lại `TurnFailed` (và `UsageRecorded` nếu đã tốn token): chữ dở và event do tool sinh trong lượt đó bị bỏ. Event của lượt chỉ được phát ở cuối lượt |
 
 ### A3. Tải lại trang giữa lượt
 
@@ -55,12 +55,12 @@ Các quyết định này cố định schema, định dạng SSE và việc `ag
 - **Lối thoát:**
   - Nếu một bước kéo quá M lượt, người học bấm được "sang bước sau" (event `StepSkipped`).
   - Người học sửa được plan trước khi bắt đầu dạy. Phần này để sau phase 1.
-- **Chuyển trạng thái:** dùng tool, không dùng output có cấu trúc, vì Teacher cần vừa stream chữ vừa đổi trạng thái trong cùng một lượt. Cần kiểm lại bằng một lượt chạy thật ở bước 3.
+- **Chuyển trạng thái:** dùng tool, không dùng output có cấu trúc, vì Teacher cần vừa stream chữ vừa đổi trạng thái trong cùng một lượt. Đã kiểm bằng lượt chạy thật ở bước 3 (2026-11-21, Haiku): đứng vững, xem [progress/phase-1.md](progress/phase-1.md). Tool theo trạng thái: `submit_assessment` khi probing, `create_plan` khi planning, `complete_step` khi teaching; sau `AssessmentRecorded` client bắt đầu ngay một lượt input rỗng để Teacher lập plan.
 
 ### A5. Side chat
 
 - Là luồng riêng gắn với buổi học và bước hiện tại. Event là `SideMessageAppended {threadId}`.
-- Ngữ cảnh gồm plan, bước hiện tại và vài tin nhắn gần nhất của luồng chính. Side chat không ghi vào lịch sử chính và không đổi trạng thái buổi học.
+- Ngữ cảnh gồm plan, bước hiện tại và vài tin nhắn gần nhất của luồng chính. Side chat không ghi vào lịch sử chính và không đổi trạng thái buổi học. Client ghi tin nhắn của người học trước khi gửi (như A3); lỗi ghi `SideTurnFailed {threadId}`; tin trả lời mang `usage` của lượt gọi model.
 
 ### A6. Phạm vi model và hồ sơ dạy học
 

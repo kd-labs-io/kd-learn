@@ -53,13 +53,22 @@ export const MessageAppended = Schema.TaggedStruct('MessageAppended', {
   content: Schema.String,
 });
 
-/** Token usage summed over the model calls of one turn. */
+/** Token usage summed over the model calls of one turn. `model` is what served them, to price them later. */
 export const UsageRecorded = Schema.TaggedStruct('UsageRecorded', {
   ...base,
   turnId: TurnId,
+  model: Schema.NonEmptyString,
   inputTokens: NonNegativeInt,
   outputTokens: NonNegativeInt,
 });
+
+/** Usage of one side chat answer (it has no turn, so no `UsageRecorded`). */
+export const SideUsage = Schema.Struct({
+  model: Schema.NonEmptyString,
+  inputTokens: NonNegativeInt,
+  outputTokens: NonNegativeInt,
+});
+export type SideUsage = typeof SideUsage.Type;
 
 export const TurnCompleted = Schema.TaggedStruct('TurnCompleted', {
   ...base,
@@ -76,7 +85,7 @@ export const TurnFailed = Schema.TaggedStruct('TurnFailed', {
   retryable: Schema.Boolean,
 });
 
-/** Result of the Prober's `submit_assessment` tool. */
+/** Result of the Prober's `submit_assessment` tool. `level` is coarse; the Teacher reads `summary` and `gaps`. */
 export const AssessmentRecorded = Schema.TaggedStruct('AssessmentRecorded', {
   ...base,
   turnId: TurnId,
@@ -121,6 +130,20 @@ export const SideMessageAppended = Schema.TaggedStruct('SideMessageAppended', {
   content: Schema.String,
   /** Step the learner was on. Absent before teaching starts. */
   stepId: Schema.optionalKey(StepId),
+  /** Usage of the model call that produced an assistant message. */
+  usage: Schema.optionalKey(SideUsage),
+});
+
+/**
+ * A side chat answer failed. The learner's message is already in the log (the client writes it first),
+ * so the UI can offer a retry. `message` must never contain a key (plan A7). Changes no session state.
+ */
+export const SideTurnFailed = Schema.TaggedStruct('SideTurnFailed', {
+  ...base,
+  threadId: Schema.NonEmptyString,
+  code: Schema.NonEmptyString,
+  message: Schema.String,
+  retryable: Schema.Boolean,
 });
 
 export const DomainEvent = Schema.Union([
@@ -136,6 +159,7 @@ export const DomainEvent = Schema.Union([
   StepSkipped,
   SessionCompleted,
   SideMessageAppended,
+  SideTurnFailed,
 ]);
 export type DomainEvent = typeof DomainEvent.Type;
 
