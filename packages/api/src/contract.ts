@@ -14,6 +14,7 @@ export const INVITES_PATH = '/api/admin/invites';
 export const ACCOUNT_SETTINGS_PATH = '/api/account/settings';
 export const CONNECTIONS_PATH = '/api/account/connections';
 export const ROLES_PATH = '/api/account/roles';
+export const SESSIONS_PATH = '/api/account/sessions';
 
 const Secret = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512));
 const ModelName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200));
@@ -104,6 +105,12 @@ export const ErrorCode = {
   RoleNotConfigured: 'RoleNotConfigured',
   /** A stored key cannot be decrypted (the master key changed). Enter the key again. */
   KeyUnreadable: 'KeyUnreadable',
+  /** The session already runs a turn of this kind (one main and one side turn at a time, A2). */
+  TurnInProgress: 'TurnInProgress',
+  /** The turn cannot start in this state (session done, nothing to retry, step not current). */
+  NothingToRun: 'NothingToRun',
+  /** The turn ran out of time on the server. */
+  TurnTimeout: 'TurnTimeout',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -251,3 +258,104 @@ export const AccountSettings = Schema.Struct({
   roles: RoleModels,
 });
 export type AccountSettings = typeof AccountSettings.Type;
+
+// Account sessions (plan tai-khoan.md A1, A2). The server writes the log; the client only reads it,
+// starts turns, and follows the stream. Paths below `SESSIONS_PATH`:
+//   GET  /                                  list
+//   POST /                                  create (CreateSessionRequest)
+//   GET  /:id                               snapshot (SessionSnapshot)
+//   GET  /:id/stream?after=<seq>            SSE of AccountFrame
+//   POST /:id/turns                         start (StartTurnRequest) -> StartTurnResponse
+//   POST /:id/turns/:turnId/cancel          cancel a running turn
+//   POST /:id/skip                          skip the current step (SkipStepRequest)
+
+/** Learner input of one message. */
+// 4000 code units stay under the 16 KiB body cap of account routes, even as 3-byte UTF-8.
+const Input = Schema.String.check(Schema.isMaxLength(4000));
+
+export const CreateSessionRequest = Schema.Struct({
+  topic: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+  /** Language of the lesson, a BCP 47 tag such as `vi` or `en`. */
+  language: Schema.String.check(Schema.isPattern(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/)),
+});
+export type CreateSessionRequest = typeof CreateSessionRequest.Type;
+
+export const CreateSessionResponse = Schema.Struct({ sessionId: Schema.NonEmptyString });
+export type CreateSessionResponse = typeof CreateSessionResponse.Type;
+
+export const SessionSummaryInfo = Schema.Struct({
+  sessionId: Schema.NonEmptyString,
+  topic: Schema.String,
+  createdAt: Schema.Number,
+  updatedAt: Schema.Number,
+  eventCount: Schema.Number,
+});
+export const SessionList = Schema.Struct({ sessions: Schema.Array(SessionSummaryInfo) });
+export type SessionList = typeof SessionList.Type;
+
+/**
+ * `send`: the learner's answer. `retry`: the input of the failed or interrupted last turn again.
+ * `auto`: the turn that needs no input (first Prober turn, planning). `side`: a side chat message
+ * (`content` absent: answer the last learner message again).
+ */
+export const StartTurnRequest = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('send'), input: Input }),
+  Schema.Struct({ kind: Schema.Literal('retry') }),
+  Schema.Struct({ kind: Schema.Literal('auto') }),
+  Schema.Struct({
+    kind: Schema.Literal('side'),
+    threadId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    content: Schema.optionalKey(Input.check(Schema.isMinLength(1))),
+  }),
+]);
+export type StartTurnRequest = typeof StartTurnRequest.Type;
+
+/** `turnId` of a main turn; for a side turn, the id the stream uses for it. */
+export const StartTurnResponse = Schema.Struct({ turnId: Schema.NonEmptyString });
+export type StartTurnResponse = typeof StartTurnResponse.Type;
+
+export const SkipStepRequest = Schema.Struct({ stepId: Schema.NonEmptyString });
+export type SkipStepRequest = typeof SkipStepRequest.Type;
+
+/** A turn the server is running now. An open `TurnStarted` without one is interrupted. */
+export const RunningTurn = Schema.Struct({
+  turnId: Schema.NonEmptyString,
+  kind: Schema.Literals(['main', 'side']),
+  threadId: Schema.optionalKey(Schema.String),
+  /** Text streamed so far, per assistant message. */
+  text: Schema.Array(Schema.Struct({ messageId: Schema.String, text: Schema.String })),
+});
+export type RunningTurn = typeof RunningTurn.Type;
+
+/** `seq` is the position in the session log: contiguous from 0. */
+export const SequencedEvent = Schema.Struct({ seq: Schema.Number, event: DomainEvent });
+export type SequencedEvent = typeof SequencedEvent.Type;
+
+/** `GET .../sessions/:id`. */
+export const SessionSnapshot = Schema.Struct({
+  events: Schema.Array(SequencedEvent),
+  running: Schema.Array(RunningTurn),
+});
+export type SessionSnapshot = typeof SessionSnapshot.Type;
+
+/** First frame of a stream: the turns running at connect time, with their text so far. */
+export const RunningFrame = Schema.TaggedStruct('running', { turns: Schema.Array(RunningTurn) });
+/** A committed event, in log order. */
+export const LogFrame = Schema.TaggedStruct('log', SequencedEvent.fields);
+/** Live text of a running turn. Display only. */
+export const TurnDeltaFrame = Schema.TaggedStruct('delta', {
+  turnId: Schema.NonEmptyString,
+  messageId: Schema.NonEmptyString,
+  delta: Schema.String,
+});
+/** A turn started (`running`) or ended. `failed` carries the failure (also in the log). */
+export const TurnFrame = Schema.TaggedStruct('turn', {
+  turnId: Schema.NonEmptyString,
+  kind: Schema.Literals(['main', 'side']),
+  threadId: Schema.optionalKey(Schema.String),
+  status: Schema.Literals(['running', 'completed', 'failed', 'cancelled']),
+  error: Schema.optionalKey(Failure),
+});
+
+export const AccountFrame = Schema.Union([RunningFrame, LogFrame, TurnDeltaFrame, TurnFrame]);
+export type AccountFrame = typeof AccountFrame.Type;

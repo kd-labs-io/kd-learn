@@ -3,6 +3,8 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Effect, Schema } from 'effect';
+import type { Layer } from 'effect';
+import type { AiPort } from '@kd-learn/ai/port';
 import {
   AuthResponse,
   CreateInviteRequest,
@@ -12,7 +14,12 @@ import {
   MeResponse,
   RegisterRequest,
 } from '@kd-learn/api';
-import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlite-node';
+import {
+  makeServerStorage,
+  openServerDatabase,
+  type ServerDatabase,
+} from '@kd-learn/storage/sqlite-node';
+import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
 import { makeSettings, type SettingsService } from '../settings/service.ts';
@@ -29,6 +36,7 @@ export interface Accounts {
   readonly database: ServerDatabase;
   readonly auth: AuthService;
   readonly settings: SettingsService;
+  readonly sessions: SessionRunner;
 }
 
 /**
@@ -39,6 +47,8 @@ export const initAccounts = async (
   config: AccountConfig,
   options: {
     readonly endpoints: () => ReadonlyArray<Endpoint>;
+    readonly ai: Layer.Layer<AiPort>;
+    readonly turnTimeoutMs?: number;
     readonly database?: ServerDatabase;
     readonly auth?: AuthOptions;
     readonly log: Logger;
@@ -56,7 +66,14 @@ export const initAccounts = async (
   }
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
   const settings = makeSettings(database, box, options.endpoints);
-  return { database, auth, settings };
+  const sessions = makeSessionRunner({
+    storage: makeServerStorage(database),
+    settings,
+    ai: options.ai,
+    log: options.log,
+    ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
+  });
+  return { database, auth, settings, sessions };
 };
 
 export interface AccountHandlers {

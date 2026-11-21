@@ -1,12 +1,17 @@
 // Server-sent events framing for `Frame`. Pure string work, shared by server and client.
 import { Schema } from 'effect';
-import { Frame } from './contract.ts';
+import { AccountFrame, Frame } from './contract.ts';
 
 const encodeJson = Schema.encodeSync(Frame);
+const encodeAccountJson = Schema.encodeSync(AccountFrame);
 
 /** One SSE message: `event: <tag>` and a single-line JSON `data`. */
 export const encodeFrame = (frame: Frame): string =>
   `event: ${frame._tag}\ndata: ${JSON.stringify(encodeJson(frame))}\n\n`;
+
+/** One SSE message of the account stream. */
+export const encodeAccountFrame = (frame: AccountFrame): string =>
+  `event: ${frame._tag}\ndata: ${JSON.stringify(encodeAccountJson(frame))}\n\n`;
 
 export interface SseMessage {
   readonly event: string;

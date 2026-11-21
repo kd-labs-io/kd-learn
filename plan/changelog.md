@@ -38,3 +38,4 @@
 - **Cập nhật:** 2026-11-21: xong bước 1 phase 2 (driver `@kd-learn/storage/sqlite-node`, migration riêng của server, `forUser`), ghi ở `progress/phase-2.md`; mục 7 chuyển sang bước 2, 3
 - **Cập nhật:** 2026-11-21: xong bước 2 phase 2 (auth tự viết, route `/api/auth/*`, `/api/admin/invites`); A4 và rủi ro 23 ghi rõ đăng ký không giấu được email đã có khi chưa xác minh email; mục 7 chuyển sang bước 3
 - **Cập nhật:** 2026-11-21: xong bước 3 phase 2 (key mã hoá AES-256-GCM, cài đặt model theo vai, route `/api/account/*`); A5 ghi rõ thiếu `KD_LEARN_SECRET_KEY` thì chỉ phần tài khoản không chạy; mục 7 chuyển sang bước 4
+- **Cập nhật:** 2026-11-21: xong bước 4 phase 2 (lượt chạy trên server tách khỏi request, stream gắn lại theo `seq`, huỷ, khoá theo buổi, quá giờ 3 phút); `shouldAutoStart` chuyển sang `@kd-learn/agent/client`; rủi ro 25 ghi kết quả; mục 7 chuyển sang bước 5
