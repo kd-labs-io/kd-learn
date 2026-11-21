@@ -1,4 +1,4 @@
 {
-  "extends": "@kd-learn/config/tsconfig/pure.json",
+  "extends": "@kd-learn/config/tsconfig/dom.json",
   "include": ["src"]
 }

@@ -8,7 +8,7 @@
 | TypeScript | 6.0, chưa lên 7: `typescript-eslint` chỉ hỗ trợ dưới 6.1, `astryx integration check` cần API của TS 6 |
 | i18n | [Paraglide JS](https://paraglidejs.com) cho chuỗi của app (`packages/i18n/messages/{vi,en}.json`, ngôn ngữ gốc `vi`). Chuỗi của component Astryx do `InternationalizationProvider` của Astryx dịch, dùng chung locale. Locale lấy theo cookie, rồi ngôn ngữ trình duyệt, rồi `vi`. Plugin của Paraglide nạp từ `node_modules`, không từ CDN |
 | Font | Tự host qua Fontsource (bản variable của Inter, Source Serif 4, JetBrains Mono) |
-| Test | Vitest |
+| Test | Vitest. Test trình duyệt (DB local, sau này luồng UI): Playwright (`@playwright/test`, `apps/web/e2e`, đuôi `*.e2e.ts` để Vitest không nhặt), chạy trên bản build SSR; CI chỉ cài Chromium (chốt ở bước 5 phase 1, [progress/phase-1.md](progress/phase-1.md)) |
 | Lint | ESLint, gồm rule chặn import theo package (ranh giới ở [mục 3.2](03-kien-truc.md)) |
 | Format | Prettier |
 | CI | GitHub Actions chạy `turbo build test lint` |
