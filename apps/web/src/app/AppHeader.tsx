@@ -15,7 +15,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const current = useWho();
   const config = usePublicConfig().data ?? guestOnly;
-  const go = (to: '/' | '/settings' | '/admin' | '/login') => void navigate({ to });
+  const go = (to: '/' | '/settings' | '/admin' | '/login' | '/graph') => void navigate({ to });
 
   const mode = current.status === 'local' ? localModeOf(current, config) : undefined;
   // Another mode to switch to: the chooser only makes sense when the server offers more than one.
@@ -63,6 +63,15 @@ export function AppHeader() {
             onClick={() => go('/')}
             data-testid="nav-home"
           />
+          {current.status === 'signed-in' || mode !== undefined ? (
+            <Button
+              label={m.nav_graph()}
+              variant="ghost"
+              size="sm"
+              onClick={() => go('/graph')}
+              data-testid="nav-graph"
+            />
+          ) : null}
           {mode === 'demo' ? null : (
             <Button
               label={m.nav_settings()}
