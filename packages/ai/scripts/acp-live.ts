@@ -45,12 +45,42 @@ const Answer = Schema.Struct({
 
 // Every submit_result call of the current run: true when accepted.
 let submits: Array<boolean> = [];
-const run = runTurn({ onSubmit: (accepted) => submits.push(accepted) });
+// What the agent reports for the current run: its model and its last usage_update.
+let agentModel = '?';
+let usage: { used?: number; size?: number; cost?: { amount: number; currency: string } | null } =
+  {};
+let totalCost = 0;
+const run = runTurn({
+  onSubmit: (accepted) => submits.push(accepted),
+  onAcp: (event) => {
+    const raw = (event.kind === 'session' ? event.response : event.update) as {
+      sessionUpdate?: string;
+      models?: { currentModelId?: string } | null;
+      configOptions?: ReadonlyArray<{
+        id: string;
+        category?: string | null;
+        currentValue?: unknown;
+      }> | null;
+    } & typeof usage;
+    // Agents report the model either in `models` or as a config option of category `model`.
+    const option = raw.configOptions?.find((o) => o.category === 'model' || o.id === 'model');
+    const model = raw.models?.currentModelId ?? option?.currentValue;
+    if (typeof model === 'string') agentModel = model;
+    if (raw.sessionUpdate === 'usage_update') usage = raw;
+  },
+});
+const usageText = () => {
+  totalCost += usage.cost?.amount ?? 0;
+  const cost = usage.cost ? ` cost=${usage.cost.amount.toFixed(4)} ${usage.cost.currency}` : '';
+  return `model=${agentModel} context=${usage.used ?? '?'}/${usage.size ?? '?'}${cost}`;
+};
 
 const once = (i: number) => {
   const a = 1000 + i;
   const b = 2345 * (i + 1);
   submits = [];
+  agentModel = '?';
+  usage = {};
   return run({
     model,
     system: 'You are a terse assistant.',
@@ -67,7 +97,7 @@ const once = (i: number) => {
       return {
         ok: value?.sum === a + b,
         submits: submits.length,
-        detail: `tools=${toolCalls} submits=${submits.length} ${JSON.stringify(value)}`,
+        detail: `${usageText()} tools=${toolCalls} submits=${submits.length} ${JSON.stringify(value)}`,
         ms: Number(duration),
       };
     }),
@@ -75,7 +105,7 @@ const once = (i: number) => {
       Effect.succeed({
         ok: false,
         submits: submits.length,
-        detail: `${error._tag} submits=${submits.length}: ${error.message.slice(0, 300)}`,
+        detail: `${usageText()} ${error._tag} submits=${submits.length}: ${error.message.slice(0, 300)}`,
         ms: 0,
       }),
     ),
@@ -140,7 +170,9 @@ const program = Effect.gen(function* () {
     if (r.ok && r.submits > 1) fixed++;
     console.log(agent, i, r.ok ? 'ok' : 'FAIL', r.detail);
   }
-  console.log(`${agent}: ${passed}/${runs} valid, ${fixed} after a fix`);
+  console.log(
+    `${agent}: ${passed}/${runs} valid, ${fixed} after a fix, cost ${totalCost.toFixed(4)}`,
+  );
   if (skipInterrupt) return;
   console.log(
     agent,

@@ -79,6 +79,8 @@ const launchFor = (ref: AcpRef, home: string): Launch => {
           ...(ref.model ? { ANTHROPIC_MODEL: ref.model } : {}),
           // Without this, every claude.ai connector of the account joins the context (~500k tokens).
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+          // No auto memory dir under the server user's ~/.claude/projects.
+          CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
         },
         // No built-in tools, no user/project settings (hooks, MCP servers, default mode), no bypass,
         // no MCP servers but kd-learn's.
@@ -89,6 +91,8 @@ const launchFor = (ref: AcpRef, home: string): Launch => {
               settingSources: [],
               strictMcpConfig: true,
               allowDangerouslySkipPermissions: false,
+              // Keep transcripts out of the server user's ~/.claude/projects.
+              persistSession: false,
             },
           },
         },
@@ -161,6 +165,12 @@ export interface AcpOverrides {
   readonly onSubmit?: (accepted: boolean) => void;
   /** Spike hook: false drops the "use only kd-learn tools" line, to test the technical block alone. */
   readonly toolRule?: boolean;
+  /** Spike hook: the raw `session/new` response and every `session/update`, to read model and usage. */
+  readonly onAcp?: (
+    event:
+      | { readonly kind: 'session'; readonly response: unknown }
+      | { readonly kind: 'update'; readonly update: unknown },
+  ) => void;
 }
 
 export const runTurn =
@@ -320,6 +330,7 @@ export const runTurn =
                   },
             );
             return builder.withSession(async (session) => {
+              overrides.onAcp?.({ kind: 'session', response: session.newSessionResponse });
               cancel = () =>
                 ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
               void session.prompt(
@@ -333,6 +344,7 @@ export const runTurn =
                 const next = await session.nextUpdate();
                 if (next.kind === 'stop') return next.stopReason;
                 const u = next.update;
+                overrides.onAcp?.({ kind: 'update', update: u });
                 if (u.sessionUpdate === 'agent_message_chunk' && u.content.type === 'text') {
                   emit({ _tag: 'TextDelta', messageId: session.sessionId, delta: u.content.text });
                 }
