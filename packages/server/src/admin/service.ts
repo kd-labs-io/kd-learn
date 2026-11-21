@@ -1,0 +1,102 @@
+// Admin switches and user management (plan tai-khoan.md A7). Stored in `server_config`; a value
+// an admin never set falls back to the environment default.
+import type {
+  AdminConfig,
+  AdminUser,
+  RegistrationMode,
+  UpdateAdminConfigRequest,
+} from '@kd-learn/api';
+import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
+import type { AuthService } from '../auth/service.ts';
+import { registrationModes } from '../auth/service.ts';
+
+export interface SwitchDefaults {
+  readonly registration: RegistrationMode;
+  readonly guestMode: boolean;
+  readonly demoMode: boolean;
+}
+
+export interface AdminService {
+  readonly config: () => AdminConfig;
+  readonly updateConfig: (change: UpdateAdminConfigRequest) => AdminConfig;
+  readonly users: () => ReadonlyArray<AdminUser>;
+  /** Undefined when there is no such user. */
+  readonly user: (userId: string) => AdminUser | undefined;
+  readonly setDisabled: (userId: string, disabled: boolean) => void;
+  readonly unlock: (userId: string) => void;
+}
+
+const bool = (value: string | undefined, fallback: boolean) =>
+  value === undefined ? fallback : value === 'true';
+
+export const makeAdmin = (
+  database: ServerDatabase,
+  auth: AuthService,
+  defaults: SwitchDefaults,
+  now: () => number = Date.now,
+): AdminService => {
+  const { db } = database;
+  const q = {
+    get: db.prepare('SELECT value FROM server_config WHERE key = ?'),
+    put: db.prepare('INSERT OR REPLACE INTO server_config (key, value) VALUES (?, ?)'),
+    users: db.prepare(
+      `SELECT u.id, u.email, u.role, u.disabled, u.created_at, t.locked_until
+         FROM users u LEFT JOIN login_throttle t ON t.email = u.email
+        ORDER BY u.created_at, u.id`,
+    ),
+    user: db.prepare(
+      `SELECT u.id, u.email, u.role, u.disabled, u.created_at, t.locked_until
+         FROM users u LEFT JOIN login_throttle t ON t.email = u.email WHERE u.id = ?`,
+    ),
+  };
+  const read = (key: string) => (q.get.get(key) as { value: string } | undefined)?.value;
+
+  const config = (): AdminConfig => ({
+    registration: auth.registrationMode(),
+    guestMode: bool(read('guestMode'), defaults.guestMode),
+    demoMode: bool(read('demoMode'), defaults.demoMode),
+  });
+
+  type Row = {
+    id: string;
+    email: string;
+    role: 'admin' | 'user';
+    disabled: number;
+    created_at: number;
+    locked_until: number | null;
+  };
+  const toUser = (row: Row): AdminUser => ({
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    disabled: Boolean(row.disabled),
+    ...(row.locked_until !== null && row.locked_until > now()
+      ? { lockedUntil: Number(row.locked_until) }
+      : {}),
+    createdAt: Number(row.created_at),
+  });
+
+  return {
+    config,
+    updateConfig: (change) => {
+      database.transaction(() => {
+        if (change.registration !== undefined && registrationModes.includes(change.registration)) {
+          auth.setRegistrationMode(change.registration);
+        }
+        if (change.guestMode !== undefined) q.put.run('guestMode', String(change.guestMode));
+        if (change.demoMode !== undefined) q.put.run('demoMode', String(change.demoMode));
+      });
+      return config();
+    },
+    users: () => (q.users.all() as unknown as Row[]).map(toUser),
+    user: (userId) => {
+      const row = q.user.get(userId) as unknown as Row | undefined;
+      return row === undefined ? undefined : toUser(row);
+    },
+    setDisabled: (userId, disabled) => auth.setDisabled(userId, disabled),
+    unlock: (userId) => {
+      const row = q.user.get(userId) as unknown as Row | undefined;
+      if (row) auth.unlock(row.email);
+    },
+  };
+};

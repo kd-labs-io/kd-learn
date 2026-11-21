@@ -20,7 +20,20 @@ export interface AccountConfig {
   readonly trustProxy: boolean;
   /** `KD_LEARN_SECRET_KEY`: encrypts provider keys (plan A5). Required for accounts. */
   readonly masterKey: Buffer;
+  /** Guest mode until an admin changes it (`KD_LEARN_GUEST_MODE`, default on). */
+  readonly guestMode: boolean;
+  /** Demo mode until an admin changes it (`KD_LEARN_DEMO_MODE`, default off). */
+  readonly demoMode: boolean;
 }
+
+/** `on`/`off`, `true`/`false`, `1`/`0`; empty gives `fallback`. */
+export const switchFrom = (name: string, raw: string | undefined, fallback: boolean): boolean => {
+  const value = raw?.trim().toLowerCase() ?? '';
+  if (value === '') return fallback;
+  if (['on', 'true', '1'].includes(value)) return true;
+  if (['off', 'false', '0'].includes(value)) return false;
+  throw new ConfigError({ message: `${name} must be on or off.` });
+};
 
 export const DEFAULT_DB_PATH = 'data/kd-learn.db';
 
@@ -31,6 +44,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * - `KD_LEARN_ADMIN_EMAIL`, `KD_LEARN_ADMIN_PASSWORD`: the first admin.
  * - `KD_LEARN_REGISTRATION`: `open`, `invite` (default) or `closed`.
  * - `KD_LEARN_TRUST_PROXY`: `1` or `true` behind a reverse proxy.
+ * - `KD_LEARN_GUEST_MODE`, `KD_LEARN_DEMO_MODE`: `on` / `off`, defaults until an admin changes them.
  * - `KD_LEARN_SECRET_KEY`: required, 32 bytes in base64. Without it the account routes refuse to
  *   run (guest mode does not need it).
  */
@@ -66,6 +80,8 @@ export const loadAccountConfig = (
     registration,
     trustProxy: trust === '1' || trust === 'true',
     masterKey: loadMasterKey(env),
+    guestMode: switchFrom('KD_LEARN_GUEST_MODE', env.KD_LEARN_GUEST_MODE, true),
+    demoMode: switchFrom('KD_LEARN_DEMO_MODE', env.KD_LEARN_DEMO_MODE, false),
   };
 };
 

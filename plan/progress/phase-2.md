@@ -11,7 +11,7 @@
 | Bước 2: auth | Xong (2026-11-21). `packages/server/src/auth/`, route `/api/auth/*`, `/api/admin/invites`. Xem ghi chú bước 2 bên dưới |
 | Bước 3: key mã hoá, cài đặt theo vai | Xong (2026-11-21). `packages/server/src/settings/`, route `/api/account/*`. Xem ghi chú bước 3 bên dưới |
 | Bước 4: lượt chạy trên server | Xong (2026-11-21). `packages/server/src/sessions/`, route `/api/account/sessions/*`. Xem ghi chú bước 4 bên dưới |
-| Bước 5: công tắc admin | Chưa bắt đầu |
+| Bước 5: công tắc admin | Xong (2026-11-21). `packages/server/src/admin/`, route `/api/admin/*`, `/api/config`. Xem ghi chú bước 5 bên dưới |
 | Bước 6: demo, ngân sách chung | Chưa bắt đầu |
 | Bước 7: ACP | Chưa bắt đầu |
 | Bước 8: UI | Chưa bắt đầu |
@@ -187,4 +187,26 @@ Thử nghiệm chạy bằng script tạm (không giữ trong repo) trên macOS,
   - Defect và lỗi provider có chứa key thì DB và log sạch key; quá giờ; nối lượt lập plan; side chạy song song với main; vai chưa đặt.
   - Cross-user: cả 6 route trả 404 và không tạo dòng `sessions`; khởi động lại trên cùng file DB.
 - **Giới hạn:** input của người học tối đa 4.000 ký tự (dưới trần 16 KiB của body route tài khoản).
+
+## Bước 5: công tắc admin (2026-11-21)
+
+- **Công tắc:** đăng ký (`open` / `invite` / `closed`), chế độ khách, chế độ demo. Lưu trong `server_config`. Công tắc nào admin chưa đặt thì lấy mặc định từ env: `KD_LEARN_REGISTRATION`, `KD_LEARN_GUEST_MODE` (mặc định `on`), `KD_LEARN_DEMO_MODE` (mặc định `off`). Giá trị env sai thì phần tài khoản không chạy.
+- **API admin** (chỉ admin; không có token trả 401, không phải admin trả 403):
+  - `GET` và `PUT /api/admin/config`. `PUT` chỉ đổi các trường được gửi.
+  - `GET /api/admin/users`: danh sách người dùng, kèm `lockedUntil` nếu đang bị khoá do đăng nhập sai.
+  - `PATCH /api/admin/users/:id` với `{ disabled }` hoặc `{ unlock: true }`. Tắt tài khoản thì thu hồi mọi token của tài khoản đó. Admin không tự tắt tài khoản của mình được (409).
+  - `POST /api/admin/invites` giữ route riêng như bước 2.
+- **`GET /api/config` (công khai):** `{ registration, guestMode, demoMode }`, để UI ở bước 8 biết hiện lối vào nào. Khi server không bật tài khoản (thiếu `KD_LEARN_SECRET_KEY`), route này trả `registration: closed`, `demoMode: false`, còn `guestMode` lấy theo env.
+- **Chặn khách ở server:** `POST /api/turns` đọc công tắc ở mỗi request, công tắc tắt thì trả `403 GuestModeDisabled`. Nếu không đọc được công tắc (DB lỗi, biến env sai) thì từ chối luôn, để công tắc admin đã tắt không bị bỏ qua.
+  - Server có bật tài khoản: mỗi lượt của khách đọc công tắc từ DB.
+  - Server không bật tài khoản: công tắc chỉ lấy từ env.
+- **Admin đầu tiên:** vẫn được tạo ở request đầu tiên cần DB. `GET /api/config` cũng là một request như vậy, nên lần UI tải trang đầu tiên sẽ tạo admin. Bước 9 trỏ healthcheck vào route này.
+- **Test (7 mới):**
+  - người không phải admin bị 403 trên mọi route admin;
+  - tắt khách thì `/api/turns` trả `GuestModeDisabled`, bật lại thì chạy;
+  - đổi chế độ đăng ký có tác dụng ngay;
+  - mặc định lấy từ env; giá trị env sai thì từ chối khách;
+  - server không có tài khoản thì theo env;
+  - tắt tài khoản thu hồi token; mở khoá đăng nhập; không tự tắt mình được; người dùng không tồn tại trả 404.
+  - Chạy thật trên bản build bằng `curl`: tắt khách thì `/api/turns` trả 403.
 

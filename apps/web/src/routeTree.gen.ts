@@ -11,11 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiConfigRouteImport } from './routes/api.config'
 import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
 import { Route as SSessionIdRouteImport } from './routes/s.$sessionId'
 import { Route as ApiAccountSplatRouteImport } from './routes/api.account.$'
+import { Route as ApiAdminSplatRouteImport } from './routes/api.admin.$'
 import { Route as ApiAdminInvitesRouteImport } from './routes/api.admin.invites'
 import { Route as ApiAuthActionRouteImport } from './routes/api.auth.$action'
 
@@ -27,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiConfigRoute = ApiConfigRouteImport.update({
+  id: '/api/config',
+  path: '/api/config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEndpointsRoute = ApiEndpointsRouteImport.update({
@@ -54,6 +61,11 @@ const ApiAccountSplatRoute = ApiAccountSplatRouteImport.update({
   path: '/api/account/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminSplatRoute = ApiAdminSplatRouteImport.update({
+  id: '/api/admin/$',
+  path: '/api/admin/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminInvitesRoute = ApiAdminInvitesRouteImport.update({
   id: '/api/admin/invites',
   path: '/api/admin/invites',
@@ -68,22 +80,26 @@ const ApiAuthActionRoute = ApiAuthActionRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
+  '/api/admin/$': typeof ApiAdminSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
+  '/api/admin/$': typeof ApiAdminSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
@@ -91,11 +107,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/turns': typeof ApiTurnsRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
+  '/api/admin/$': typeof ApiAdminSplatRoute
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
 }
@@ -104,33 +122,39 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/settings'
+    | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
+    | '/api/admin/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/settings'
+    | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
+    | '/api/admin/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   id:
     | '__root__'
     | '/'
     | '/settings'
+    | '/api/config'
     | '/api/endpoints'
     | '/api/turns'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
+    | '/api/admin/$'
     | '/api/admin/invites'
     | '/api/auth/$action'
   fileRoutesById: FileRoutesById
@@ -138,11 +162,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SettingsRoute: typeof SettingsRoute
+  ApiConfigRoute: typeof ApiConfigRoute
   ApiEndpointsRoute: typeof ApiEndpointsRoute
   ApiTurnsRoute: typeof ApiTurnsRoute
   DevStorageRoute: typeof DevStorageRoute
   SSessionIdRoute: typeof SSessionIdRoute
   ApiAccountSplatRoute: typeof ApiAccountSplatRoute
+  ApiAdminSplatRoute: typeof ApiAdminSplatRoute
   ApiAdminInvitesRoute: typeof ApiAdminInvitesRoute
   ApiAuthActionRoute: typeof ApiAuthActionRoute
 }
@@ -161,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/config': {
+      id: '/api/config'
+      path: '/api/config'
+      fullPath: '/api/config'
+      preLoaderRoute: typeof ApiConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/endpoints': {
@@ -198,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAccountSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/$': {
+      id: '/api/admin/$'
+      path: '/api/admin/$'
+      fullPath: '/api/admin/$'
+      preLoaderRoute: typeof ApiAdminSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/invites': {
       id: '/api/admin/invites'
       path: '/api/admin/invites'
@@ -218,11 +258,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SettingsRoute: SettingsRoute,
+  ApiConfigRoute: ApiConfigRoute,
   ApiEndpointsRoute: ApiEndpointsRoute,
   ApiTurnsRoute: ApiTurnsRoute,
   DevStorageRoute: DevStorageRoute,
   SSessionIdRoute: SSessionIdRoute,
   ApiAccountSplatRoute: ApiAccountSplatRoute,
+  ApiAdminSplatRoute: ApiAdminSplatRoute,
   ApiAdminInvitesRoute: ApiAdminInvitesRoute,
   ApiAuthActionRoute: ApiAuthActionRoute,
 }

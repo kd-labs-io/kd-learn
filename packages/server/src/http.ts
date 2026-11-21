@@ -10,7 +10,7 @@ export const corsHeaders = (request: Request, config: ServerConfig): Record<stri
   return origin !== null && config.corsOrigins.includes(origin)
     ? {
         'access-control-allow-origin': origin,
-        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
         'access-control-allow-headers': 'content-type, accept, authorization',
         'access-control-max-age': '600',
         vary: 'origin',
