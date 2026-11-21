@@ -20,3 +20,4 @@
 - **Cập nhật:** 2026-11-21: sửa adapter ACP cho Claude Code (model bị ghi đè, connector claude.ai làm phình ngữ cảnh); sửa kết quả spike: cả 20 lượt Claude Code chạy Opus; cập nhật rủi ro 16, thêm rủi ro 17 (mục 5, spike port AI)
 - **Cập nhật:** 2026-11-21: adapter ACP không còn ghi transcript của Claude Code vào `~/.claude/projects`; email tài khoản không tắt được với gói thuê bao (rủi ro 17). Script spike in model và chi phí mỗi lượt (mục 5)
 - **Cập nhật:** 2026-11-21: thêm phần bàn giao vào `progress/phase-1.md` cho bước lập plan phần chính của phase 1 (mục 8)
+- **Cập nhật:** 2026-11-21: thêm `loi-day-hoc.md` (plan phần chính phase 1: quyết định nền, 9 bước, câu hỏi spike), thêm rủi ro 18, 19, cập nhật mục 6, 7, 8
