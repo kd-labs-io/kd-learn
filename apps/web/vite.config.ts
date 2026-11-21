@@ -37,6 +37,8 @@ const katexWoff2Only = (): Plugin => ({
 
 export default defineConfig({
   server: { port: 3000 },
+  // Read by the root route: the SPA shell is prerendered in the base locale (see __root.tsx).
+  define: { 'import.meta.env.VITE_KD_SPA': JSON.stringify(spa ? '1' : '') },
   plugins: [
     katexWoff2Only(),
     tanstackStart(

@@ -27,6 +27,7 @@ export function AppHeader() {
             variant="ghost"
             size="sm"
             onClick={() => void navigate({ to: '/' })}
+            data-testid="nav-home"
           />
           <Button
             label={m.nav_settings()}

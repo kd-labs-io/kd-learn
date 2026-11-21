@@ -6,6 +6,13 @@ import { TUTOR_RICH_TEXT, mockTurns, sse } from './fake-server';
 
 test.use({ locale: 'en-US' });
 
+// Playwright's WebKit has no OPFS, so the storage falls back to memory and nothing survives a
+// reload: these tests need a real database (the "not persistent" test below covers the fallback).
+test.skip(
+  ({ browserName }) => browserName === 'webkit',
+  'No OPFS in this browser context: storage falls back to memory',
+);
+
 const KEY = 'sk-test-0123456789abcdef';
 
 /** Saves provider, model and key on the settings screen. */
@@ -376,4 +383,24 @@ test('the fake server speaks the real frame format', () => {
   expect(sse([{ _tag: 'done', outcome: 'completed' }])).toBe(
     'event: done\ndata: {"_tag":"done","outcome":"completed"}\n\n',
   );
+});
+
+test('warns on every screen when the browser cannot keep data', async ({ page }) => {
+  // The same situation as a private window: no OPFS, so the storage falls back to memory.
+  await page.addInitScript(() => {
+    Object.defineProperty(StorageManager.prototype, 'getDirectory', { value: undefined });
+  });
+  await mockTurns(page);
+  await page.goto('/settings');
+  await expect(page.getByTestId('not-persistent')).toBeVisible();
+  await page.getByLabel('Model').fill('claude-test');
+  await page.getByLabel('API key').fill(KEY);
+  await page.getByTestId('save-settings').click();
+  await expect(page.getByTestId('settings-message')).toContainText('Saved');
+  await page.getByTestId('nav-home').click();
+  await expect(page.getByTestId('not-persistent')).toBeVisible();
+  await page.getByLabel('What do you want to learn?').fill('Fractions');
+  await page.getByTestId('start-session').click();
+  await expect(tutorMessages(page)).toHaveCount(1);
+  await expect(page.getByTestId('not-persistent')).toBeVisible();
 });

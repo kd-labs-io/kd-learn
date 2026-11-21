@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { AppShell } from '@astryxdesign/core/AppShell';
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
+import { ClientOnly, HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { getLocale } from '@kd-learn/i18n';
 import '../styles/app.css';
@@ -18,18 +18,28 @@ export const Route = createRootRoute({
     // its dev stylesheet. Production builds put StyleX CSS in the main bundle.
     links: import.meta.env.DEV ? [{ rel: 'stylesheet', href: '/virtual:stylex.css' }] : [],
   }),
-  component: () => (
+  component: RootComponent,
+  shellComponent: RootDocument,
+});
+
+function RootComponent() {
+  // Fills the viewport; each screen is a Layout inside it, so the lesson scrolls in its own region.
+  const app = (
     <I18nRoot>
       <ThemeRoot>
-        {/* Fills the viewport; each screen is a Layout inside it, so the lesson scrolls in its own region. */}
         <AppShell>
           <Outlet />
         </AppShell>
       </ThemeRoot>
     </I18nRoot>
-  ),
-  shellComponent: RootDocument,
-});
+  );
+  // The SPA shell is prerendered in the base locale (Astryx strings such as the skip link
+  // included), but the client may prefer another one, so its first render would not match the HTML
+  // (React error #418, seen on WebKit in steps 1 and 6). The screens only show local data anyway:
+  // in the SPA build they render after mount. The SSR build renders on the server in the request's
+  // locale.
+  return import.meta.env['VITE_KD_SPA'] ? <ClientOnly fallback={null}>{app}</ClientOnly> : app;
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   // Light only until dark mode lands: set it on <html> so SSR has no mode flash.
