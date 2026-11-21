@@ -299,15 +299,27 @@ importers:
       '@babel/core':
         specifier: ^8.1.2
         version: 8.1.2
+      '@journeyapps/wa-sqlite':
+        specifier: 2.0.10
+        version: 2.0.10
       '@kd-learn/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@sqlite.org/sqlite-wasm':
+        specifier: 3.54.1-build1
+        version: 3.54.1-build1
       '@stylexjs/babel-plugin':
         specifier: 'catalog:'
         version: 0.19.2
       '@stylexjs/unplugin':
         specifier: 'catalog:'
         version: 0.19.2(unplugin@2.3.11)
+      '@tanstack/browser-db-sqlite-persistence':
+        specifier: 1.0.0-rc.1.5
+        version: 1.0.0-rc.1.5(@journeyapps/wa-sqlite@2.0.10)(typescript@6.0.3)
+      '@tanstack/db':
+        specifier: 1.0.0-rc.1.5
+        version: 1.0.0-rc.1.5(typescript@6.0.3)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -323,6 +335,9 @@ importers:
       nitro:
         specifier: 3.0.261103-rc
         version: 3.0.261103-rc
+      playwright:
+        specifier: ^1.65.1
+        version: 1.65.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1165,6 +1180,9 @@ packages:
   '@isaacs/nonrecursive-glob-match@1.1.0':
     resolution: {integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==}
 
+  '@journeyapps/wa-sqlite@2.0.10':
+    resolution: {integrity: sha512-6Wo5ZijOc4/6M9u+MDsJdW8zDCdrct/p+7LcG7S7CT5YKu42j6lshMfUvgtGYMaZeuH7rpQHULZupPTQFqbS0w==}
+
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
 
@@ -1512,6 +1530,10 @@ packages:
   '@sinclair/typebox@0.31.30':
     resolution: {integrity: sha512-MGsM7bVmHg3sUKCphlu3SGQ+T+5JTbygZWYArfKQCW5anJeACHeqLhcnf+R7XlCWZ+QR3C8JTBx3kCKJTN69ow==}
 
+  '@sqlite.org/sqlite-wasm@3.54.1-build1':
+    resolution: {integrity: sha512-foW427VBLJ3G87bsnvQTZCc9zYe0Fq1wH0pz1I6BlKLKXcArIAyTkHtq0iT2llmhcMQt9T/p6l5PpQQh+6O8uQ==}
+    engines: {node: '>=22'}
+
   '@stablelib/base64@1.0.1':
     resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
 
@@ -1566,6 +1588,27 @@ packages:
       '@opentelemetry/api':
         optional: true
 
+  '@tanstack/browser-db-sqlite-persistence@1.0.0-rc.1.5':
+    resolution: {integrity: sha512-Xn5uI7/kihugpQHiXOiFQdDHXmnbRixvy80rVlTRG0ZOp2nk3Ykvo3bx3O/vEEMdQyZnPus16LvotSxQx4yLGQ==}
+    peerDependencies:
+      '@journeyapps/wa-sqlite': ^1.4.1
+      typescript: '>=4.7'
+
+  '@tanstack/db-ivm@1.0.0-rc.1.3':
+    resolution: {integrity: sha512-4LhRE/6nypOURscUzRyjqffaANVBK8TDv/011cLz79NMxNpZuNgjzwV3s9Z+Rb1d4je+ooRBfPt8hPmGp6dPMw==}
+    peerDependencies:
+      typescript: '>=4.7'
+
+  '@tanstack/db-sqlite-persistence-core@1.0.0-rc.1.5':
+    resolution: {integrity: sha512-R8X53vv6/qhZMtGIGQubpQAKtH/kED9s0L6MaVTu2Hk7LNWFaWyfhcTRDclR6dMdKYitwBEn6kVu2VCM7hOxng==}
+    peerDependencies:
+      typescript: '>=4.7'
+
+  '@tanstack/db@1.0.0-rc.1.5':
+    resolution: {integrity: sha512-Cpbrc7e1ZcM5j+l/hltVB4IuA6P2i1Py7WRqUsbb0Whof/eylpEfJzx0wgw/2PiOF+s3wJlIXArmghe/zjZR/g==}
+    peerDependencies:
+      typescript: '>=4.7'
+
   '@tanstack/devtools-event-client@0.4.4':
     resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
     engines: {node: '>=18'}
@@ -1579,6 +1622,10 @@ packages:
     resolution: {integrity: sha512-PjWt6NJzFhnNfxPKJgigyuM1ADWMEMp+11MyA6UTVpc9EtoyGDeM156KMZ68gX2y3Vhmxkb4Gmw/+B6TQpblRQ==}
     peerDependencies:
       '@tanstack/ai': ^1.4.0
+
+  '@tanstack/pacer-lite@0.3.0':
+    resolution: {integrity: sha512-+YeHKWX5Zd1Irga2smwAolGtzOcf8VVYhM2QI5XEA5TN58iKKufTjhvrbTCEgLLglR1ynHMGVT/l4m5PkwOdaw==}
+    engines: {node: '>=20'}
 
   '@tanstack/react-router@1.170.46':
     resolution: {integrity: sha512-ez1iNIhsPjGlaDHg3BXWs67EWVIYzB2tbopEHYDESdkO7owgkGb5de52+5Kv2v1fxdkggcNzo35bdk4arTVGQw==}
@@ -2387,6 +2434,10 @@ packages:
   fraction.js@5.3.4:
     resolution: {integrity: sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==}
 
+  fractional-indexing@3.4.0:
+    resolution: {integrity: sha512-8J3glhz2rrpKG6KmI7wmJo3zH1VjeOpN+vTJSw1fOyO+Viqq3zX6/5NGh6oaZB2qIAYdOYuu5Dz9xp4faOO0Pg==}
+    engines: {node: ^14.13.1 || >=16.0.0}
+
   fresh@2.0.0:
     resolution: {integrity: sha512-Rx/WycZ60HOaqLKAi6cHRKKI7zxWbJ31MhntmtwMoaTeF7XFH9hhBp8vITaMidfljRQ6eYWCKkaTK+ykVJHP2A==}
     engines: {node: '>= 0.8'}
@@ -2953,6 +3004,16 @@ packages:
   pkg-dir@3.0.0:
     resolution: {integrity: sha512-/E57AYkoeQ25qkxMj5PBOVgF8Kiu/h7cYS30Z5+R7WaiCCBfLq58ZI/dSeaEKb9WVJV5n/03QwrN3IeWIFllvw==}
     engines: {node: '>=6'}
+
+  playwright-core@1.65.1:
+    resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.65.1:
+    resolution: {integrity: sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss-selector-parser@7.2.1:
     resolution: {integrity: sha512-GwxlMgTTXwIom+ebC7an3k6RaJDwklRQQnfiXsLPGicu8FYV/k/+1/9YY2OU2+r938H2t4X0TDxoif+HP2rjzQ==}
@@ -4197,6 +4258,8 @@ snapshots:
 
   '@isaacs/nonrecursive-glob-match@1.1.0': {}
 
+  '@journeyapps/wa-sqlite@2.0.10': {}
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
@@ -4452,6 +4515,8 @@ snapshots:
 
   '@sinclair/typebox@0.31.30': {}
 
+  '@sqlite.org/sqlite-wasm@3.54.1-build1': {}
+
   '@stablelib/base64@1.0.1': {}
 
   '@standard-schema/spec@1.1.0': {}
@@ -4543,6 +4608,30 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
+  '@tanstack/browser-db-sqlite-persistence@1.0.0-rc.1.5(@journeyapps/wa-sqlite@2.0.10)(typescript@6.0.3)':
+    dependencies:
+      '@journeyapps/wa-sqlite': 2.0.10
+      '@tanstack/db-sqlite-persistence-core': 1.0.0-rc.1.5(typescript@6.0.3)
+      typescript: 6.0.3
+
+  '@tanstack/db-ivm@1.0.0-rc.1.3(typescript@6.0.3)':
+    dependencies:
+      fractional-indexing: 3.4.0
+      typescript: 6.0.3
+
+  '@tanstack/db-sqlite-persistence-core@1.0.0-rc.1.5(typescript@6.0.3)':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      '@tanstack/db': 1.0.0-rc.1.5(typescript@6.0.3)
+      typescript: 6.0.3
+
+  '@tanstack/db@1.0.0-rc.1.5(typescript@6.0.3)':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      '@tanstack/db-ivm': 1.0.0-rc.1.3(typescript@6.0.3)
+      '@tanstack/pacer-lite': 0.3.0
+      typescript: 6.0.3
+
   '@tanstack/devtools-event-client@0.4.4': {}
 
   '@tanstack/history@1.162.5': {}
@@ -4560,6 +4649,8 @@ snapshots:
       - undici
       - ws
       - zod
+
+  '@tanstack/pacer-lite@0.3.0': {}
 
   '@tanstack/react-router@1.170.46(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -5454,6 +5545,8 @@ snapshots:
 
   fraction.js@5.3.4: {}
 
+  fractional-indexing@3.4.0: {}
+
   fresh@2.0.0: {}
 
   fsevents@2.3.3:
@@ -5949,6 +6042,12 @@ snapshots:
   pkg-dir@3.0.0:
     dependencies:
       find-up: 3.0.0
+
+  playwright-core@1.65.1: {}
+
+  playwright@1.65.1:
+    dependencies:
+      playwright-core: 1.65.1
 
   postcss-selector-parser@7.2.1:
     dependencies:

@@ -41,6 +41,7 @@ allowBuilds:
   '@astryxdesign/core': false
   '@astryxdesign/cli': false
   '@google/genai': false
+  '@journeyapps/wa-sqlite': false
   protobufjs: false
 
 permissions:
