@@ -46,7 +46,7 @@ Ba quyết định sản phẩm (admin đầu tiên A4, model theo vai cho khác
 ### A5. Key mã hoá
 
 - Key provider của tài khoản mã hoá AES-256-GCM bằng `node:crypto`, IV ngẫu nhiên mỗi bản ghi, có `keyVersion` để đổi master key sau này.
-- Master key lấy từ env `KD_LEARN_SECRET_KEY` (32 byte, base64). Thiếu hoặc sai độ dài thì server không khởi động.
+- Master key lấy từ env `KD_LEARN_SECRET_KEY` (32 byte, base64). Thiếu hoặc sai độ dài thì phần tài khoản không chạy: mọi route tài khoản trả `500 ServerMisconfigured`, log nêu tên biến. Chế độ khách vẫn chạy, vì không cần key này (bước 3).
 - Mất master key thì mọi key đã lưu không giải mã được; người dùng nhập lại. Ghi rõ trong tài liệu triển khai.
 - Key không bao giờ trả về client (API chỉ báo "đã có key", tối đa 4 ký tự cuối), không vào log, lỗi hay `TurnFailed`. Mở rộng test của [rủi ro 19](05-rui-ro.md) sang đường tài khoản.
 

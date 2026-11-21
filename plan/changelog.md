@@ -37,3 +37,4 @@
 - **Cập nhật:** 2026-11-21: bắt đầu phase 2, tạo `progress/phase-2.md`; xong bước 0 (spike C1, C2): driver SQLite server là `node:sqlite`, auth tự viết (Argon2id, token opaque), Bearer cho cả web và Capacitor; thêm rủi ro 28, bổ sung rủi ro 23; mục 2.4, 6, 7 và README cập nhật theo; `engines` lên `>=26.4`
 - **Cập nhật:** 2026-11-21: xong bước 1 phase 2 (driver `@kd-learn/storage/sqlite-node`, migration riêng của server, `forUser`), ghi ở `progress/phase-2.md`; mục 7 chuyển sang bước 2, 3
 - **Cập nhật:** 2026-11-21: xong bước 2 phase 2 (auth tự viết, route `/api/auth/*`, `/api/admin/invites`); A4 và rủi ro 23 ghi rõ đăng ký không giấu được email đã có khi chưa xác minh email; mục 7 chuyển sang bước 3
+- **Cập nhật:** 2026-11-21: xong bước 3 phase 2 (key mã hoá AES-256-GCM, cài đặt model theo vai, route `/api/account/*`); A5 ghi rõ thiếu `KD_LEARN_SECRET_KEY` thì chỉ phần tài khoản không chạy; mục 7 chuyển sang bước 4

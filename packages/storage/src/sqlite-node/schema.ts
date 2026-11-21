@@ -57,4 +57,27 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
        value TEXT NOT NULL
      ) WITHOUT ROWID`,
   ],
+  // v3: account settings (plan step 3, A5, A6). Keys are AES-256-GCM ciphertext; `key_last4` is
+  // the only part of a key the API ever shows.
+  [
+    `CREATE TABLE connections (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL REFERENCES users (id),
+       label TEXT NOT NULL,
+       provider TEXT NOT NULL,
+       endpoint_id TEXT,
+       key_sealed TEXT,
+       key_version INTEGER,
+       key_last4 TEXT,
+       created_at INTEGER NOT NULL
+     ) WITHOUT ROWID`,
+    `CREATE INDEX connections_by_user ON connections (user_id)`,
+    `CREATE TABLE role_models (
+       user_id TEXT NOT NULL REFERENCES users (id),
+       role TEXT NOT NULL,
+       connection_id TEXT NOT NULL REFERENCES connections (id) ON DELETE CASCADE,
+       model TEXT NOT NULL,
+       PRIMARY KEY (user_id, role)
+     ) WITHOUT ROWID`,
+  ],
 ];

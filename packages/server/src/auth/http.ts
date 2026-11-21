@@ -2,7 +2,7 @@
 // Logs carry codes and statuses only: never an email, password, token or invite code.
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Effect, Result, Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import {
   AuthResponse,
   CreateInviteRequest,
@@ -13,21 +13,22 @@ import {
   RegisterRequest,
 } from '@kd-learn/api';
 import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlite-node';
-import type { ServerConfig } from '../config.ts';
-import type { Handler, Logger, RequestContext } from '../handler.ts';
-import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from '../http.ts';
-import { describeIssue } from '../safety.ts';
-import { clientAddress, type AccountConfig } from './config.ts';
+import type { Endpoint, ServerConfig } from '../config.ts';
+import { makeSecretBox } from '../settings/secret-box.ts';
+import { makeSettings, type SettingsService } from '../settings/service.ts';
+import type { Handler, Logger } from '../handler.ts';
+import { SECURITY_HEADERS } from '../http.ts';
+import { bearerToken, makeRouteKit, type Ctx } from '../routes.ts';
+import type { AccountConfig } from './config.ts';
 import { makeRateLimiter, type RateLimiter } from './rate-limit.ts';
-import { makeAuth, type AuthOptions, type AuthService, type CurrentUser } from './service.ts';
+import { makeAuth, type AuthOptions, type AuthService } from './service.ts';
 
-/** Bodies of account requests are small. */
-const MAX_BODY_BYTES = 16 * 1024;
 const HOUR = 60 * 60 * 1000;
 
 export interface Accounts {
   readonly database: ServerDatabase;
   readonly auth: AuthService;
+  readonly settings: SettingsService;
 }
 
 /**
@@ -37,6 +38,7 @@ export interface Accounts {
 export const initAccounts = async (
   config: AccountConfig,
   options: {
+    readonly endpoints: () => ReadonlyArray<Endpoint>;
     readonly database?: ServerDatabase;
     readonly auth?: AuthOptions;
     readonly log: Logger;
@@ -52,7 +54,9 @@ export const initAccounts = async (
     const outcome = await auth.ensureAdmin(config.admin.email, config.admin.password);
     options.log({ event: 'accounts.admin', fields: { outcome } });
   }
-  return { database, auth };
+  const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
+  const settings = makeSettings(database, box, options.endpoints);
+  return { database, auth, settings };
 };
 
 export interface AccountHandlers {
@@ -62,13 +66,6 @@ export interface AccountHandlers {
   readonly me: Handler;
   readonly invites: Handler;
 }
-
-/** `Authorization: Bearer <token>`, or undefined. */
-export const bearerToken = (request: Request): string | undefined => {
-  const header = request.headers.get('authorization');
-  const match = header === null ? null : /^Bearer ([A-Za-z0-9_-]{1,128})$/.exec(header.trim());
-  return match?.[1];
-};
 
 export const makeAccountHandlers = (
   accounts: () => Promise<Accounts>,
@@ -81,89 +78,12 @@ export const makeAccountHandlers = (
   const loginLimit = limits.login ?? makeRateLimiter({ limit: 30, windowMs: HOUR / 4 });
   const registerLimit = limits.register ?? makeRateLimiter({ limit: 10, windowMs: HOUR });
 
-  type Ctx = {
-    readonly request: Request;
-    readonly cors: Record<string, string>;
-    readonly address: string | undefined;
-    readonly accounts: Accounts;
-    readonly reject: (
-      status: number,
-      code: string,
-      message: string,
-      retryable?: boolean,
-    ) => Response;
-  };
-
-  const route =
-    (
-      name: string,
-      methods: ReadonlyArray<string>,
-      body: (ctx: Ctx) => Promise<Response> | Response,
-    ): Handler =>
-    async (request, context?: RequestContext) => {
-      const cors = corsHeaders(request, config);
-      const reject = (status: number, code: string, message: string, retryable = false) => {
-        log({ event: `${name}.rejected`, fields: { status, code } });
-        return failureResponse(status, code, message, retryable, cors);
-      };
-      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-      if (!methods.includes(request.method)) {
-        return reject(405, ErrorCode.MethodNotAllowed, `Use ${methods.join(' or ')}.`);
-      }
-      let ready: Accounts;
-      try {
-        ready = await accounts();
-      } catch {
-        return failureResponse(
-          500,
-          ErrorCode.Misconfigured,
-          'Accounts are not available on this server.',
-          false,
-          cors,
-        );
-      }
-      const address = clientAddress(request, context?.clientAddress, accountConfig.trustProxy);
-      return body({ request, cors, address, accounts: ready, reject });
-    };
-
-  const json = (ctx: Ctx, value: unknown, status = 200) =>
-    Response.json(value, {
-      status,
-      headers: { ...SECURITY_HEADERS, 'cache-control': 'no-store', ...ctx.cors },
-    });
-
-  /** Decodes a JSON body; the error message comes from paths and codes, never from values. */
-  const decode = async <S extends Schema.Top>(
-    ctx: Ctx,
-    schema: S,
-  ): Promise<S['Type'] | Response> => {
-    const body = await readLimited(ctx.request, MAX_BODY_BYTES);
-    if (body === 'too-large')
-      return ctx.reject(413, ErrorCode.InvalidRequest, 'The request is too large.');
-    if (body === 'unreadable') {
-      return ctx.reject(400, ErrorCode.InvalidRequest, 'The request body is not readable UTF-8.');
-    }
-    let value: unknown;
-    try {
-      value = body.text === '' ? {} : JSON.parse(body.text);
-    } catch {
-      return ctx.reject(400, ErrorCode.InvalidRequest, 'The request body is not valid JSON.');
-    }
-    const decoded = Schema.decodeUnknownResult(schema as never)(value, {
-      onExcessProperty: 'error',
-    });
-    if (Result.isFailure(decoded)) {
-      return ctx.reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure as never));
-    }
-    return decoded.success as S['Type'];
-  };
-
-  const currentUser = (ctx: Ctx): CurrentUser | undefined => {
-    const token = bearerToken(ctx.request);
-    return token === undefined ? undefined : ctx.accounts.auth.authenticate(token);
-  };
-
-  const unauthorized = (ctx: Ctx) => ctx.reject(401, ErrorCode.Unauthorized, 'Sign in again.');
+  const { route, json, decode, currentUser, unauthorized } = makeRouteKit({
+    accounts,
+    config,
+    accountConfig,
+    log,
+  });
 
   const tooMany = (ctx: Ctx) =>
     ctx.reject(429, ErrorCode.TooManyAttempts, 'Too many attempts. Try again later.', true);
@@ -247,3 +167,5 @@ export const makeAccountHandlers = (
     }),
   };
 };
+
+export { bearerToken } from '../routes.ts';
