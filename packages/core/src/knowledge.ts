@@ -603,3 +603,74 @@ export const resolveProposition = (
   }
   return undefined;
 };
+
+/** What `fitKnowledgeBatch` left out, for logs and tests. */
+export interface FitResult {
+  readonly events: ReadonlyArray<KnowledgeEvent>;
+  /** Edges left out because they would break a rule on the current graph. */
+  readonly droppedEdges: ReadonlyArray<{ readonly edgeId: EdgeId; readonly reason: string }>;
+}
+
+/**
+ * Fits a batch built elsewhere (the extraction pipeline only saw a slice of the graph) to the
+ * current graph, just before writing: an edge that would repeat an existing edge, make a cycle of
+ * requires / implies, loop on itself or touch an inactive proposition is left out, and a source
+ * added to a merged-away proposition moves to the one it was merged into. Everything else is kept
+ * as is, so a batch that still does not project (for example a source on a retired proposition)
+ * is a real conflict for the writer to report.
+ */
+export const fitKnowledgeBatch = (
+  graph: KnowledgeGraph,
+  batch: ReadonlyArray<KnowledgeEvent>,
+): FitResult => {
+  const active = new Set(Object.keys(graph.propositions));
+  const keys = new Set(Object.values(graph.edges).map(edgeKey));
+  const order: Precedence = new Map();
+  for (const edge of Object.values(graph.edges)) link(order, edge);
+  const events: Array<KnowledgeEvent> = [];
+  const droppedEdges: Array<{ edgeId: EdgeId; reason: string }> = [];
+
+  for (const event of batch) {
+    if (event._tag === 'PropositionAdded') active.add(event.propositionId);
+    if (event._tag === 'PropositionSourced' && !active.has(event.propositionId)) {
+      const now = resolveProposition(graph, event.propositionId);
+      if (now !== undefined) {
+        events.push({ ...event, propositionId: now.propositionId });
+        continue;
+      }
+    }
+    if (event._tag !== 'EdgeAdded') {
+      events.push(event);
+      continue;
+    }
+    const edge: Edge = {
+      edgeId: event.edgeId,
+      from: resolveProposition(graph, event.from)?.propositionId ?? event.from,
+      to: resolveProposition(graph, event.to)?.propositionId ?? event.to,
+      relation: event.relation,
+      label: event.label,
+    };
+    const drop = (reason: string) => droppedEdges.push({ edgeId: edge.edgeId, reason });
+    if (!active.has(edge.from) || !active.has(edge.to)) {
+      drop('an end is not an active proposition');
+      continue;
+    }
+    if (edge.from === edge.to) {
+      drop('links a proposition to itself');
+      continue;
+    }
+    if (keys.has(edgeKey(edge))) {
+      drop('repeats an edge');
+      continue;
+    }
+    const step = precedence(edge);
+    if (step !== undefined && reaches(order, step.after, step.before)) {
+      drop('makes a cycle of requires / implies');
+      continue;
+    }
+    keys.add(edgeKey(edge));
+    link(order, edge);
+    events.push({ ...event, from: edge.from, to: edge.to });
+  }
+  return { events, droppedEdges };
+};

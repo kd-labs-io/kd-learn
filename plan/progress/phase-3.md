@@ -11,7 +11,7 @@
 | Bước 1: spike extraction với Haiku (C2, C3) | Xong (2026-11-21). Pipeline 3 lần gọi (extractor, auditor kiểm cả mệnh đề và cạnh, merge theo ứng viên của từng mệnh đề), chọn lát theo từ vựng K = 5 mỗi mệnh đề, giữ 5 quan hệ. Không dùng TanStack DB. Khoảng $0,007 mỗi buổi với Haiku. Xem ghi chú bước 1 bên dưới |
 | Bước 2: log kiến thức (core, storage) | Xong (2026-11-21). Event và projection của graph trong `core`, chặn trích hai lần, hàm chọn lát hai tầng; bảng `knowledge_events` ở cả ba driver (migration khách v3, server v7), ghi có điều kiện theo `expectedLastSeq` (bắt buộc) qua `appendKnowledgeChecked`. Sự kiện luyện tập và mức nắm vững dời sang bước 6. Xem ghi chú bước 2 bên dưới |
 | Bước 3: hồ sơ dạy học v2, vai mới | Xong (2026-11-21). `TeachingProfile` thêm `name` và bốn prompt tuỳ chọn, `resolveProfile` điền từ hồ sơ mặc định; hồ sơ lưu qua port ở cả hai driver; `GET` / `PUT` / `DELETE /api/account/profile`; vai `practitioner` / `extractor` chưa đặt thì dùng model của `teacher`. Xem ghi chú bước 3 bên dưới |
-| Bước 4: pipeline extraction (agent) | Chưa bắt đầu |
+| Bước 4: pipeline extraction (agent) | Xong (2026-11-21). `runExtraction` trong `agent` (3 lần gọi, bỏ merge khi không có ứng viên), `fitKnowledgeBatch` trong `core` để khớp lô với graph lúc ghi; kiểm bằng Haiku thật trên 2 buổi tiếng Việt: khoảng $0,009 mỗi buổi, merge gộp đúng 3 mệnh đề trùng. Xem ghi chú bước 4 bên dưới |
 | Bước 5: extraction trên server | Chưa bắt đầu |
 | Bước 6: registry bài tập, Practitioner | Xong (2026-11-21). Sự kiện luyện tập trong log kiến thức, mức nắm vững theo hộp Leitner, registry bốn loại, hàm chọn bài, Practitioner (một lần gọi ra cả bộ bài, chấm theo ba mức). C4 với Haiku: chấm ổn định 21/21, không bị đánh lừa 9/9, khoảng $0,004 cả lần kiểm. Xem ghi chú bước 6 bên dưới |
 | Bước 7: luyện tập trên server | Chưa bắt đầu |
@@ -34,6 +34,32 @@
 - **Kiểm trước khi mở PR:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `cd apps/web && pnpm build && npx playwright test --project=chromium`; đụng Docker hay env thì `./scripts/compose-smoke.sh`. Firefox chập chờn khi chạy song song ở máy local; CI chỉ chạy Chromium.
 - **Quy ước:** mỗi bước một nhánh, một PR; CI xanh thì tự merge. Không format file trong `plan/` (nằm trong `.prettierignore`; đừng chạy prettier khi đang đứng trong `plan/`). Secret trong `.env` không in, không commit. Model thật tối đa một lần kiểm mỗi bước.
 - **Xong mỗi bước:** cập nhật bảng trên và ghi chú của bước, một dòng `changelog.md`, mục 7 trong `06-viec-mo.md`, rủi ro liên quan trong `05-rui-ro.md`.
+
+## Bước 4: pipeline extraction (2026-11-21)
+
+**Code** (`packages/agent/src/extraction.ts`, `packages/core/src/knowledge.ts`):
+
+- `runExtraction({ log, slice, profile, model, extractionId, newId, maxOutputTokens })` trả `ExtractionResult {events, usage, dropped}` hoặc lỗi có kiểu: `InvalidExtraction` (log không dựng được, chưa có lượt nào xong) hay `ExtractionModelFailed {step, failure, usage}` (`failure` đã bỏ key, dùng thẳng cho `ExtractionFailed`; `usage` của các lần gọi đã xong để quyết toán ngân sách demo).
+  - Lô gồm `PropositionAdded` / `PropositionSourced` / `EdgeAdded`, kết thúc bằng `SessionExtracted` (thêm trường tuỳ chọn `usage {model, calls, inputTokens, outputTokens}`). Không có `ExtractionStarted`: người gọi ghi trước khi gọi.
+  - Bản ghi gửi cho model chỉ gồm các lượt đã `TurnCompleted`. Ngôn ngữ của mệnh đề theo `profile.language` chụp trong buổi học.
+  - Không tin output của model: key trùng / rỗng, câu dài quá 1.000 ký tự, cạnh tới key không có, `existingId` không thuộc ứng viên của đúng mệnh đề đó, cạnh merge không nối một mệnh đề mới với ứng viên của nó, đều bị bỏ (ghi vào `dropped`). `stepId` không có trong plan thì nguồn không ghi bước. Chủ đề cắt về 200 ký tự.
+  - Auditor có thêm verdict `split` (`parts`, mỗi câu một ý); cạnh của mệnh đề bị tách thì bỏ. Mệnh đề auditor không nhắc tới thì bỏ; cạnh auditor không nhắc tới thì giữ.
+  - Merge chỉ gửi các mệnh đề có ít nhất một ứng viên (`selectCandidates`, K = 5); không có thì bỏ lần gọi thứ ba.
+- `fitKnowledgeBatch(graph, batch)` (core): pipeline chỉ thấy lát graph, nên ngay trước khi ghi, người ghi khớp lô với graph hiện tại: bỏ cạnh lặp cạnh có sẵn, tạo chu trình, vòng tự thân hay chạm mệnh đề không còn hoạt động; nguồn và đầu cạnh trỏ tới mệnh đề đã bị gộp thì chuyển sang mệnh đề nhận. Nguồn trên mệnh đề đã bị bỏ thì giữ nguyên để projection từ chối (xung đột thật, A3). Bước 5 dùng `appendKnowledgeChecked(storage, (graph) => fitKnowledgeBatch(graph, result.events).events)`.
+- `fakeAi` thêm action `{ result }` (trả `StructuredResult`, decode bằng `request.output`).
+- Prompt mặc định của auditor: không chép lại câu và hai đầu cạnh khi giữ nguyên (giảm token ra, xem dưới).
+
+**Kiểm bằng Haiku thật** (script tạm ngoài repo; 2 buổi tiếng Việt mới tạo bằng Haiku: "Tìm kiếm nhị phân" 20 lượt, "Độ phức tạp Big-O của tìm kiếm và sắp xếp" 23 lượt; trích buổi 1 vào graph rỗng, rồi buổi 2 với lát lấy từ graph sau buổi 1):
+
+| Buổi | Lần gọi | Token vào / ra | Thời gian | Mệnh đề mới | Gộp vào cũ | Cạnh |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tìm kiếm nhị phân | 2 (lát rỗng, bỏ merge) | 23.494 / 8.044 | 32 s | 16 | 0 | 10 |
+| Big-O | 3 (lát 16 mệnh đề) | 38.712 / 14.317 | 53 s | 20 | 3 | 17 |
+
+- **Chi phí:** khoảng $0,006 và $0,011, trung bình $0,009 mỗi buổi (tiếng Anh ở bước 1: $0,007). Tạo hai buổi thử tốn khoảng $0,07.
+- **Chất lượng:** mệnh đề tiếng Việt đúng, tự đứng được, không thấy bịa. Merge gộp đúng 3 mệnh đề trùng giữa hai buổi (O(n) của tìm kiếm tuyến tính, O(log n) của nhị phân, cơ số logarit trong O) và không gộp nhầm. Một mệnh đề gần trùng ("nhị phân yêu cầu mảng đã sắp xếp *và* truy cập trực tiếp") thành mệnh đề mới nối bằng `supports`: hợp lý vì nó có thêm một ý. Vài cạnh `contrastsWith` hơi gượng; vài mệnh đề ví dụ cụ thể (16 phần tử, n = 1.000.000) được giữ, nối bằng `exampleOf`.
+- **Trần token:** lần chạy đầu, auditor bị cắt ở 8.192 token ra (`max_tokens`) vì chép lại mọi câu. Sau khi rút gọn output (bỏ chép câu và hai đầu cạnh khi giữ) thì chạy xong với trần 16.384. Bước 5: trần của vai `extractor` ở demo là 16.384 (A8).
+- `fitKnowledgeBatch` bỏ 1 cạnh lặp; pipeline bỏ 5 đề xuất (cạnh tới key không còn, cạnh merge không hợp lệ).
 
 ## Bước 2: log kiến thức (2026-11-21)
 

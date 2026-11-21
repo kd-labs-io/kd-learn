@@ -97,7 +97,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-21: một graph cho mỗi n
 ### A8. Demo
 
 - **Demo dùng được graph và luyện tập (chốt 2026-11-21)**, tính chung ngân sách demo (A8 phase 2): extraction tốn 3 lần gọi (bước 1), ra bài một lần, chấm bằng model một lần, chấm bằng code không tốn.
-- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Trần 2.048 token ra không đủ cho extraction (đo được tới 4,4k, phần lớn là thinking): vai `extractor` có trần riêng (đề xuất 8.192), làm ở bước 5. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
+- Giữ chỗ trước khi gọi, quyết toán cuối, trần token mỗi lần gọi như phase 2. Trần 2.048 token ra không đủ cho extraction (đo được tới 4,4k, phần lớn là thinking): vai `extractor` có trần riêng, làm ở bước 5. Bước 4 đo với buổi tiếng Việt: auditor vượt 8.192 token ra khi còn chép lại câu cho mệnh đề giữ nguyên; sau khi rút gọn output thì chạy được với trần 16.384. Trần đề xuất cho vai `extractor`: 16.384. Thân request của các route mới tối đa 256 KiB với demo. Server dùng hồ sơ của mình (A2).
 
 ### A9. Màn hình graph
 
