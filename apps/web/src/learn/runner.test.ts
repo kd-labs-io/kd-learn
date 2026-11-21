@@ -13,11 +13,7 @@ import {
   type Session,
 } from '@kd-learn/core';
 import { makeMemoryStorage } from '@kd-learn/storage/memory';
-import {
-  StorageBusy,
-  type GuestSettings,
-  type StorageService,
-} from '@kd-learn/storage/port';
+import { StorageBusy, type GuestSettings, type StorageService } from '@kd-learn/storage/port';
 import { SessionRunner, appendBatch, shouldAutoStart } from './runner';
 
 const SESSION = 's1';
@@ -34,7 +30,11 @@ const created = (profile = defaultProfile): DomainEvent => ({
   profile,
 });
 
-const settings: GuestSettings = { provider: 'anthropic', model: 'claude-test', apiKey: 'sk-test-key' };
+const settings: GuestSettings = {
+  provider: 'anthropic',
+  model: 'claude-test',
+  apiKey: 'sk-test-key',
+};
 
 const body = (frames: ReadonlyArray<Frame>) =>
   new Response(frames.map(encodeFrame).join(''), {
@@ -71,7 +71,13 @@ const reply = (request: TurnRequest): ReadonlyArray<Frame> => {
   const turnId = turn.turnId;
   const say = (text: string): Frame => ({
     _tag: 'event',
-    event: { _tag: 'MessageAppended', ...ev(turnId), messageId: id(), agent: 'teacher', content: text },
+    event: {
+      _tag: 'MessageAppended',
+      ...ev(turnId),
+      messageId: id(),
+      agent: 'teacher',
+      content: text,
+    },
   });
   const completed: Frame = {
     _tag: 'event',

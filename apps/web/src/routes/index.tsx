@@ -1,122 +1,163 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
-import { Popover } from '@astryxdesign/core/Popover';
 import { Heading } from '@astryxdesign/core/Heading';
-import { HStack } from '@astryxdesign/core/HStack';
+import { Item } from '@astryxdesign/core/Item';
+import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
-import { TextArea } from '@astryxdesign/core/TextArea';
+import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
-import { getLocale, locales, m, setLocale } from '@kd-learn/i18n';
-import { LessonText } from '@kd-learn/ui/components/LessonText';
-import { checkContrast, decodeTheme, defaultTheme } from '@kd-learn/tokens';
-import { createFileRoute } from '@tanstack/react-router';
-import { Result } from 'effect';
+import { defaultProfile } from '@kd-learn/agent/client';
+import { getLocale, getLocaleTag, m } from '@kd-learn/i18n';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useThemeControl } from '../theme/ThemeRoot';
+import { AppHeader } from '../app/AppHeader';
+import { useStoragePersistent } from '../learn/hooks';
+import { runStorage, useGuestSettings, useSessionList } from '../storage';
 
 export const Route = createFileRoute('/')({ component: Home });
 
-// A sample theme to try runtime switching (UI spike, plan phase 0).
-const sampleTheme = {
-  ...defaultTheme,
-  name: 'forest',
-  colors: {
-    ...defaultTheme.colors,
-    bg: '#F3F7F2',
-    surface: '#EDF3EB',
-    border: '#C9D8C5',
-    accent: '#5E9A62',
-    'accent-strong': '#2F6B3A',
-    'focus-ring': '#2F6B3A',
-  },
-  radius: { sm: 2, md: 4, lg: 6 },
-};
+const formatDate = (epochMs: number) =>
+  new Intl.DateTimeFormat(getLocaleTag(), { dateStyle: 'medium', timeStyle: 'short' }).format(
+    epochMs,
+  );
 
 function Home() {
-  const { override, setOverride } = useThemeControl();
-  const [source, setSource] = useState(() => JSON.stringify(sampleTheme, null, 2));
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const sessions = useSessionList();
+  const settings = useGuestSettings();
+  const persistent = useStoragePersistent();
+  const [topic, setTopic] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const apply = () => {
-    let json: unknown;
+  const needsKey =
+    settings.status === 'ready' && (settings.data === undefined || !settings.data.apiKey);
+
+  const start = async () => {
+    const name = topic.trim();
+    if (name === '' || creating) return;
+    setCreating(true);
+    setError(undefined);
     try {
-      json = JSON.parse(source);
-    } catch {
-      setError(m.theme_invalid({ reason: 'JSON' }));
-      return;
+      const sessionId = crypto.randomUUID();
+      // The log starts with the profile it was created with, in the learner's language (plan A1, A6).
+      await runStorage((storage) =>
+        storage.appendEvents(sessionId, [
+          {
+            _tag: 'SessionCreated',
+            id: crypto.randomUUID(),
+            at: Date.now(),
+            sessionId,
+            topic: name,
+            profile: { ...defaultProfile, language: getLocale() },
+          },
+        ]),
+      );
+      await navigate({ to: '/s/$sessionId', params: { sessionId } });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setCreating(false);
     }
-    const decoded = decodeTheme(json);
-    if (Result.isFailure(decoded)) {
-      setError(m.theme_invalid({ reason: String(decoded.failure) }));
-      return;
-    }
-    const issues = checkContrast(decoded.success);
-    if (issues.length > 0) {
-      const list = issues.map((i) => `${i.foreground}/${i.background} ${i.ratio.toFixed(2)}`);
-      setError(m.theme_invalid({ reason: `WCAG AA: ${list.join(', ')}` }));
-      return;
-    }
-    setError(null);
-    setOverride(decoded.success);
   };
 
   return (
-    <VStack gap={6} padding={6} maxWidth="68ch">
-      <VStack gap={2}>
-        <Heading level={1}>{m.app_name()}</Heading>
-        <Text type="large" color="secondary">
-          {m.app_tagline()}
-        </Text>
-        <HStack gap={2}>
-          <Text type="supporting">{m.locale_label()}:</Text>
-          {locales.map((locale) => (
-            <Button
-              key={locale}
-              size="sm"
-              label={locale.toUpperCase()}
-              variant={locale === getLocale() ? 'primary' : 'ghost'}
-              onClick={() => setLocale(locale)}
-            />
-          ))}
-        </HStack>
-      </VStack>
+    <Layout
+      header={<AppHeader />}
+      content={
+        <LayoutContent padding={6}>
+          <VStack gap={6} maxWidth="68ch">
+            <Text type="large" color="secondary">
+              {m.app_tagline()}
+            </Text>
 
-      <LessonText variant="callout">
-        Mỗi bước dạy hiển thị bằng LessonText: component riêng của kd-learn viết bằng StyleX, dùng
-        token của Astryx nên đổi theme là đổi theo.
-      </LessonText>
+            {persistent === false ? (
+              <Banner
+                status="warning"
+                title={m.storage_not_persistent_title()}
+                description={m.storage_not_persistent_body()}
+                data-testid="not-persistent"
+              />
+            ) : null}
 
-      <Card padding={6} elevation="low">
-        <VStack gap={4}>
-          <Heading level={2}>Theme: {override?.name ?? 'kd'}</Heading>
-          <HStack gap={3}>
-            <Button label="Primary" variant="primary" />
-            <Button label="Secondary" variant="secondary" />
-            <Button label="Ghost" variant="ghost" />
-            <Popover label="Popover" content={<Text>Lớp nổi dùng cùng theme.</Text>}>
-              <Button label="Popover" variant="secondary" />
-            </Popover>
-          </HStack>
-          <Banner status="success" title="Đã lưu" description="Trạng thái thành công." />
-        </VStack>
-      </Card>
+            {needsKey ? (
+              <Banner
+                status="info"
+                title={m.home_need_key_title()}
+                description={m.home_need_key_body()}
+                endContent={
+                  <Button
+                    label={m.home_need_key_action()}
+                    onClick={() => void navigate({ to: '/settings' })}
+                    data-testid="need-key-action"
+                  />
+                }
+                data-testid="need-key"
+              />
+            ) : null}
 
-      <Card padding={6}>
-        <VStack gap={4}>
-          <TextArea
-            isOptional
-            label="Theme JSON"
-            value={source}
-            onChange={(value) => setSource(value)}
-          />
-          {error ? <Banner status="error" title={error} /> : null}
-          <HStack gap={3}>
-            <Button label={m.theme_apply()} variant="primary" onClick={apply} />
-            <Button label={m.theme_reset()} variant="secondary" onClick={() => setOverride(null)} />
-          </HStack>
-        </VStack>
-      </Card>
-    </VStack>
+            <VStack gap={3}>
+              <Heading level={2}>{m.home_new_title()}</Heading>
+              <TextInput
+                label={m.home_topic_label()}
+                placeholder={m.home_topic_placeholder()}
+                value={topic}
+                onChange={setTopic}
+                onEnter={() => void start()}
+                data-testid="topic-input"
+              />
+              <Button
+                label={m.home_start()}
+                variant="primary"
+                isLoading={creating}
+                isDisabled={topic.trim() === ''}
+                onClick={() => void start()}
+                data-testid="start-session"
+              />
+              {error === undefined ? null : (
+                <Banner status="error" title={m.home_create_failed({ reason: error })} />
+              )}
+            </VStack>
+
+            <VStack gap={2}>
+              <Heading level={2}>{m.home_sessions_title()}</Heading>
+              {sessions.status === 'loading' ? (
+                <Spinner size="sm" label={m.learn_loading()} />
+              ) : null}
+              {sessions.status === 'error' ? (
+                <Banner
+                  status="error"
+                  title={m.storage_error({ reason: sessions.error.message })}
+                />
+              ) : null}
+              {sessions.status === 'ready' && sessions.data.length === 0 ? (
+                <Text type="supporting" data-testid="no-sessions">
+                  {m.home_sessions_empty()}
+                </Text>
+              ) : null}
+              {sessions.status === 'ready' && sessions.data.length > 0 ? (
+                <VStack gap={1} as="ul" data-testid="session-list">
+                  {sessions.data.map((session) => (
+                    <Item
+                      as="li"
+                      key={session.sessionId}
+                      label={session.topic === '' ? session.sessionId : session.topic}
+                      description={m.home_session_updated({ date: formatDate(session.updatedAt) })}
+                      onClick={() =>
+                        void navigate({
+                          to: '/s/$sessionId',
+                          params: { sessionId: session.sessionId },
+                        })
+                      }
+                      data-testid="session-item"
+                    />
+                  ))}
+                </VStack>
+              ) : null}
+            </VStack>
+          </VStack>
+        </LayoutContent>
+      }
+    />
   );
 }

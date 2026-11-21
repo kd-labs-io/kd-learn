@@ -9,6 +9,22 @@ import { StorageUnavailable, type StorageError, type StorageService } from '@kd-
 let current: Promise<StorageService> | undefined;
 let listening = false;
 
+// Bumped when the connection is replaced after a back/forward cache restore (see `getStorage`).
+let epoch = 0;
+const epochListeners = new Set<() => void>();
+export const storageEpoch = {
+  subscribe: (listener: () => void) => {
+    epochListeners.add(listener);
+    return () => {
+      epochListeners.delete(listener);
+    };
+  },
+  get: () => epoch,
+};
+
+const closeOf = (storage: StorageService) =>
+  (storage as StorageService & { close?: Effect.Effect<void> }).close ?? Effect.void;
+
 async function openStorage(): Promise<StorageService> {
   if (!import.meta.env.SSR) {
     const { openWasmStorage } = await import('@kd-learn/storage/sqlite-wasm');
@@ -28,9 +44,18 @@ async function openStorage(): Promise<StorageService> {
 export function getStorage(): Promise<StorageService> {
   if (!listening && typeof window !== 'undefined') {
     listening = true;
-    // A page restored from the back/forward cache lost its Worker: open a new connection.
+    // A page restored from the back/forward cache may have lost its Worker, and the `changes`
+    // subscriptions of mounted hooks point at the old connection. Drop the connection and bump the
+    // epoch: hooks depend on it, so they subscribe again on the new one and re-read.
     window.addEventListener('pageshow', (event) => {
-      if (event.persisted) current = undefined;
+      if (!event.persisted) return;
+      const old = current;
+      current = undefined;
+      epoch += 1;
+      epochListeners.forEach((listener) => listener());
+      void old
+        ?.then((storage) => ('close' in storage ? Effect.runPromise(closeOf(storage)) : undefined))
+        .catch(() => undefined);
     });
   }
   // A rejected open is not cached: the next call tries again.

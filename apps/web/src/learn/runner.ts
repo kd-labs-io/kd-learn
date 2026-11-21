@@ -161,6 +161,16 @@ export class SessionRunner {
     }, 32);
   }
 
+  /** Forgets failures kept in memory, e.g. when the learner comes back to the screen. */
+  clearFailure(): void {
+    if (this.state.main.failure === undefined && this.state.side.failure === undefined) return;
+    this.state = {
+      main: { ...this.state.main, failure: undefined },
+      side: { ...this.state.side, failure: undefined },
+    };
+    this.emit();
+  }
+
   // --- public actions: never reject, they report through the state ---
 
   /** Starts the turn that needs no learner input (first Prober turn, planning), if it is due. */
@@ -252,13 +262,17 @@ export class SessionRunner {
     const model = modelChoiceOf(await Effect.runPromise(storage.getSettings));
     // No key: write nothing, or an auto turn would leave a dangling `TurnStarted`.
     if (model === undefined) {
-      this.setMain({ failure: fail(ClientFailure.NoKey, 'No key, model or endpoint saved.', false) });
+      this.setMain({
+        failure: fail(ClientFailure.NoKey, 'No key, model or endpoint saved.', false),
+      });
       return 'failed';
     }
     const log = await Effect.runPromise(storage.readSession(this.sessionId));
     const session = unwrap(projectSession(log));
     if (session === undefined) {
-      this.setMain({ failure: fail(ClientFailure.InvalidLog, 'The saved log is not valid.', false) });
+      this.setMain({
+        failure: fail(ClientFailure.InvalidLog, 'The saved log is not valid.', false),
+      });
       return 'failed';
     }
     if (session.state._tag === 'Done') return 'skipped';
@@ -285,23 +299,28 @@ export class SessionRunner {
     };
     const withStarted: EventLog = [...log, started];
     if (Result.isFailure(projectSession(withStarted))) {
-      this.setMain({ failure: fail(ClientFailure.InvalidLog, 'The turn cannot start here.', false) });
+      this.setMain({
+        failure: fail(ClientFailure.InvalidLog, 'The turn cannot start here.', false),
+      });
       return 'failed';
     }
     await appendBatch(storage, this.sessionId, [started]);
 
     this.setMain({ live: { turnId, text: '' }, failure: undefined });
     const parts = new Map<string, string>();
-    const collected = await this.collect({ model, turn: { kind: 'main' }, log: withStarted }, (frame) => {
-      if (frame._tag !== 'delta') return;
-      this.pushLive(() => {
-        parts.set(frame.messageId, (parts.get(frame.messageId) ?? '') + frame.delta);
-        this.state = {
-          ...this.state,
-          main: { ...this.state.main, live: { turnId, text: [...parts.values()].join('\n\n') } },
-        };
-      });
-    });
+    const collected = await this.collect(
+      { model, turn: { kind: 'main' }, log: withStarted },
+      (frame) => {
+        if (frame._tag !== 'delta') return;
+        this.pushLive(() => {
+          parts.set(frame.messageId, (parts.get(frame.messageId) ?? '') + frame.delta);
+          this.state = {
+            ...this.state,
+            main: { ...this.state.main, live: { turnId, text: [...parts.values()].join('\n\n') } },
+          };
+        });
+      },
+    );
     if (collected === undefined) {
       // Transport error: nothing is written, the open turn is "interrupted" (A3).
       this.setMain({
@@ -314,13 +333,23 @@ export class SessionRunner {
     const batch = [...collected.events];
     // A failure before the stream (HTTP 4xx) carries no `TurnFailed`: record it so it survives a reload.
     if (collected.error !== undefined && !batch.some((event) => event._tag === 'TurnFailed')) {
-      batch.push({ _tag: 'TurnFailed', id: this.newId(), at: this.now(), turnId, ...collected.error });
+      batch.push({
+        _tag: 'TurnFailed',
+        id: this.newId(),
+        at: this.now(),
+        turnId,
+        ...collected.error,
+      });
     }
     if (batch.length > 0) {
       if (Result.isFailure(projectSession([...withStarted, ...batch]))) {
         this.setMain({
           live: undefined,
-          failure: fail(ClientFailure.InvalidLog, 'The answer does not fit the saved lesson.', false),
+          failure: fail(
+            ClientFailure.InvalidLog,
+            'The answer does not fit the saved lesson.',
+            false,
+          ),
         });
         return 'failed';
       }
@@ -343,13 +372,17 @@ export class SessionRunner {
         const storage = await this.deps.storage();
         const model = modelChoiceOf(await Effect.runPromise(storage.getSettings));
         if (model === undefined) {
-          this.setSide({ failure: fail(ClientFailure.NoKey, 'No key, model or endpoint saved.', false) });
+          this.setSide({
+            failure: fail(ClientFailure.NoKey, 'No key, model or endpoint saved.', false),
+          });
           return;
         }
         const log = await Effect.runPromise(storage.readSession(this.sessionId));
         const session = unwrap(projectSession(log));
         if (session === undefined) {
-          this.setSide({ failure: fail(ClientFailure.InvalidLog, 'The saved log is not valid.', false) });
+          this.setSide({
+            failure: fail(ClientFailure.InvalidLog, 'The saved log is not valid.', false),
+          });
           return;
         }
         let outgoing: EventLog = log;
@@ -367,7 +400,9 @@ export class SessionRunner {
           };
           outgoing = [...log, message];
           if (Result.isFailure(projectSession(outgoing))) {
-            this.setSide({ failure: fail(ClientFailure.InvalidLog, 'The message cannot be sent here.', false) });
+            this.setSide({
+              failure: fail(ClientFailure.InvalidLog, 'The message cannot be sent here.', false),
+            });
             return;
           }
           await appendBatch(storage, this.sessionId, [message]);
@@ -377,22 +412,31 @@ export class SessionRunner {
 
         this.setSide({ live: '' });
         let text = '';
-        const collected = await this.collect({ model, turn: { kind: 'side', threadId }, log: outgoing }, (frame) => {
-          if (frame._tag !== 'delta') return;
-          this.pushLive(() => {
-            text += frame.delta;
-            this.state = { ...this.state, side: { ...this.state.side, live: text } };
-          });
-        });
+        const collected = await this.collect(
+          { model, turn: { kind: 'side', threadId }, log: outgoing },
+          (frame) => {
+            if (frame._tag !== 'delta') return;
+            this.pushLive(() => {
+              text += frame.delta;
+              this.state = { ...this.state, side: { ...this.state.side, live: text } };
+            });
+          },
+        );
         if (collected === undefined) {
           this.setSide({
             live: undefined,
-            failure: fail(ClientFailure.Network, 'The connection was lost before the answer ended.'),
+            failure: fail(
+              ClientFailure.Network,
+              'The connection was lost before the answer ended.',
+            ),
           });
           return;
         }
         const batch = [...collected.events];
-        if (collected.error !== undefined && !batch.some((event) => event._tag === 'SideTurnFailed')) {
+        if (
+          collected.error !== undefined &&
+          !batch.some((event) => event._tag === 'SideTurnFailed')
+        ) {
           batch.push({
             _tag: 'SideTurnFailed',
             id: this.newId(),
@@ -405,7 +449,11 @@ export class SessionRunner {
           if (Result.isFailure(projectSession([...outgoing, ...batch]))) {
             this.setSide({
               live: undefined,
-              failure: fail(ClientFailure.InvalidLog, 'The answer does not fit the saved lesson.', false),
+              failure: fail(
+                ClientFailure.InvalidLog,
+                'The answer does not fit the saved lesson.',
+                false,
+              ),
             });
             return;
           }
@@ -414,7 +462,9 @@ export class SessionRunner {
         this.setSide({ live: undefined, failure: collected.error });
       });
       if (!result.acquired) {
-        this.setSide({ failure: fail(ClientFailure.Busy, 'Another tab is waiting for an answer.') });
+        this.setSide({
+          failure: fail(ClientFailure.Busy, 'Another tab is waiting for an answer.'),
+        });
       }
     } catch (error) {
       this.setSide({ live: undefined, failure: failureOfThrown(error) });

@@ -20,9 +20,25 @@ const astryx = (): Plugin[] =>
       : plugin,
   );
 
+// KaTeX's CSS lists woff2, woff and ttf for every font, and Vite copies all three. Every browser we
+// support reads woff2, so drop the other two sources: 19 woff2 files (256 kB) instead of 817 kB,
+// which matters for the Capacitor bundle (plan step 7).
+const katexWoff2Only = (): Plugin => ({
+  name: 'kd-katex-woff2-only',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.split('?')[0]!.endsWith('katex/dist/katex.min.css')) return null;
+    return code.replace(
+      /,url\([^)]*\.woff\) format\("woff"\),url\([^)]*\.ttf\) format\("truetype"\)/g,
+      '',
+    );
+  },
+});
+
 export default defineConfig({
   server: { port: 3000 },
   plugins: [
+    katexWoff2Only(),
     tanstackStart(
       spa
         ? { spa: { enabled: true, prerender: { outputPath: '/index.html', crawlLinks: false } } }

@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { AppShell } from '@astryxdesign/core/AppShell';
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { getLocale } from '@kd-learn/i18n';
@@ -20,7 +21,10 @@ export const Route = createRootRoute({
   component: () => (
     <I18nRoot>
       <ThemeRoot>
-        <Outlet />
+        {/* Fills the viewport; each screen is a Layout inside it, so the lesson scrolls in its own region. */}
+        <AppShell>
+          <Outlet />
+        </AppShell>
       </ThemeRoot>
     </I18nRoot>
   ),

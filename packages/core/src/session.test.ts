@@ -191,12 +191,7 @@ describe('projectSession', () => {
 
   it('lets the learner skip the last step: SessionCompleted without a turn', () => {
     const noTurn = (): DomainEvent => ({ _tag: 'SessionCompleted', ...meta() });
-    const full = project(
-      ...teachingLog(),
-      stepSkipped('a'),
-      stepSkipped('b'),
-      noTurn(),
-    );
+    const full = project(...teachingLog(), stepSkipped('a'), stepSkipped('b'), noTurn());
     expect(full.state).toEqual({ _tag: 'Done' });
     expect(full.skippedSteps).toEqual(['a', 'b']);
     // Still checked: not valid while a step is left.

@@ -18,7 +18,9 @@ export const withLock: WithLock = async (name, run) => {
     const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
     if (locks === undefined) return { acquired: true, value: await run() };
     return await locks.request(name, { ifAvailable: true }, async (lock) =>
-      lock === null ? { acquired: false as const } : { acquired: true as const, value: await run() },
+      lock === null
+        ? { acquired: false as const }
+        : { acquired: true as const, value: await run() },
     );
   } finally {
     heldHere.delete(name);

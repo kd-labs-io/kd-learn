@@ -5,6 +5,7 @@
   "description": "kd-learn components on top of Astryx (an Astryx integration package).",
   "type": "module",
   "exports": {
+    "./components/LessonMarkdown": "./components/LessonMarkdown.tsx",
     "./components/LessonText": "./components/LessonText.tsx"
   },
   "scripts": {
@@ -17,6 +18,7 @@
     "@astryxdesign/core": "catalog:",
     "@kd-learn/config": "workspace:*",
     "@stylexjs/stylex": "catalog:",
+    "@types/katex": "0.16.8",
     "@types/react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -27,5 +29,9 @@
     "@astryxdesign/core": "catalog:",
     "@stylexjs/stylex": "catalog:",
     "react": "catalog:"
+  },
+  "dependencies": {
+    "@kd-learn/i18n": "workspace:*",
+    "katex": "0.19.1"
   }
 }
