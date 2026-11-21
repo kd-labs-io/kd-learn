@@ -82,7 +82,7 @@ Bài thử: cộng hai số, gọi tool `add` rồi `submit_result` theo schema 
 
 Còn thiếu:
 
-- Chạy lại 8 lượt Claude Code (`acp-live.ts claude-code 8 12`) khi gói hết giới hạn.
+- Chạy lại 8 lượt Claude Code (`acp-live.ts claude-code 8 12 --no-interrupt`, nay mặc định Haiku) khi gói hết giới hạn.
 - Antigravity huỷ chậm (khoảng 1,2 s): chưa rõ do `session/cancel` hay do chờ kill.
 
 ## Tiêu chí đạt (chốt 2026-11-17)

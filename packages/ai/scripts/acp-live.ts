@@ -1,5 +1,5 @@
 // Manual spike check for ACP agents (not run in CI): structured result reliability and cancel.
-// Run: node --env-file=../../.env scripts/acp-live.ts <claude-code|antigravity|opencode> [runs] [first]
+// Run: node --env-file=../../.env scripts/acp-live.ts <claude-code|antigravity|opencode> [runs] [first] [--no-interrupt]
 // B4 check: node --env-file=../../.env scripts/acp-live.ts <agent> --attack
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
@@ -11,13 +11,17 @@ import { runTurn } from '../src/acp/index.ts';
 
 const agent = (process.argv[2] ?? 'claude-code') as 'claude-code' | 'antigravity' | 'opencode';
 const attack = process.argv.includes('--attack');
-const runs = attack ? 0 : Number(process.argv[3] ?? 1);
+const skipInterrupt = process.argv.includes('--no-interrupt');
+const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const runs = attack ? 0 : Number(positional[1] ?? 1);
 // Index of the first run, so a later batch asks new sums.
-const first = attack ? 0 : Number(process.argv[4] ?? 0);
+const first = attack ? 0 : Number(positional[2] ?? 0);
 const model: ModelRef = {
   provider: 'acp',
   agent,
+  // Cheapest models: the spike checks reliability, not model quality.
   ...(agent === 'opencode' ? { model: 'opencode-go/claude-haiku-5-5' } : {}),
+  ...(agent === 'claude-code' ? { model: 'claude-haiku-5-5' } : {}),
   ...(agent === 'antigravity' && process.env.KD_LEARN_GEMINI_API
     ? { apiKey: process.env.KD_LEARN_GEMINI_API }
     : {}),
@@ -137,6 +141,7 @@ const program = Effect.gen(function* () {
     console.log(agent, i, r.ok ? 'ok' : 'FAIL', r.detail);
   }
   console.log(`${agent}: ${passed}/${runs} valid, ${fixed} after a fix`);
+  if (skipInterrupt) return;
   console.log(
     agent,
     yield* interrupt.pipe(Effect.catch((e) => Effect.succeed(`interrupt error ${e.message}`))),
