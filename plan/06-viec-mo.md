@@ -11,4 +11,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0–4 xong; bước hiện tại: bước 5 (công tắc admin). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).
+Phase 2 (tài khoản + triển khai, [mục 4](04-phases.md)): plan phần chính ở [tai-khoan.md](tai-khoan.md). Bước 0–5 xong; bước hiện tại: bước 6 (demo với ngân sách chung). Tiến độ ở [progress/phase-2.md](progress/phase-2.md).

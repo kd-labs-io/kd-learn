@@ -19,7 +19,8 @@ import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
 import { asRecord, describeIssue, redact, scrubFrame } from './safety.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
-import { loadAccountConfig } from './auth/config.ts';
+import { loadAccountConfig, switchFrom } from './auth/config.ts';
+import { makeAdminHandlers } from './admin/http.ts';
 import {
   initAccounts,
   makeAccountHandlers,
@@ -48,6 +49,8 @@ export interface HandlerDeps {
   readonly ai?: Layer.Layer<AiPort>;
   readonly log?: Logger;
   readonly newId?: () => string;
+  /** False when an admin turned guest mode off (plan A7). Absent: allowed. */
+  readonly guestAllowed?: () => Promise<boolean>;
 }
 
 /** What the host knows about the connection. `clientAddress` is the socket peer, not a header. */
@@ -145,6 +148,15 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (request.method !== 'POST') {
     return reject(405, ErrorCode.MethodNotAllowed, 'Use POST.');
+  }
+  let allowed: boolean;
+  try {
+    allowed = deps.guestAllowed === undefined ? true : await deps.guestAllowed();
+  } catch {
+    return reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
+  }
+  if (!allowed) {
+    return reject(403, ErrorCode.GuestModeDisabled, 'Guest mode is turned off on this server.');
   }
 
   const body = await readLimited(request, config.maxRequestBytes);
@@ -272,8 +284,12 @@ export const handleEndpoints = async (request: Request, deps: HandlerDeps): Prom
 export interface Handlers extends AccountHandlers {
   readonly turns: Handler;
   readonly endpoints: Handler;
-  /** Everything under `/api/account/` (settings, connections, roles). */
+  /** Everything under `/api/account/` (settings, connections, roles, sessions). */
   readonly account: Handler;
+  /** Everything under `/api/admin/` except invites (config, users). */
+  readonly admin: Handler;
+  /** `GET /api/config`, public. */
+  readonly config: Handler;
 }
 
 export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
@@ -319,29 +335,30 @@ export const createHandlers = (
       event: 'config.invalid',
       fields: { message: error instanceof Error ? error.message : 'unknown' },
     });
+  const accountsBroken = {
+    register: broken,
+    login: broken,
+    logout: broken,
+    me: broken,
+    invites: broken,
+    account: broken,
+    admin: broken,
+  };
 
   let config: ServerConfig;
   try {
     config = loadConfig(env);
   } catch (error) {
     configFailed(error);
-    return {
-      turns: broken,
-      endpoints: broken,
-      register: broken,
-      login: broken,
-      logout: broken,
-      me: broken,
-      invites: broken,
-      account: broken,
-    };
+    return { turns: broken, endpoints: broken, config: broken, ...accountsBroken };
   }
-  const deps: HandlerDeps = { ...options, config, log };
 
   // Accounts are optional: a bad account variable breaks only the account routes, and the guest
-  // routes keep working. The database opens on the first account request.
-  let accountRoutes: AccountHandlers;
-  let account: Handler;
+  // routes keep working with the environment defaults. The database opens on the first request
+  // that needs it.
+  let accountRoutes: Omit<Handlers, 'turns' | 'endpoints' | 'config'> = accountsBroken;
+  let publicConfig: Handler;
+  let guestAllowed: () => Promise<boolean>;
   try {
     const accountConfig = loadAccountConfig(env);
     let ready: Promise<Accounts> | undefined;
@@ -362,29 +379,52 @@ export const createHandlers = (
       });
       return ready;
     };
-    accountRoutes = makeAccountHandlers(accounts, config, accountConfig, log);
-    account = makeSettingsHandler(makeRouteKit({ accounts, config, accountConfig, log }), log);
+    const kit = makeRouteKit({ accounts, config, accountConfig, log });
+    const adminRoutes = makeAdminHandlers(kit, log);
+    accountRoutes = {
+      ...makeAccountHandlers(accounts, config, accountConfig, log),
+      account: makeSettingsHandler(kit, log),
+      admin: adminRoutes.admin,
+    };
+    publicConfig = adminRoutes.config;
+    // The admin switch lives in the database. If it cannot be read, guest turns are refused
+    // (fail closed) rather than ignoring a switch the admin turned off.
+    guestAllowed = () => accounts().then((ready) => ready.admin.config().guestMode);
   } catch (error) {
     configFailed(error);
-    accountRoutes = {
-      register: broken,
-      login: broken,
-      logout: broken,
-      me: broken,
-      invites: broken,
-    };
-    account = broken;
+    const guestMode = (() => {
+      try {
+        return switchFrom('KD_LEARN_GUEST_MODE', env.KD_LEARN_GUEST_MODE, true);
+      } catch {
+        return false;
+      }
+    })();
+    guestAllowed = async () => guestMode;
+    publicConfig = async (request) =>
+      Response.json(
+        { registration: 'closed', guestMode, demoMode: false },
+        {
+          headers: {
+            ...SECURITY_HEADERS,
+            'cache-control': 'no-store',
+            ...corsHeaders(request, config),
+          },
+        },
+      );
   }
+  const deps: HandlerDeps = { ...options, config, log, guestAllowed };
 
   const wrap = (handler: Handler) => safely(handler, log);
   return {
     turns: wrap((request) => handleTurns(request, deps)),
     endpoints: wrap((request) => handleEndpoints(request, deps)),
+    config: wrap(publicConfig),
     register: wrap(accountRoutes.register),
     login: wrap(accountRoutes.login),
     logout: wrap(accountRoutes.logout),
     me: wrap(accountRoutes.me),
     invites: wrap(accountRoutes.invites),
-    account: wrap(account),
+    account: wrap(accountRoutes.account),
+    admin: wrap(accountRoutes.admin),
   };
 };

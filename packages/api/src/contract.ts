@@ -15,6 +15,9 @@ export const ACCOUNT_SETTINGS_PATH = '/api/account/settings';
 export const CONNECTIONS_PATH = '/api/account/connections';
 export const ROLES_PATH = '/api/account/roles';
 export const SESSIONS_PATH = '/api/account/sessions';
+export const CONFIG_PATH = '/api/config';
+export const ADMIN_CONFIG_PATH = '/api/admin/config';
+export const ADMIN_USERS_PATH = '/api/admin/users';
 
 const Secret = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512));
 const ModelName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200));
@@ -111,6 +114,10 @@ export const ErrorCode = {
   NothingToRun: 'NothingToRun',
   /** The turn ran out of time on the server. */
   TurnTimeout: 'TurnTimeout',
+  /** The admin turned guest mode off: `POST /api/turns` is closed (plan A7). */
+  GuestModeDisabled: 'GuestModeDisabled',
+  /** The change would lock the admin out (disabling their own account). */
+  Conflict: 'Conflict',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;
@@ -359,3 +366,53 @@ export const TurnFrame = Schema.TaggedStruct('turn', {
 
 export const AccountFrame = Schema.Union([RunningFrame, LogFrame, TurnDeltaFrame, TurnFrame]);
 export type AccountFrame = typeof AccountFrame.Type;
+
+// Admin switches (plan tai-khoan.md A7). The server enforces them; the UI only reflects them.
+
+export const RegistrationMode = Schema.Literals(['open', 'invite', 'closed']);
+export type RegistrationMode = typeof RegistrationMode.Type;
+
+/** `GET /api/config` (no sign-in): what this server offers, so the UI shows the right entry points. */
+export const PublicConfig = Schema.Struct({
+  registration: RegistrationMode,
+  guestMode: Schema.Boolean,
+  demoMode: Schema.Boolean,
+});
+export type PublicConfig = typeof PublicConfig.Type;
+
+/** `GET /api/admin/config`. Step 6 adds the demo budget, step 7 the ACP agents. */
+export const AdminConfig = PublicConfig;
+export type AdminConfig = PublicConfig;
+
+/** `PUT /api/admin/config`: only the fields given change. */
+export const UpdateAdminConfigRequest = Schema.Struct({
+  registration: Schema.optionalKey(RegistrationMode),
+  guestMode: Schema.optionalKey(Schema.Boolean),
+  demoMode: Schema.optionalKey(Schema.Boolean),
+});
+export type UpdateAdminConfigRequest = typeof UpdateAdminConfigRequest.Type;
+
+export const AdminUser = Schema.Struct({
+  id: Schema.NonEmptyString,
+  email: Schema.String,
+  role: Role,
+  disabled: Schema.Boolean,
+  /** Too many failed logins: sign-in is refused until `lockedUntil` (epoch ms) or an unlock. */
+  lockedUntil: Schema.optionalKey(Schema.Number),
+  createdAt: Schema.Number,
+});
+export type AdminUser = typeof AdminUser.Type;
+
+/** `GET /api/admin/users`. */
+export const AdminUserList = Schema.Struct({ users: Schema.Array(AdminUser) });
+export type AdminUserList = typeof AdminUserList.Type;
+
+/**
+ * `PATCH /api/admin/users/:id`. `disabled: true` also revokes every token of the user;
+ * `unlock: true` clears the failed-login lock.
+ */
+export const UpdateUserRequest = Schema.Struct({
+  disabled: Schema.optionalKey(Schema.Boolean),
+  unlock: Schema.optionalKey(Schema.Literal(true)),
+});
+export type UpdateUserRequest = typeof UpdateUserRequest.Type;

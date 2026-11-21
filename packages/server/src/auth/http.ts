@@ -20,6 +20,7 @@ import {
   type ServerDatabase,
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
+import { makeAdmin, type AdminService } from '../admin/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
 import { makeSettings, type SettingsService } from '../settings/service.ts';
@@ -37,6 +38,7 @@ export interface Accounts {
   readonly auth: AuthService;
   readonly settings: SettingsService;
   readonly sessions: SessionRunner;
+  readonly admin: AdminService;
 }
 
 /**
@@ -73,7 +75,12 @@ export const initAccounts = async (
     log: options.log,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
-  return { database, auth, settings, sessions };
+  const admin = makeAdmin(database, auth, {
+    registration: config.registration,
+    guestMode: config.guestMode,
+    demoMode: config.demoMode,
+  });
+  return { database, auth, settings, sessions, admin };
 };
 
 export interface AccountHandlers {
