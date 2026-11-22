@@ -7,6 +7,7 @@ import { localModeNow } from '../account/auth';
 import { useGuestLessonSources } from '../sources/library';
 import { useSession } from '../storage';
 import { useRunner, useStoragePersistent, useTurnRunningElsewhere } from './hooks';
+import { guestFigureLoader } from './figures';
 import { LearnScreen } from './LearnScreen';
 import type { LessonView } from './source';
 
@@ -32,7 +33,15 @@ export function GuestLesson({ sessionId }: { sessionId: string }) {
 
   return (
     <LearnScreen
-      source={{ view, state, actions: runner, elsewhere, persistent, sources }}
+      source={{
+        view,
+        state,
+        actions: runner,
+        elsewhere,
+        persistent,
+        sources,
+        loadFigure: guestFigureLoader,
+      }}
       onHome={() => void navigate({ to: '/' })}
       onSettings={() => void navigate({ to: '/settings' })}
     />

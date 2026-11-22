@@ -19,9 +19,11 @@ import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
 import { canSkipStep, type Citation, type EventLog, type Session } from '@kd-learn/core';
-import { LessonMarkdown } from '@kd-learn/ui/components/LessonMarkdown';
+import { LessonFigure, type FigureBodyLoader } from '@kd-learn/ui/components/LessonFigure';
 import { Result } from 'effect';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeControl } from '../theme/ThemeRoot';
+import { figureVarsOf } from './figures';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
 import { LessonSourcesPanel } from '../sources/LessonSourcesPanel';
 import { PlanPanel } from './PlanPanel';
@@ -200,7 +202,12 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                   {planPanel}
                 </Collapsible>
               )}
-              <Conversation session={session} state={state} onCite={setCited} />
+              <Conversation
+                session={session}
+                state={state}
+                onCite={setCited}
+                loadFigure={source.loadFigure}
+              />
             </VStack>
           </LayoutContent>
         }
@@ -266,12 +273,20 @@ function Conversation({
   session,
   state,
   onCite,
+  loadFigure,
 }: {
   session: Session;
   state: RunnerState;
   onCite: (citation: Citation) => void;
+  loadFigure: FigureBodyLoader;
 }) {
   const titles = new Map(session.sources.map((s) => [s.sourceId, s.title]));
+  const { override } = useThemeControl();
+  const vars = figureVarsOf(override);
+  const figures = useMemo(
+    () => new Map(session.figures.map((figure) => [figure.figureId, figure])),
+    [session.figures],
+  );
   const items = conversationOf(session);
   const endRef = useRef<HTMLElement>(null);
   const { live } = state.main;
@@ -298,7 +313,9 @@ function Conversation({
         ) : (
           <VStack key={item.key} gap={1} data-testid="msg-tutor">
             <Text type="supporting">{m.conv_tutor()}</Text>
-            <LessonMarkdown>{item.content}</LessonMarkdown>
+            <LessonFigure figures={figures} loadBody={loadFigure} vars={vars}>
+              {item.content}
+            </LessonFigure>
             {item.citations === undefined ? null : (
               <HStack gap={1} wrap="wrap" data-testid="citations">
                 {item.citations.map((citation) => (
@@ -322,7 +339,9 @@ function Conversation({
           {live.text === '' ? (
             <Spinner size="sm" label={m.conv_writing()} />
           ) : (
-            <LessonMarkdown isStreaming={writing}>{live.text}</LessonMarkdown>
+            <LessonFigure figures={figures} loadBody={loadFigure} vars={vars} isStreaming={writing}>
+              {live.text}
+            </LessonFigure>
           )}
         </VStack>
       ) : null}

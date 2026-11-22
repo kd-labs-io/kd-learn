@@ -4,6 +4,7 @@ import type { EventLog, ProjectionError, Session } from '@kd-learn/core';
 import type { Result } from 'effect';
 import type { LessonSources } from '../sources/library';
 import type { RunnerState } from './runner';
+import type { FigureBodyLoader } from '@kd-learn/ui/components/LessonFigure';
 
 export type LessonView =
   | { readonly status: 'loading' }
@@ -45,4 +46,6 @@ export interface LessonSource {
   readonly persistent: boolean | undefined;
   /** Sources to attach and the chunks citations open (phase 4). */
   readonly sources?: LessonSources;
+  /** Reads a figure body (phase 5). */
+  readonly loadFigure: FigureBodyLoader;
 }

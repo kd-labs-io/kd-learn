@@ -398,5 +398,12 @@
   "figure_demo_rerun": "Chạy lại",
   "figure_demo_error": "Demo báo lỗi: {message}",
   "figure_demo_unavailable": "Demo chỉ chạy được qua HTTPS hoặc trên localhost.",
-  "figure_demo_libraries": "Thư viện: {list}"
+  "figure_demo_libraries": "Thư viện: {list}",
+  "profile_figures": "Hình minh hoạ",
+  "profile_figures_description": "Những gì Teacher được hiện ngoài chữ, trong pha dạy.",
+  "profile_figures_diagrams": "Sơ đồ (SVG và Mermaid)",
+  "profile_figures_demos": "Demo tương tác (chạy trong khung cách ly)",
+  "profile_figures_images": "Ảnh sinh bằng AI",
+  "admin_figure_cdn": "Thư viện trong demo",
+  "admin_figure_cdn_hint": "Demo được nạp D3, Chart.js và Matter.js từ jsDelivr (ghim phiên bản, kiểm bằng hash). Tắt: chỉ JavaScript thuần."
 }

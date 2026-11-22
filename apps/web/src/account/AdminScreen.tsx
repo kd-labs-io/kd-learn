@@ -119,6 +119,13 @@ function Switches({ config, change }: { config: AdminConfig; change: Change }) {
         changeAction={(demoMode) => change({ demoMode })}
         data-testid="admin-demo-mode"
       />
+      <Switch
+        label={m.admin_figure_cdn()}
+        description={m.admin_figure_cdn_hint()}
+        value={config.figureCdn}
+        changeAction={(figureCdn) => change({ figureCdn })}
+        data-testid="admin-figure-cdn"
+      />
     </VStack>
   );
 }

@@ -398,5 +398,12 @@
   "figure_demo_rerun": "Run again",
   "figure_demo_error": "The demo reported an error: {message}",
   "figure_demo_unavailable": "Demos can run only over HTTPS or on localhost.",
-  "figure_demo_libraries": "Libraries: {list}"
+  "figure_demo_libraries": "Libraries: {list}",
+  "profile_figures": "Figures",
+  "profile_figures_description": "What the Teacher may show besides text, in the teaching phase.",
+  "profile_figures_diagrams": "Diagrams (SVG and Mermaid)",
+  "profile_figures_demos": "Interactive demos (run in an isolated frame)",
+  "profile_figures_images": "Generated images",
+  "admin_figure_cdn": "Libraries in demos",
+  "admin_figure_cdn_hint": "Demos may load D3, Chart.js and Matter.js from jsDelivr (pinned versions, checked by hash). Off: plain JavaScript only."
 }

@@ -9,6 +9,7 @@ import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { NumberInput } from '@astryxdesign/core/NumberInput';
 import { Spinner } from '@astryxdesign/core/Spinner';
+import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { TextInput } from '@astryxdesign/core/TextInput';
@@ -19,6 +20,7 @@ import {
   MAX_PROMPT_LENGTH,
   MAX_TURNS_PER_STEP,
   SavedProfile,
+  type FigureSettings,
   type PromptKey,
   type ResolvedProfile,
 } from '@kd-learn/core';
@@ -72,8 +74,17 @@ interface ProfileForm {
   readonly language: string;
   readonly maxProbeQuestions: number;
   readonly maxTurnsPerStep: number;
+  readonly figures: FigureSettings;
   readonly prompts: Record<PromptKey, string>;
 }
+
+const FIGURE_KINDS = ['diagrams', 'demos', 'images'] as const;
+const figureLabel = (kind: (typeof FIGURE_KINDS)[number]) =>
+  kind === 'diagrams'
+    ? m.profile_figures_diagrams()
+    : kind === 'demos'
+      ? m.profile_figures_demos()
+      : m.profile_figures_images();
 
 const toForm = (profile: ResolvedProfile): ProfileForm => ({
   id: profile.id,
@@ -81,6 +92,7 @@ const toForm = (profile: ResolvedProfile): ProfileForm => ({
   language: profile.language,
   maxProbeQuestions: profile.maxProbeQuestions,
   maxTurnsPerStep: profile.maxTurnsPerStep,
+  figures: { ...profile.figures },
   prompts: { ...profile.prompts },
 });
 
@@ -92,6 +104,7 @@ const toSaved = (form: ProfileForm): SavedProfile => {
     language: form.language.trim(),
     maxProbeQuestions: form.maxProbeQuestions,
     maxTurnsPerStep: form.maxTurnsPerStep,
+    figures: form.figures,
     prompts: form.prompts,
   };
 };
@@ -312,6 +325,20 @@ function ProfileEditor({
           />
         )}
       </form.Field>
+      <Heading level={3}>{m.profile_figures()}</Heading>
+      <Text type="supporting">{m.profile_figures_description()}</Text>
+      {FIGURE_KINDS.map((kind) => (
+        <form.Field key={kind} name={`figures.${kind}`}>
+          {(field) => (
+            <Switch
+              label={figureLabel(kind)}
+              value={field.state.value}
+              onChange={(checked) => field.handleChange(checked)}
+              data-testid={`profile-figures-${kind}`}
+            />
+          )}
+        </form.Field>
+      ))}
       <Heading level={3}>{m.profile_prompts()}</Heading>
       {PROMPT_KEYS.map((key) => (
         <form.Field key={key} name={`prompts.${key}`}>
@@ -385,6 +412,16 @@ function ProfileFields({ value, isReadOnly }: { value: ProfileForm; isReadOnly: 
         onChange={() => undefined}
         isReadOnly={isReadOnly}
       />
+      <Heading level={3}>{m.profile_figures()}</Heading>
+      {FIGURE_KINDS.map((kind) => (
+        <Switch
+          key={kind}
+          label={figureLabel(kind)}
+          value={value.figures[kind]}
+          onChange={() => undefined}
+          isDisabled
+        />
+      ))}
       <Heading level={3}>{m.profile_prompts()}</Heading>
       {PROMPT_KEYS.map((key) => (
         <TextArea

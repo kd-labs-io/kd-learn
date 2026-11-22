@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 // Lint code as if it lived at a given path, with the real root config.
 const root = fileURLToPath(new URL('../../..', import.meta.url));
@@ -12,6 +12,9 @@ const ruleIds = async (filePath: string, code: string) => {
 };
 
 describe('package boundaries', () => {
+  // The first lint loads the whole config and its plugins: seconds on a cold CI runner.
+  beforeAll(() => ruleIds('packages/core/src/fixture.ts', 'export {};'), 60_000);
+
   it.each([
     ["import { readFileSync } from 'node:fs';\nreadFileSync('x');"],
     ["import { readFileSync } from 'fs';\nreadFileSync('x');"],
