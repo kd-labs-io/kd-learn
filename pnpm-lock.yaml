@@ -292,6 +292,9 @@ importers:
       '@stylexjs/stylex':
         specifier: 'catalog:'
         version: 0.19.2
+      '@tabler/icons-react':
+        specifier: ^3.52.0
+        version: 3.52.0(react@19.3.1)
       '@tanstack/react-form':
         specifier: 1.33.5
         version: 1.33.5(@tanstack/react-start@1.169.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.6)(jiti@2.7.0)))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -1779,6 +1782,14 @@ packages:
     resolution: {integrity: sha512-kyHrLCVyKNmycPl+WnjVGJmPgKGAYbtVPasuCe3UgQllennwj2himUKQncG98zt+66nDuGpy7Sx2xCYM03nr3Q==}
     peerDependencies:
       unplugin: ^2.3.11
+
+  '@tabler/icons-react@3.52.0':
+    resolution: {integrity: sha512-tN22mz4KLVpR+psqu9bAsT4b1IdhKcPGA1fDhyQerIv+8azyowdWzf8e0hWxQSsIxDTfkipGfiL0/uHNmpbvgw==}
+    peerDependencies:
+      react: '>= 16'
+
+  '@tabler/icons@3.52.0':
+    resolution: {integrity: sha512-dldKlJNfO/gZnGLcIY0X2EFFKIMGwL/rEvTqglvBgAPFiwj9pZOCN5V3Sf0Gyjq6foX4VQmLdOmsS4w5FdWKAw==}
 
   '@tanstack/ai-anthropic@1.1.1':
     resolution: {integrity: sha512-pQvU543yZ+HoLvuInTqx9xe93hWu0nBYyPPkXtsUQOBF2yO+aAfTyJpBZE9zz6EO2t/s5uVVJFq1BBwiNYOFag==}
@@ -5264,6 +5275,13 @@ snapshots:
       unplugin: 2.3.11
     transitivePeerDependencies:
       - supports-color
+
+  '@tabler/icons-react@3.52.0(react@19.3.1)':
+    dependencies:
+      '@tabler/icons': 3.52.0
+      react: 19.3.1
+
+  '@tabler/icons@3.52.0': {}
 
   '@tanstack/ai-anthropic@1.1.1(@tanstack/ai@1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7))(zod@4.6.7)':
     dependencies:
