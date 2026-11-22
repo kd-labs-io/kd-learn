@@ -2,6 +2,7 @@
 export * from './event.ts';
 export * from './exercise-schema.ts';
 export * from './exercises.ts';
+export * from './figure.ts';
 export * from './knowledge-event.ts';
 export * from './knowledge.ts';
 export * from './plan.ts';

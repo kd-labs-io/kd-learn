@@ -4,12 +4,13 @@ import { Effect, Queue, Schema, Stream } from 'effect';
 import {
   SavedProfile,
   type DomainEvent,
+  type FigureBody,
   type KnowledgeEvent,
   type SourceChunk,
   type SourceInfo,
   type TeachingProfile,
 } from '@kd-learn/core';
-import { checkChunks, checkNewSourceInfo } from '../sqlite/codec.ts';
+import { checkChunks, checkFigures, checkNewSourceInfo } from '../sqlite/codec.ts';
 import {
   KnowledgeConflict,
   SourceConflict,
@@ -24,6 +25,7 @@ import {
 export const makeMemoryStorage = (): StorageService => {
   const sessions = new Map<string, DomainEvent[]>();
   const eventIds = new Set<string>();
+  const figureBodies = new Map<string, FigureBody>();
   const knowledge: KnowledgeEvent[] = [];
   const knowledgeIds = new Set<string>();
   let settings: GuestSettings | undefined;
@@ -41,9 +43,17 @@ export const makeMemoryStorage = (): StorageService => {
   return {
     persistent: false,
 
-    appendEvents: (sessionId, events) =>
+    appendEvents: (sessionId, events, figures = []) =>
       Effect.suspend(() => {
         // Validate the whole batch before touching state: all or none.
+        try {
+          checkFigures(events, figures);
+        } catch (error) {
+          return Effect.fail(failure(error));
+        }
+        if (figures.some((figure) => figureBodies.has(figure.figureId))) {
+          return Effect.fail(new StorageFailure({ message: 'Duplicate figure id' }));
+        }
         const batchIds = new Set<string>();
         for (const event of events) {
           if (eventIds.has(event.id) || batchIds.has(event.id)) {
@@ -55,11 +65,14 @@ export const makeMemoryStorage = (): StorageService => {
         log.push(...events);
         sessions.set(sessionId, log);
         batchIds.forEach((id) => eventIds.add(id));
+        figures.forEach((figure) => figureBodies.set(figure.figureId, figure));
         if (events.length > 0) emit({ _tag: 'SessionChanged', sessionId });
         return Effect.succeed({ lastSeq: log.length - 1 });
       }),
 
     readSession: (sessionId) => Effect.sync(() => [...(sessions.get(sessionId) ?? [])]),
+
+    readFigure: (figureId) => Effect.sync(() => figureBodies.get(figureId)),
 
     listSessions: Effect.sync(() => {
       const rows: SessionSummary[] = [];

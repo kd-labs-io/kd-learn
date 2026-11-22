@@ -5,7 +5,12 @@
 // Every server table lives in this one list, including those owned by services outside the storage
 // port (users, tokens, admin config, demo budget), so one database has one version number.
 // Never edit a migration that has shipped: add the next one.
-import { eventsTable, knowledgeEventsTable, sourcesTables } from '../sqlite/schema.ts';
+import {
+  eventsTable,
+  knowledgeEventsTable,
+  sourcesTables,
+  figuresTable,
+} from '../sqlite/schema.ts';
 
 export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
   // v1: event log, and the owner of each session.
@@ -121,4 +126,6 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
   ],
   // v9: learning sources (phase 4 step 4); `owner` is the user id, read through `forUser` only.
   [...sourcesTables],
+  // v10: figure bodies (phase 5 A1); `owner` is the user id.
+  [...figuresTable],
 ];

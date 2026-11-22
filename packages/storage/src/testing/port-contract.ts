@@ -50,6 +50,25 @@ export const propositionAdded = (id: string, at: number): KnowledgeEvent => ({
   source: { sessionId: 's1' },
 });
 
+export const figureAdded = (
+  figureId: string,
+  turnId: string,
+  kind: 'svg' | 'image',
+  bytes: number,
+): DomainEvent => ({
+  _tag: 'FigureAdded',
+  id: `fig-event-${turnId}-${figureId}`,
+  at: 5,
+  turnId,
+  figureId,
+  kind,
+  title: 'A figure',
+  mime: kind === 'svg' ? 'image/svg+xml' : 'image/jpeg',
+  bytes,
+});
+
+const svgBody = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+
 export const portContract = (name: string, make: () => StorageService) =>
   describe(`${name}: storage port contract`, () => {
     it('reads back what was appended, in order', async () => {
@@ -62,6 +81,63 @@ export const portContract = (name: string, make: () => StorageService) =>
       const log = await Effect.runPromise(storage.readSession('s1'));
       expect(log.map((event) => event.id)).toEqual(['a', 'b', 'c']);
       expect(await Effect.runPromise(storage.readSession('unknown'))).toEqual([]);
+    });
+
+    it('writes figure bodies with their batch and reads them back', async () => {
+      const storage = make();
+      const image = new Uint8Array([255, 216, 255, 0, 1, 2]);
+      await Effect.runPromise(
+        storage.appendEvents(
+          's1',
+          [
+            sessionCreated('s1', 'Triangles', 1),
+            turnStarted('e1', 2),
+            figureAdded('f1', 'turn-e1', 'svg', svgBody.length),
+            figureAdded('f2', 'turn-e1', 'image', image.length),
+          ],
+          [
+            { figureId: 'f1', body: svgBody },
+            { figureId: 'f2', body: image },
+          ],
+        ),
+      );
+      expect(await Effect.runPromise(storage.readFigure('f1'))).toEqual({
+        figureId: 'f1',
+        body: svgBody,
+      });
+      const read = await Effect.runPromise(storage.readFigure('f2'));
+      expect(read?.body).toBeInstanceOf(Uint8Array);
+      expect([...(read!.body as Uint8Array)]).toEqual([...image]);
+      expect(await Effect.runPromise(storage.readFigure('nope'))).toBeUndefined();
+    });
+
+    it('rejects a batch whose figures and bodies do not match, and writes nothing', async () => {
+      const storage = make();
+      await Effect.runPromise(storage.appendEvents('s1', [sessionCreated('s1', 'T', 1)]));
+      const batches: Array<
+        [ReadonlyArray<DomainEvent>, ReadonlyArray<{ figureId: string; body: string | Uint8Array }>]
+      > = [
+        [[turnStarted('e1', 2), figureAdded('f1', 'turn-e1', 'svg', svgBody.length)], []],
+        [[turnStarted('e2', 2)], [{ figureId: 'f2', body: svgBody }]],
+        [
+          [turnStarted('e3', 2), figureAdded('f3', 'turn-e3', 'svg', 3)],
+          [{ figureId: 'f3', body: svgBody }],
+        ],
+        [
+          [turnStarted('e4', 2), figureAdded('f4', 'turn-e4', 'image', 6)],
+          [{ figureId: 'f4', body: 'abcdef' }],
+        ],
+        [
+          [turnStarted('e5', 2), figureAdded('f5', 'turn-e5', 'svg', 65 * 1024)],
+          [{ figureId: 'f5', body: 'x'.repeat(65 * 1024) }],
+        ],
+      ];
+      for (const [events, figures] of batches) {
+        const exit = await Effect.runPromiseExit(storage.appendEvents('s1', events, figures));
+        expect(exit._tag).toBe('Failure');
+      }
+      expect(await Effect.runPromise(storage.readSession('s1'))).toHaveLength(1);
+      expect(await Effect.runPromise(storage.readFigure('f2'))).toBeUndefined();
     });
 
     it('reports the end of the log for an empty batch', async () => {

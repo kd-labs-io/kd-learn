@@ -27,7 +27,9 @@ import {
   toEventRow,
   toKnowledgeRow,
   checkChunks,
+  checkFigures,
   checkNewSourceInfo,
+  fromFigureRow,
   fromChunkRow,
   fromSourceRow,
   toChunkRow,
@@ -215,19 +217,35 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
   return {
     persistent: true,
 
-    appendEvents: (sessionId, events) =>
-      events.length === 0
+    appendEvents: (sessionId, events, figures = []) =>
+      events.length === 0 && figures.length === 0
         ? // Nothing to write: report the current end of the log without a transaction.
           call<string[]>({ op: 'read', sessionId }).pipe(
             Effect.map((payloads): AppendResult => ({ lastSeq: payloads.length - 1 })),
           )
-        : call<AppendReply>({
-            op: 'append',
-            sessionId,
-            events: events.map(toEventRow),
+        : Effect.try({
+            try: () => checkFigures(events, figures),
+            catch: (error) =>
+              new StorageFailure({
+                message: error instanceof Error ? error.message : String(error),
+              }),
           }).pipe(
+            Effect.flatMap((figureRows) =>
+              call<AppendReply>({
+                op: 'append',
+                sessionId,
+                events: events.map(toEventRow),
+                figures: figureRows,
+              }),
+            ),
             Effect.tap(() => Effect.sync(() => committed({ _tag: 'SessionChanged', sessionId }))),
           ),
+
+    readFigure: (figureId) =>
+      call<{ figure_id: string; text: string | null; blob: Uint8Array | null } | undefined>({
+        op: 'readFigure',
+        figureId,
+      }).pipe(Effect.map((row) => (row === undefined ? undefined : fromFigureRow(row)))),
 
     readSession: (sessionId) =>
       call<string[]>({ op: 'read', sessionId }).pipe(Effect.flatMap(decodeLog)),
