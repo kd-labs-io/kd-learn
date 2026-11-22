@@ -7,8 +7,9 @@ import { Clock, Data, Effect, Result, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import type { AiError, ModelRef, TurnEvent } from '@kd-learn/ai/port';
 import { findInterruptedTurn, projectSession } from '@kd-learn/core';
-import type { DomainEvent, EventLog, FinishReason, Session } from '@kd-learn/core';
+import type { DomainEvent, EventLog, FinishReason, Session, SourceSlice } from '@kd-learn/core';
 import { mainSystem, toMessages } from './context.ts';
+import { historyForModel, resolveCitations, sourceBlock } from './sources.ts';
 import { toolsFor } from './tools.ts';
 import type { ToolContext } from './tools.ts';
 
@@ -40,6 +41,8 @@ export interface TurnParams {
   readonly newId: () => string;
   /** Upper bound on model calls inside the turn. Default 6. */
   readonly maxSteps?: number;
+  /** Chunks of the attached sources for this turn (phase 4 A3), already cut to the byte budget. */
+  readonly sourceSlice?: SourceSlice;
 }
 
 /** Name used in `UsageRecorded`. */
@@ -153,11 +156,14 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
       const agent = session.state._tag === 'Probing' ? 'prober' : 'teacher';
       const stamp = (at: number) => ({ id: params.newId(), at });
 
+      const slice = params.sourceSlice ?? [];
+      const references = sourceBlock(slice);
       const live = ai
         .runTurn({
           model: params.model,
-          system: mainSystem(session),
-          messages: toMessages([...session.history, { role: 'user', content: input }]),
+          system:
+            references === '' ? mainSystem(session) : `${mainSystem(session)}\n\n${references}`,
+          messages: toMessages([...historyForModel(session), { role: 'user', content: input }]),
           tools: toolsFor(session, ctx),
           maxSteps: params.maxSteps ?? 6,
         })
@@ -188,7 +194,7 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
 
       const completed = Stream.unwrap(
         Effect.map(Clock.currentTimeMillis, (at) => {
-          const text = collector.text();
+          const { content: text, citations } = resolveCitations(collector.text(), slice);
           const events: Array<DomainEvent> = [
             ...(text.trim() === ''
               ? []
@@ -200,11 +206,20 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
                     messageId,
                     agent,
                     content: text,
+                    ...(citations.length === 0 ? {} : { citations }),
                   } satisfies DomainEvent,
                 ]),
             ...ctx.pending,
             ...usageEvent(at),
-            { _tag: 'TurnCompleted', ...stamp(at), turnId, reason: collector.finish() },
+            {
+              _tag: 'TurnCompleted',
+              ...stamp(at),
+              turnId,
+              reason: collector.finish(),
+              ...(slice.length === 0
+                ? {}
+                : { sourceRefs: slice.map(({ sourceId, ordinal }) => ({ sourceId, ordinal })) }),
+            },
           ];
           return fromIterable<AgentOutput>([
             ...events.map((event): AgentOutput => ({ _tag: 'Event', event })),

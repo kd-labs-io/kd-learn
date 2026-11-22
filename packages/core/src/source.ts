@@ -10,10 +10,12 @@ import {
   maxChunkChars,
   defaultChunkChars,
   type SourceChunk,
+  type SourceChunkRef,
   type SourceFailure,
 } from './source-schema.ts';
 import { lexicalSimilarity, tokenize, utf8Length } from './slice.ts';
 import { currentStep, type Session } from './session.ts';
+import type { EventLog } from './event.ts';
 
 /** Most text one source may hold (UTF-8 of its chunks). */
 export const maxSourceTextBytes = 4 * 1024 * 1024;
@@ -356,4 +358,87 @@ export const pdfSourceChunks = (
   if (chunks.length === 0) return fail('NoText');
   if (chunksBytes(chunks) > maxSourceTextBytes) return fail('TooLarge');
   return { ok: true, chunks };
+};
+
+/**
+ * The slice of one turn (A3): chunks of the sources attached to the session (`chunks` as storage
+ * reads them; a source not ready has none), closest to the turn's query. Guest and server call
+ * this with the same data and get the same slice.
+ */
+export const turnSourceSlice = (
+  session: Session,
+  chunks: ReadonlyArray<{
+    readonly sourceId: string;
+    readonly title: string;
+    readonly chunk: SourceChunk;
+  }>,
+  input = '',
+  options: { readonly count?: number; readonly maxBytes?: number } = {},
+): SourceSlice => {
+  const attached = new Set(session.sources.map((s) => s.sourceId));
+  const candidates = chunks
+    .filter((stored) => attached.has(stored.sourceId))
+    .map((stored): SliceChunk => ({
+      sourceId: stored.sourceId,
+      ordinal: stored.chunk.ordinal,
+      title: stored.title,
+      text: stored.chunk.text,
+      locator: stored.chunk.locator,
+    }));
+  return candidates.length === 0
+    ? []
+    : selectSourceSlice(candidates, sourceQueryText(session, input), options);
+};
+
+/** The chunks a session was taught from (`TurnCompleted.sourceRefs`), each once, in first-use order. */
+export const usedSourceRefs = (log: EventLog): SourceChunkRef[] => {
+  const refs: SourceChunkRef[] = [];
+  const seen = new Set<string>();
+  for (const event of log) {
+    if (event._tag !== 'TurnCompleted' || event.sourceRefs === undefined) continue;
+    for (const ref of event.sourceRefs) {
+      const key = `${ref.sourceId}\u0000${ref.ordinal}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      refs.push(ref);
+    }
+  }
+  return refs;
+};
+
+/** Default byte budget of the documents of an extraction (A3). */
+export const defaultDocumentSliceBytes = 48 * 1024;
+
+/**
+ * The documents of an extraction (A3): the chunks the session used that still exist (a deleted
+ * source is skipped), in first-use order, cut to `maxBytes` (UTF-8 of their JSON).
+ */
+export const sessionDocumentSlice = (
+  log: EventLog,
+  chunks: ReadonlyArray<{
+    readonly sourceId: string;
+    readonly title: string;
+    readonly chunk: SourceChunk;
+  }>,
+  maxBytes = defaultDocumentSliceBytes,
+): SourceSlice => {
+  const byRef = new Map(chunks.map((c) => [`${c.sourceId}\u0000${c.chunk.ordinal}`, c]));
+  const slice: SliceChunk[] = [];
+  let bytes = 2;
+  for (const ref of usedSourceRefs(log)) {
+    const stored = byRef.get(`${ref.sourceId}\u0000${ref.ordinal}`);
+    if (stored === undefined) continue;
+    const chunk: SliceChunk = {
+      sourceId: stored.sourceId,
+      ordinal: stored.chunk.ordinal,
+      title: stored.title,
+      text: stored.chunk.text,
+      locator: stored.chunk.locator,
+    };
+    const size = byteLength(JSON.stringify(chunk)) + 1;
+    if (bytes + size > maxBytes) break;
+    slice.push(chunk);
+    bytes += size;
+  }
+  return slice;
 };

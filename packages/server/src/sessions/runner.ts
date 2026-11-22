@@ -20,8 +20,14 @@ import { shouldAutoStart } from '@kd-learn/agent/client';
 import type { AiPort, ModelRef } from '@kd-learn/ai/port';
 import type { Failure, ModelRole, RunningTurn, StartTurnRequest } from '@kd-learn/api';
 import { ErrorCode } from '@kd-learn/api';
-import { canSkipStep, currentStep, projectSession } from '@kd-learn/core';
-import type { DomainEvent, EventLog, Session } from '@kd-learn/core';
+import {
+  canSkipStep,
+  currentStep,
+  findInterruptedTurn,
+  projectSession,
+  turnSourceSlice,
+} from '@kd-learn/core';
+import type { DomainEvent, EventLog, Session, SourceSlice } from '@kd-learn/core';
 import type { SessionSummary, StorageService } from '@kd-learn/storage/port';
 import type { ServerStorage } from '@kd-learn/storage/sqlite-node';
 import type { Logger } from '../handler.ts';
@@ -63,7 +69,23 @@ export type SkipResult =
   | { readonly _tag: 'NothingToRun'; readonly message: string };
 
 export interface SessionRunner {
-  readonly create: (userId: string, topic: string, language: string) => string;
+  /** Undefined when a source id is unknown for this user. */
+  readonly create: (
+    userId: string,
+    topic: string,
+    language: string,
+    sourceIds?: ReadonlyArray<string>,
+  ) => string | undefined;
+  /**
+   * Attaches and detaches sources (phase 4 A2). Refused while a main turn runs, like a skip, so the
+   * turn's batch and this one never race. Attaching an attached source, or detaching one that is
+   * not, is a no-op; an unknown source id is `NothingToRun`.
+   */
+  readonly setSources: (
+    userId: string,
+    sessionId: string,
+    change: { readonly attach: ReadonlyArray<string>; readonly detach: ReadonlyArray<string> },
+  ) => SkipResult;
   readonly list: (userId: string) => ReadonlyArray<SessionSummary>;
   /** Undefined when the session does not exist for this user. */
   readonly snapshot: (
@@ -347,6 +369,36 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
 
   const keyOfModel = (model: ModelRef) => ('apiKey' in model ? model.apiKey : undefined);
 
+  /** `SourceAttached` for each id, or undefined when one is not a source of this user. */
+  const attachEvents = (
+    storage: StorageService,
+    sourceIds: ReadonlyArray<string>,
+  ): DomainEvent[] | undefined => {
+    const events: DomainEvent[] = [];
+    for (const sourceId of sourceIds) {
+      const info = Effect.runSync(storage.getSource(sourceId));
+      if (info === undefined) return undefined;
+      events.push({
+        _tag: 'SourceAttached',
+        id: newId(),
+        at: now(),
+        sourceId,
+        title: info.title,
+        kind: info.kind,
+      });
+    }
+    return events;
+  };
+
+  /** Chunks of the attached sources for the open turn of `log` (phase 4 A3), from the DB. */
+  const sourceSliceOf = (storage: StorageService, log: EventLog): SourceSlice => {
+    const projected = projectSession(log);
+    if (Result.isFailure(projected) || projected.success.sources.length === 0) return [];
+    const session = projected.success;
+    const chunks = Effect.runSync(storage.readChunks(session.sources.map((s) => s.sourceId)));
+    return turnSourceSlice(session, chunks, findInterruptedTurn(session)?.input ?? '');
+  };
+
   const startMain = (
     userId: string,
     sessionId: string,
@@ -370,7 +422,12 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       for (;;) {
         const key = keyOfModel(current.model);
         const collected = yield* consume(
-          runTurn({ log: current.log, model: current.model, newId }),
+          runTurn({
+            log: current.log,
+            model: current.model,
+            newId,
+            sourceSlice: sourceSliceOf(storage, current.log),
+          }),
           live,
           entry,
           key,
@@ -550,8 +607,10 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
   };
 
   return {
-    create: (userId, topic, language) => {
+    create: (userId, topic, language, sourceIds = []) => {
       const storage = deps.storage.forUser(userId);
+      const attached = attachEvents(storage, [...new Set(sourceIds)]);
+      if (attached === undefined) return undefined;
       // The profile in use now is snapshotted into the session (phase 3 A2).
       const { profile } = Effect.runSync(activeProfile(storage));
       const sessionId = newId();
@@ -563,8 +622,43 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
         topic,
         profile: { ...profile, language },
       };
-      appendSync(storage, userId, sessionId, [event]);
+      appendSync(storage, userId, sessionId, [event, ...attached]);
       return sessionId;
+    },
+
+    setSources: (userId, sessionId, change) => {
+      const storage = deps.storage.forUser(userId);
+      const log = readSync(storage, sessionId);
+      if (log.length === 0) return { _tag: 'NotFound' };
+      if (entries.get(keyOf(userId, sessionId))?.main !== undefined) {
+        return { _tag: 'TurnInProgress' };
+      }
+      const session = unwrap(log);
+      if (session === undefined) return { _tag: 'NothingToRun', message: 'The lesson is invalid.' };
+      const current = new Set(session.sources.map((s) => s.sourceId));
+      const detach = [...new Set(change.detach)].filter((id) => current.has(id));
+      const attach = [...new Set(change.attach)].filter(
+        (id) => !current.has(id) && !detach.includes(id),
+      );
+      const attached = attachEvents(storage, attach);
+      if (attached === undefined) return { _tag: 'NothingToRun', message: 'Unknown source.' };
+      const batch: DomainEvent[] = [
+        ...detach.map((sourceId): DomainEvent => ({
+          _tag: 'SourceDetached',
+          id: newId(),
+          at: now(),
+          sourceId,
+        })),
+        ...attached,
+      ];
+      if (batch.length === 0) return { _tag: 'Ok' };
+      if (Result.isFailure(projectSession([...log, ...batch]))) {
+        return { _tag: 'NothingToRun', message: 'These sources cannot be changed now.' };
+      }
+      appendSync(storage, userId, sessionId, batch);
+      const entry = entries.get(keyOf(userId, sessionId));
+      if (entry) publish(entry, { _tag: 'commit' });
+      return { _tag: 'Ok' };
     },
 
     list: (userId) => Effect.runSync(deps.storage.forUser(userId).listSessions),

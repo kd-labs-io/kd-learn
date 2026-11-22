@@ -42,6 +42,7 @@ import {
   SESSIONS_PATH,
   SessionList,
   SessionSnapshot,
+  SessionSourcesRequest,
   SetRolesRequest,
   SkipStepRequest,
   StartTurnRequest,
@@ -332,6 +333,13 @@ export const accountClient = (options: AccountClientOptions = {}) => {
       go<void>({
         method: 'POST',
         path: `${sessionPath(sessionId)}/turns/${encodeURIComponent(turnId)}/cancel`,
+      }),
+    /** Attaches and detaches sources (phase 4 A2). */
+    setSessionSources: (sessionId: string, change: SessionSourcesRequest) =>
+      go<void>({
+        method: 'POST',
+        path: `${sessionPath(sessionId)}/sources`,
+        body: bodyOf(SessionSourcesRequest, change),
       }),
     skipStep: (sessionId: string, stepId: string) =>
       go<void>({

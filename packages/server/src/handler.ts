@@ -15,7 +15,13 @@ import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
 import { AiPort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
 import { layer as tanstackLayer } from '@kd-learn/ai/tanstack';
-import { EndpointsResponse, ErrorCode, TurnRequest, encodeFrame } from '@kd-learn/api';
+import {
+  EndpointsResponse,
+  ErrorCode,
+  MAX_SOURCE_SLICE_BYTES,
+  TurnRequest,
+  encodeFrame,
+} from '@kd-learn/api';
 import type { Failure, Frame, ModelChoice } from '@kd-learn/api';
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
@@ -219,8 +225,18 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   if (Result.isFailure(decoded)) {
     return reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure));
   }
-  const { model: choice, turn } = decoded.success;
+  const { model: choice, turn, sourceSlice } = decoded.success;
   let eventLog = decoded.success.log;
+  if (
+    sourceSlice !== undefined &&
+    new TextEncoder().encode(JSON.stringify(sourceSlice)).byteLength > MAX_SOURCE_SLICE_BYTES
+  ) {
+    return reject(
+      413,
+      ErrorCode.HistoryTooLarge,
+      `sourceSlice is limited to ${MAX_SOURCE_SLICE_BYTES} bytes.`,
+    );
+  }
   const misconfigured = () =>
     reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
 
@@ -304,7 +320,12 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const outputs =
     turn.kind === 'main'
-      ? runTurn({ log: eventLog, model, newId })
+      ? runTurn({
+          log: eventLog,
+          model,
+          newId,
+          ...(sourceSlice === undefined ? {} : { sourceSlice }),
+        })
       : runSideChat({ log: eventLog, threadId: turn.threadId, model, newId });
 
   const startedAt = Date.now();

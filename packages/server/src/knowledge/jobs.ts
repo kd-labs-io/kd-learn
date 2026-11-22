@@ -17,6 +17,8 @@ import {
   projectKnowledge,
   projectSession,
   selectSessionSlice,
+  sessionDocumentSlice,
+  usedSourceRefs,
   sessionQueryText,
   type EventLog,
   type KnowledgeEvent,
@@ -149,9 +151,19 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
       const graph = graphOf(storage);
       const { profile } = yield* activeProfile(storage);
       const slice = selectSessionSlice(graph, sessionQueryText(session.success));
+      // The chunks the session was taught from (phase 4 A3); a deleted source is skipped.
+      const used = usedSourceRefs(log);
+      const documentSlice =
+        used.length === 0
+          ? []
+          : sessionDocumentSlice(
+              log,
+              yield* storage.readChunks([...new Set(used.map((r) => r.sourceId))]),
+            );
       const outcome = yield* runExtraction({
         log,
         slice,
+        ...(documentSlice.length === 0 ? {} : { documentSlice }),
         profile,
         model,
         extractionId,
