@@ -44,41 +44,6 @@ export const LogoutIcon = outline(IconLogout2);
 export const AdminIcon = outline(IconShieldCheck);
 export const SwitchIcon = outline(IconArrowsExchange);
 
-export const LanguageIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <circle cx="12" cy="12" r="8.5" />
-    <path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5" />
-  </Outline>
-);
-
-export const LoginIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14" />
-    <path d="M4 12h11M11 8l4 4-4 4" />
-  </Outline>
-);
-
-export const LogoutIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
-    <path d="M9 12h11M16 8l4 4-4 4" />
-  </Outline>
-);
-
-export const AdminIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M12 3.5 19 6v5.5c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z" />
-    <path d="m9 12 2 2 4-4" />
-  </Outline>
-);
-
-export const SwitchIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M4 8h14M15 5l3 3-3 3" />
-    <path d="M20 16H6M9 13l-3 3 3 3" />
-  </Outline>
-);
-
 /**
  * The kd-learn mark: an open book whose pages rise into a spark (learning that lights up). Drawn in
  * `currentColor` so the rail paints it with the accent of the active theme.
