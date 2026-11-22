@@ -24,6 +24,7 @@ import { relationText } from './relation';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
 import type { SourceLibrary } from '../sources/library';
 import type { KnowledgeSource, PendingExtraction } from './source';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 const GraphFigure = lazy(() => import('./GraphFigure'));
@@ -149,90 +150,92 @@ function ReadyGraph({
   const list = (
     <VStack gap={4}>
       <Heading level={2}>{m.graph_title()}</Heading>
-      <PendingBanners pending={pending} onExtract={source.extract} />
-      {graph.propositions.length === 0 ? (
-        <EmptyState
-          title={m.graph_empty_title()}
-          description={m.graph_empty_body()}
-          headingLevel={3}
-        />
-      ) : (
-        <>
-          <HStack gap={3} wrap="wrap" vAlign="end">
-            <TextInput
-              label={m.graph_search()}
-              placeholder={m.graph_search_placeholder()}
-              value={query}
-              onChange={(value) => {
-                setQuery(value);
-                setLimit(PAGE);
-              }}
-              type="search"
-              data-testid="graph-search"
-            />
-            <Selector
-              label={m.graph_topic()}
-              options={topicOptions}
-              value={topic}
-              onChange={(value) => {
-                setTopic(value as string);
-                setLimit(PAGE);
-              }}
-              data-testid="graph-topic"
-            />
-            <Selector
-              label={m.graph_session()}
-              options={sessionOptions}
-              value={session}
-              onChange={(value) => {
-                setSession(value as string);
-                setLimit(PAGE);
-              }}
-              data-testid="graph-session"
-            />
-          </HStack>
-          <Text type="supporting" data-testid="graph-count">
-            {m.graph_count({
-              shown: Math.min(limit, matching.length),
-              total: graph.propositions.length,
-            })}
-          </Text>
-          {matching.length === 0 ? (
-            <Text>{m.graph_no_match()}</Text>
-          ) : (
-            <List hasDividers density="compact" data-testid="graph-list">
-              {matching.slice(0, limit).map((p) => (
-                <Item
-                  key={p.propositionId}
-                  label={p.text}
-                  labelLines={2}
-                  description={`${p.topic} · ${masteryText(p)}`}
-                  isSelected={p.propositionId === selectedId}
-                  onClick={() => setSelectedId(p.propositionId)}
-                  data-testid="graph-item"
-                />
-              ))}
-            </List>
-          )}
-          {matching.length > limit ? (
-            <Button
-              label={m.graph_show_more()}
-              variant="secondary"
-              onClick={() => setLimit((n) => n + PAGE)}
-              data-testid="graph-more"
-            />
-          ) : null}
-          {client ? (
-            <Suspense fallback={null}>
-              <GraphFigure
-                graph={graph}
-                selectedId={selected?.propositionId}
-                onSelect={setSelectedId}
+      <Block>
+        <PendingBanners pending={pending} onExtract={source.extract} />
+        {graph.propositions.length === 0 ? (
+          <EmptyState
+            title={m.graph_empty_title()}
+            description={m.graph_empty_body()}
+            headingLevel={3}
+          />
+        ) : (
+          <>
+            <HStack gap={3} wrap="wrap" vAlign="end">
+              <TextInput
+                label={m.graph_search()}
+                placeholder={m.graph_search_placeholder()}
+                value={query}
+                onChange={(value) => {
+                  setQuery(value);
+                  setLimit(PAGE);
+                }}
+                type="search"
+                data-testid="graph-search"
               />
-            </Suspense>
-          ) : null}
-        </>
-      )}
+              <Selector
+                label={m.graph_topic()}
+                options={topicOptions}
+                value={topic}
+                onChange={(value) => {
+                  setTopic(value as string);
+                  setLimit(PAGE);
+                }}
+                data-testid="graph-topic"
+              />
+              <Selector
+                label={m.graph_session()}
+                options={sessionOptions}
+                value={session}
+                onChange={(value) => {
+                  setSession(value as string);
+                  setLimit(PAGE);
+                }}
+                data-testid="graph-session"
+              />
+            </HStack>
+            <Text type="supporting" data-testid="graph-count">
+              {m.graph_count({
+                shown: Math.min(limit, matching.length),
+                total: graph.propositions.length,
+              })}
+            </Text>
+            {matching.length === 0 ? (
+              <Text>{m.graph_no_match()}</Text>
+            ) : (
+              <List hasDividers density="compact" data-testid="graph-list">
+                {matching.slice(0, limit).map((p) => (
+                  <Item
+                    key={p.propositionId}
+                    label={p.text}
+                    labelLines={2}
+                    description={`${p.topic} · ${masteryText(p)}`}
+                    isSelected={p.propositionId === selectedId}
+                    onClick={() => setSelectedId(p.propositionId)}
+                    data-testid="graph-item"
+                  />
+                ))}
+              </List>
+            )}
+            {matching.length > limit ? (
+              <Button
+                label={m.graph_show_more()}
+                variant="secondary"
+                onClick={() => setLimit((n) => n + PAGE)}
+                data-testid="graph-more"
+              />
+            ) : null}
+            {client ? (
+              <Suspense fallback={null}>
+                <GraphFigure
+                  graph={graph}
+                  selectedId={selected?.propositionId}
+                  onSelect={setSelectedId}
+                />
+              </Suspense>
+            ) : null}
+          </>
+        )}
+      </Block>
     </VStack>
   );
 

@@ -1,5 +1,6 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
 import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
 import { Heading } from '@astryxdesign/core/Heading';
 import { Selector } from '@astryxdesign/core/Selector';
@@ -121,7 +122,9 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
               <ChatMessageBubble>{message.content}</ChatMessageBubble>
             </ChatMessage>
           ) : (
-            <LessonMarkdown key={message.messageId}>{message.content}</LessonMarkdown>
+            <Card key={message.messageId} padding={3} elevation="low">
+              <LessonMarkdown>{message.content}</LessonMarkdown>
+            </Card>
           ),
         )}
         {live !== undefined && live !== '' ? (

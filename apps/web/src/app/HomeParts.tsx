@@ -10,6 +10,7 @@ import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
 import { useState, type ReactNode } from 'react';
+import { Block } from './Block';
 import { formatDate } from './format';
 
 /** Column width of the two home columns: side by side on a wide screen, stacked on a phone. */
@@ -42,7 +43,7 @@ export function StartTopic({
   };
   const suggestions = [m.home_suggestion_1(), m.home_suggestion_2(), m.home_suggestion_3()];
   return (
-    <VStack gap={3}>
+    <Block gap={4}>
       <Heading level={2}>{m.home_hero_title()}</Heading>
       <TextInput
         label={m.home_topic_label()}
@@ -83,7 +84,7 @@ export function StartTopic({
         data-testid="start-session"
       />
       {error}
-    </VStack>
+    </Block>
   );
 }
 

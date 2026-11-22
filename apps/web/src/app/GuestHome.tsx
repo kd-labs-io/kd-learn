@@ -18,6 +18,7 @@ import { PracticeLink } from '../practice/PracticeLink';
 import { useGuestSourceLibrary, preferredProvider } from '../sources/library';
 import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { runStorage, useGuestSettings, useSessionList } from '../storage';
+import { Block } from './Block';
 import { pageWidth } from './page';
 
 /** Home in guest and demo mode: sessions in the local DB (plan 2.2). */
@@ -142,27 +143,31 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                     )
                   }
                 />
-                <PracticeLink />
+                <Block gap={0}>
+                  <PracticeLink />
+                </Block>
               </VStack>
-              <VStack gap={2} width={homeColumn}>
-                <Heading level={2}>{m.home_sessions_title()}</Heading>
-                {sessions.status === 'loading' ? (
-                  <Spinner size="sm" label={m.learn_loading()} />
-                ) : null}
-                {sessions.status === 'error' ? (
-                  <Banner
-                    status="error"
-                    title={m.storage_error({ reason: sessions.error.message })}
-                  />
-                ) : null}
-                {sessions.status === 'ready' ? (
-                  <SessionRows
-                    sessions={sessions.data}
-                    onOpen={(sessionId) =>
-                      void navigate({ to: '/s/$sessionId', params: { sessionId } })
-                    }
-                  />
-                ) : null}
+              <VStack width={homeColumn}>
+                <Block gap={3}>
+                  <Heading level={2}>{m.home_sessions_title()}</Heading>
+                  {sessions.status === 'loading' ? (
+                    <Spinner size="sm" label={m.learn_loading()} />
+                  ) : null}
+                  {sessions.status === 'error' ? (
+                    <Banner
+                      status="error"
+                      title={m.storage_error({ reason: sessions.error.message })}
+                    />
+                  ) : null}
+                  {sessions.status === 'ready' ? (
+                    <SessionRows
+                      sessions={sessions.data}
+                      onOpen={(sessionId) =>
+                        void navigate({ to: '/s/$sessionId', params: { sessionId } })
+                      }
+                    />
+                  ) : null}
+                </Block>
               </VStack>
             </HStack>
           </VStack>

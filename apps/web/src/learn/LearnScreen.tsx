@@ -1,5 +1,6 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
 import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
 import { Collapsible } from '@astryxdesign/core/Collapsible';
 import { Drawer } from '@astryxdesign/core/Drawer';
@@ -374,43 +375,52 @@ function Conversation({
             <ChatMessageBubble name={m.conv_you()}>{item.content}</ChatMessageBubble>
           </ChatMessage>
         ) : (
-          <VStack key={item.key} gap={1} data-testid="msg-tutor">
-            <Text type="label" color="accent">
-              {m.conv_tutor()}
-            </Text>
-            <LessonFigure figures={figures} loadBody={loadFigure} vars={vars}>
-              {item.content}
-            </LessonFigure>
-            {item.citations === undefined ? null : (
-              <HStack gap={1} wrap="wrap" data-testid="citations">
-                {item.citations.map((citation) => (
-                  <Button
-                    key={citation.label}
-                    size="sm"
-                    variant="secondary"
-                    label={`S${citation.label} · ${titles.get(citation.sourceId) ?? m.sources_detached()}`}
-                    onClick={() => onCite(citation)}
-                    data-testid="citation"
-                  />
-                ))}
-              </HStack>
-            )}
-          </VStack>
+          <Card key={item.key} padding={4} elevation="low">
+            <VStack gap={1} data-testid="msg-tutor">
+              <Text type="label" color="accent">
+                {m.conv_tutor()}
+              </Text>
+              <LessonFigure figures={figures} loadBody={loadFigure} vars={vars}>
+                {item.content}
+              </LessonFigure>
+              {item.citations === undefined ? null : (
+                <HStack gap={1} wrap="wrap" data-testid="citations">
+                  {item.citations.map((citation) => (
+                    <Button
+                      key={citation.label}
+                      size="sm"
+                      variant="secondary"
+                      label={`S${citation.label} · ${titles.get(citation.sourceId) ?? m.sources_detached()}`}
+                      onClick={() => onCite(citation)}
+                      data-testid="citation"
+                    />
+                  ))}
+                </HStack>
+              )}
+            </VStack>
+          </Card>
         ),
       )}
       {showLive ? (
-        <VStack gap={1} data-testid="msg-live">
-          <Text type="label" color="accent">
-            {m.conv_tutor()}
-          </Text>
-          {live.text === '' ? (
-            <Spinner size="sm" label={m.conv_writing()} />
-          ) : (
-            <LessonFigure figures={figures} loadBody={loadFigure} vars={vars} isStreaming={writing}>
-              {live.text}
-            </LessonFigure>
-          )}
-        </VStack>
+        <Card padding={4} elevation="low">
+          <VStack gap={1} data-testid="msg-live">
+            <Text type="label" color="accent">
+              {m.conv_tutor()}
+            </Text>
+            {live.text === '' ? (
+              <Spinner size="sm" label={m.conv_writing()} />
+            ) : (
+              <LessonFigure
+                figures={figures}
+                loadBody={loadFigure}
+                vars={vars}
+                isStreaming={writing}
+              >
+                {live.text}
+              </LessonFigure>
+            )}
+          </VStack>
+        </Card>
       ) : null}
       <VStack ref={endRef} />
     </VStack>
@@ -578,30 +588,32 @@ function Composer({ session, state, elsewhere, runner }: ComposerProps) {
   }, []);
 
   return (
-    <VStack gap={2}>
-      <TextArea
-        ref={inputRef}
-        label={m.composer_label()}
-        isLabelHidden
-        placeholder={m.composer_placeholder()}
-        value={draft}
-        onChange={setDraft}
-        rows={3}
-        isDisabled={blocked}
-        disabledMessage={m.composer_waiting()}
-        enterKeyHint="send"
-        data-testid="composer-input"
-      />
-      <HStack gap={3} vAlign="center" justify="between">
-        {finePointer ? <Text type="supporting">{m.composer_hint()}</Text> : <VStack />}
-        <Button
-          label={m.composer_send()}
-          variant="primary"
-          onClick={send}
-          isDisabled={blocked || draft.trim() === ''}
-          data-testid="composer-send"
+    <Card padding={3} elevation="low">
+      <VStack gap={2}>
+        <TextArea
+          ref={inputRef}
+          label={m.composer_label()}
+          isLabelHidden
+          placeholder={m.composer_placeholder()}
+          value={draft}
+          onChange={setDraft}
+          rows={3}
+          isDisabled={blocked}
+          disabledMessage={m.composer_waiting()}
+          enterKeyHint="send"
+          data-testid="composer-input"
         />
-      </HStack>
-    </VStack>
+        <HStack gap={3} vAlign="center" justify="between">
+          {finePointer ? <Text type="supporting">{m.composer_hint()}</Text> : <VStack />}
+          <Button
+            label={m.composer_send()}
+            variant="primary"
+            onClick={send}
+            isDisabled={blocked || draft.trim() === ''}
+            data-testid="composer-send"
+          />
+        </HStack>
+      </VStack>
+    </Card>
   );
 }

@@ -28,7 +28,7 @@ export function Welcome({ config }: { config: PublicConfig }) {
             </Text>
             <Heading level={2}>{m.welcome_title()}</Heading>
             {config.accounts ? (
-              <Card padding={4}>
+              <Card padding={6} elevation="low">
                 <VStack gap={2}>
                   <Heading level={3}>{m.welcome_account_title()}</Heading>
                   <Text type="supporting">{m.welcome_account_body()}</Text>
@@ -51,7 +51,7 @@ export function Welcome({ config }: { config: PublicConfig }) {
               </Card>
             ) : null}
             {config.guestMode ? (
-              <Card padding={4}>
+              <Card padding={6} elevation="low">
                 <VStack gap={2}>
                   <Heading level={3}>{m.welcome_guest_title()}</Heading>
                   <Text type="supporting">{m.welcome_guest_body()}</Text>
@@ -66,7 +66,7 @@ export function Welcome({ config }: { config: PublicConfig }) {
               </Card>
             ) : null}
             {config.demoMode ? (
-              <Card padding={4}>
+              <Card padding={6} elevation="low">
                 <VStack gap={2}>
                   <Heading level={3}>{m.welcome_demo_title()}</Heading>
                   <Text type="supporting">{m.welcome_demo_body()}</Text>

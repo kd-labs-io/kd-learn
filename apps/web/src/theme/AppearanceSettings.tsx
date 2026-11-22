@@ -4,11 +4,11 @@ import { Heading } from '@astryxdesign/core/Heading';
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { Text } from '@astryxdesign/core/Text';
-import { VStack } from '@astryxdesign/core/VStack';
 import type { ColorModeChoice } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { builtInThemeIds } from '@kd-learn/tokens';
 import { useThemeControl } from './ThemeRoot';
+import { Block } from '../app/Block';
 
 const modeLabels: Record<ColorModeChoice, () => string> = {
   system: m.appearance_mode_system,
@@ -28,7 +28,7 @@ const themeLabels: Record<string, { name: () => string; hint: () => string }> = 
 export function AppearanceSettings({ isSynced }: { isSynced: boolean }) {
   const { appearance, setAppearance } = useThemeControl();
   return (
-    <VStack gap={3} data-testid="appearance">
+    <Block gap={3} data-testid="appearance">
       <Heading level={3}>{m.appearance_title()}</Heading>
       <Text type="supporting" color="secondary">
         {isSynced ? m.appearance_synced() : m.appearance_device()}
@@ -65,6 +65,6 @@ export function AppearanceSettings({ isSynced }: { isSynced: boolean }) {
           />
         ))}
       </RadioList>
-    </VStack>
+    </Block>
   );
 }

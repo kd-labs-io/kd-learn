@@ -31,6 +31,7 @@ import { formatDate } from '../app/format';
 import { agentLabel } from './AccountSettings';
 import { errorText, keys, useAccountApi } from './api';
 import { pageWidth } from '../app/page';
+import { Block } from '../app/Block';
 
 const AGENTS: ReadonlyArray<AcpAgent> = ['claude-code', 'opencode', 'antigravity'];
 
@@ -94,7 +95,7 @@ type Change = (patch: UpdateAdminConfigRequest) => Promise<void>;
 
 function Switches({ config, change }: { config: AdminConfig; change: Change }) {
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.admin_switches()}</Heading>
       <Selector
         label={m.admin_registration()}
@@ -128,14 +129,14 @@ function Switches({ config, change }: { config: AdminConfig; change: Change }) {
         changeAction={(figureCdn) => change({ figureCdn })}
         data-testid="admin-figure-cdn"
       />
-    </VStack>
+    </Block>
   );
 }
 
 function Demo({ config, change }: { config: AdminConfig; change: Change }) {
   const { demoBudget } = config;
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.admin_demo()}</Heading>
       <Text data-testid="admin-demo-used">
         {m.admin_demo_used({ used: demoBudget.used, limit: demoBudget.limit })}
@@ -194,7 +195,7 @@ function Demo({ config, change }: { config: AdminConfig; change: Change }) {
         }}
         data-testid="admin-demo-image-cost"
       />
-    </VStack>
+    </Block>
   );
 }
 
@@ -214,7 +215,7 @@ function Acp({ config, change }: { config: AdminConfig; change: Change }) {
     void change({ acpModels: { ...config.acpModels, [agent]: list } });
   };
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.admin_acp()}</Heading>
       <Text type="supporting">{m.admin_acp_hint()}</Text>
       {!config.acpAvailable && config.acpAgents.length > 0 ? (
@@ -263,7 +264,7 @@ function Acp({ config, change }: { config: AdminConfig; change: Change }) {
         }}
         data-testid="admin-acp-max"
       />
-    </VStack>
+    </Block>
   );
 }
 
@@ -271,7 +272,7 @@ function Invites() {
   const { call } = useAccountApi();
   const invite = useMutation({ mutationFn: () => call((api) => api.createInvite({})) });
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.admin_invites()}</Heading>
       <Text type="supporting">{m.admin_invites_hint()}</Text>
       {invite.data === undefined ? null : (
@@ -293,7 +294,7 @@ function Invites() {
           data-testid="admin-invite"
         />
       </HStack>
-    </VStack>
+    </Block>
   );
 }
 
@@ -321,7 +322,7 @@ function Users({ token, selfId }: { token: string; selfId: string }) {
       .filter((part) => part !== undefined)
       .join(' · ');
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.admin_users()}</Heading>
       {users.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
       {update.isError ? (
@@ -360,7 +361,7 @@ function Users({ token, selfId }: { token: string; selfId: string }) {
           />
         ))}
       </VStack>
-    </VStack>
+    </Block>
   );
 }
 /** Search sources for research (phase 4 A6): SearXNG, Exa and its key, and guest/demo access. */
@@ -384,7 +385,7 @@ function Search({ token }: { token: string }) {
     update.mutateAsync(patch).then(() => undefined);
   const data = search.data;
   return (
-    <VStack gap={3} data-testid="admin-search">
+    <Block gap={3} data-testid="admin-search">
       <Heading level={3}>{m.admin_search()}</Heading>
       {search.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
       {update.isError ? (
@@ -460,6 +461,6 @@ function Search({ token }: { token: string }) {
           />
         </>
       )}
-    </VStack>
+    </Block>
   );
 }

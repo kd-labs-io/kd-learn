@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { clientOptions, errorCode, errorText, run, usePublicConfig } from './api';
 import { signIn, useWho } from './auth';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 const authErrorText = (error: unknown): string => {
@@ -85,73 +86,77 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
-          <VStack gap={5} maxWidth="44ch">
-            <Heading level={2}>
-              {mode === 'login' ? m.auth_login_title() : m.auth_register_title()}
-            </Heading>
-            {config.isPending || !hydrated ? <Spinner size="sm" label={m.learn_loading()} /> : null}
-            {config.data !== undefined && !config.data.accounts ? (
-              <Banner status="info" title={m.auth_no_accounts()} data-testid="no-accounts" />
-            ) : null}
-            {!hydrated ? null : closed ? (
-              <Banner status="info" title={m.auth_error_RegistrationClosed()} />
-            ) : (
-              <VStack gap={3}>
-                <TextInput
-                  label={m.auth_email()}
-                  type="email"
-                  value={email}
-                  onChange={setEmail}
-                  autoComplete="email"
-                  hasSpellCheck={false}
-                  data-testid="auth-email"
-                />
-                <TextInput
-                  label={m.auth_password()}
-                  type="password"
-                  value={password}
-                  onChange={setPassword}
-                  onEnter={() => void submit()}
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  {...(mode === 'register' ? { description: m.auth_password_hint() } : {})}
-                  data-testid="auth-password"
-                />
-                {needsInvite ? (
+          <VStack maxWidth="480px">
+            <Block gap={5}>
+              <Heading level={2}>
+                {mode === 'login' ? m.auth_login_title() : m.auth_register_title()}
+              </Heading>
+              {config.isPending || !hydrated ? (
+                <Spinner size="sm" label={m.learn_loading()} />
+              ) : null}
+              {config.data !== undefined && !config.data.accounts ? (
+                <Banner status="info" title={m.auth_no_accounts()} data-testid="no-accounts" />
+              ) : null}
+              {!hydrated ? null : closed ? (
+                <Banner status="info" title={m.auth_error_RegistrationClosed()} />
+              ) : (
+                <VStack gap={3}>
                   <TextInput
-                    label={m.auth_invite()}
-                    description={m.auth_invite_hint()}
-                    value={invite}
-                    onChange={setInvite}
-                    autoComplete="off"
+                    label={m.auth_email()}
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    autoComplete="email"
                     hasSpellCheck={false}
-                    data-testid="auth-invite"
+                    data-testid="auth-email"
                   />
-                ) : null}
-                {error === undefined ? null : (
-                  <Banner status="error" title={error} data-testid="auth-error" />
-                )}
+                  <TextInput
+                    label={m.auth_password()}
+                    type="password"
+                    value={password}
+                    onChange={setPassword}
+                    onEnter={() => void submit()}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    {...(mode === 'register' ? { description: m.auth_password_hint() } : {})}
+                    data-testid="auth-password"
+                  />
+                  {needsInvite ? (
+                    <TextInput
+                      label={m.auth_invite()}
+                      description={m.auth_invite_hint()}
+                      value={invite}
+                      onChange={setInvite}
+                      autoComplete="off"
+                      hasSpellCheck={false}
+                      data-testid="auth-invite"
+                    />
+                  ) : null}
+                  {error === undefined ? null : (
+                    <Banner status="error" title={error} data-testid="auth-error" />
+                  )}
+                  <Button
+                    label={mode === 'login' ? m.auth_login() : m.auth_register()}
+                    variant="primary"
+                    isLoading={busy}
+                    isDisabled={email.trim() === '' || password === ''}
+                    onClick={() => void submit()}
+                    data-testid="auth-submit"
+                  />
+                </VStack>
+              )}
+              <HStack gap={2} vAlign="center" wrap="wrap">
+                <Text type="supporting">
+                  {mode === 'login' ? m.auth_no_account() : m.auth_have_account()}
+                </Text>
                 <Button
-                  label={mode === 'login' ? m.auth_login() : m.auth_register()}
-                  variant="primary"
-                  isLoading={busy}
-                  isDisabled={email.trim() === '' || password === ''}
-                  onClick={() => void submit()}
-                  data-testid="auth-submit"
+                  label={mode === 'login' ? m.auth_register() : m.auth_login()}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void navigate({ to: mode === 'login' ? '/register' : '/login' })}
+                  data-testid="auth-switch"
                 />
-              </VStack>
-            )}
-            <HStack gap={2} vAlign="center" wrap="wrap">
-              <Text type="supporting">
-                {mode === 'login' ? m.auth_no_account() : m.auth_have_account()}
-              </Text>
-              <Button
-                label={mode === 'login' ? m.auth_register() : m.auth_login()}
-                variant="ghost"
-                size="sm"
-                onClick={() => void navigate({ to: mode === 'login' ? '/register' : '/login' })}
-                data-testid="auth-switch"
-              />
-            </HStack>
+              </HStack>
+            </Block>
           </VStack>
         </LayoutContent>
       }

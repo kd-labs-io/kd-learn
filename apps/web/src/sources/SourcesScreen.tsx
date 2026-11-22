@@ -26,6 +26,7 @@ import {
   type SourceLibrary,
   type SourceRow,
 } from './library';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 export const kindText = (kind: SourceInfo['kind']) =>
@@ -86,14 +87,18 @@ export function SourcesScreen({ library }: { readonly library: SourceLibrary }) 
         <LayoutContent padding={6}>
           <VStack gap={6}>
             <Heading level={2}>{m.sources_title()}</Heading>
-            <AddSources library={library} />
-            {view.status === 'loading' ? (
-              <Spinner label={m.learn_loading()} />
-            ) : view.status === 'error' ? (
-              <Banner status="error" title={view.message} />
-            ) : (
-              <SourceList library={library} sources={view.sources} />
-            )}
+            <Block>
+              <AddSources library={library} />
+            </Block>
+            <Block>
+              {view.status === 'loading' ? (
+                <Spinner label={m.learn_loading()} />
+              ) : view.status === 'error' ? (
+                <Banner status="error" title={view.message} />
+              ) : (
+                <SourceList library={library} sources={view.sources} />
+              )}
+            </Block>
           </VStack>
         </LayoutContent>
       }
