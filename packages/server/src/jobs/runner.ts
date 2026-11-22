@@ -114,7 +114,7 @@ export const makeJobRunner = (deps: JobRunnerDeps): JobRunner => {
 
   const pump = () => {
     if (stopping) return;
-    for (let i = 0; i < waiting.length; ) {
+    for (let i = 0; i < waiting.length;) {
       const entry = waiting[i]!;
       const kind = kinds.get(entry.kind);
       if (kind === undefined || !canStart(entry, kind)) {
