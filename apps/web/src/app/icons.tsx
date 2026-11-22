@@ -1,71 +1,48 @@
+import {
+  type Icon as TablerIcon,
+  type IconProps as TablerIconProps,
+  IconAdjustmentsHorizontal,
+  IconAffiliate,
+  IconArrowsExchange,
+  IconFlask,
+  IconFolder,
+  IconHome,
+  IconLogin2,
+  IconLogout2,
+  IconShieldCheck,
+  IconUser,
+  IconWorld,
+} from '@tabler/icons-react';
 import type { SVGProps } from 'react';
 
-// Outline icons for the rail (24 px grid, 1.5 stroke, `currentColor`), so they follow the theme.
-// The Astryx semantic set has no home, graph or library glyphs.
+// App icons come from Tabler (https://tabler.io/icons): outline, `currentColor`, so they follow the
+// theme. Use them where the Astryx semantic set has no glyph (home, graph, library…). Import icons
+// through this file, so the whole app shares one stroke width.
 
 type IconProps = SVGProps<SVGSVGElement>;
 
-function Outline({ children, ...props }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      {children}
-    </svg>
+const STROKE = 1.5;
+
+function outline(Glyph: TablerIcon) {
+  // Astryx `Icon` takes plain SVG props; Tabler's only differ by its optional `size`/`stroke`.
+  const Outline = (props: IconProps) => (
+    <Glyph stroke={STROKE} aria-hidden="true" {...(props as TablerIconProps)} />
   );
+  Outline.displayName = Glyph.displayName;
+  return Outline;
 }
 
-export const HomeIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M3 10.5 12 3l9 7.5" />
-    <path d="M5 9v11h5v-6h4v6h5V9" />
-  </Outline>
-);
-
-export const GraphIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <circle cx="6" cy="6" r="2.5" />
-    <circle cx="18" cy="8" r="2.5" />
-    <circle cx="9" cy="18" r="2.5" />
-    <path d="m8.3 7.1 7.4.8M7 8.4l1.3 7.2M16.4 10l-5.6 6.2" />
-  </Outline>
-);
-
-export const SourcesIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2h6.5A1.5 1.5 0 0 1 20 7.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z" />
-    <path d="M8 12h8M8 15.5h5" />
-  </Outline>
-);
-
-export const SettingsIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-    <circle cx="16" cy="7" r="2" />
-    <circle cx="10" cy="17" r="2" />
-  </Outline>
-);
-
-export const PracticeIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <path d="M9 4h6M10 4v5l-5 9.5A1 1 0 0 0 5.9 20h12.2a1 1 0 0 0 .9-1.5L14 9V4" />
-    <path d="M7.5 14h9" />
-  </Outline>
-);
-
-export const AccountIcon = (props: IconProps) => (
-  <Outline {...props}>
-    <circle cx="12" cy="8.5" r="3.5" />
-    <path d="M5 20a7 7 0 0 1 14 0" />
-  </Outline>
-);
+export const HomeIcon = outline(IconHome);
+export const GraphIcon = outline(IconAffiliate);
+export const SourcesIcon = outline(IconFolder);
+export const SettingsIcon = outline(IconAdjustmentsHorizontal);
+export const PracticeIcon = outline(IconFlask);
+export const AccountIcon = outline(IconUser);
+export const LanguageIcon = outline(IconWorld);
+export const LoginIcon = outline(IconLogin2);
+export const LogoutIcon = outline(IconLogout2);
+export const AdminIcon = outline(IconShieldCheck);
+export const SwitchIcon = outline(IconArrowsExchange);
 
 /**
  * The kd-learn mark: an open book whose pages rise into a spark (learning that lights up). Drawn in
