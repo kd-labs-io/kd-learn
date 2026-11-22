@@ -1,0 +1,12 @@
+# SearXNG for kd-learn research (plan nguon-hoc.md A6, spike C2). Internal to the compose network:
+# never publish its port. The secret comes from SEARXNG_SECRET in the env file.
+use_default_settings: true
+server:
+  limiter: false
+  image_proxy: false
+  public_instance: false
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json

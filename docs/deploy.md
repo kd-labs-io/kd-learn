@@ -49,6 +49,17 @@ Compose also reads `KD_LEARN_BIND` (default `127.0.0.1`) and `KD_LEARN_PORT` (de
 
 Not in the image: ACP agents (Claude Code, opencode, Antigravity CLI). They need the agent's CLI installed and signed in on the host, so they only work when the server runs outside Docker. The admin screen warns when an agent is enabled but the server cannot load it.
 
+## Web search for research
+
+Research (phase 4) searches the web through SearXNG, which `docker-compose.yml` runs next to the
+app on the internal network only (no published port). Set `SEARXNG_SECRET` in the env file. Set
+`SEARXNG_CONTACT_URL` to a page where the operator can be reached to turn on the Wikipedia and
+Wikidata engines. Its settings are in `deploy/searxng/settings.yml`.
+
+The server fetches the first result pages itself (SearXNG snippets are too short to teach from),
+only from public addresses. An Exa key can be added in the admin screen instead of, or next to,
+SearXNG. To run without SearXNG, remove the `searxng` service and set `KD_SEARXNG_URL=` (empty).
+
 ## HTTPS with a reverse proxy
 
 The learning screen streams with server-sent events. The proxy must not buffer responses. The server sends `X-Accel-Buffering: no`; an account stream also sends a ping every 15 seconds. A guest turn streams without pings until it ends, so keep the proxy's read timeout at 5 minutes or more.

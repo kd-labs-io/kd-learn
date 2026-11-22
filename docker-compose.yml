@@ -11,12 +11,28 @@ services:
     environment:
       # The SQLite file lives on the volume; not changeable from the env file.
       KD_LEARN_DB_PATH: /data/kd-learn.db
+      KD_SEARXNG_URL: ${KD_SEARXNG_URL-http://searxng:8080}
       PORT: '3000'
     ports:
       # Loopback only: put a reverse proxy with HTTPS in front (docs/deploy.md).
       - '${KD_LEARN_BIND:-127.0.0.1}:${KD_LEARN_PORT:-3000}:3000'
     volumes:
       - kd-learn-data:/data
+    depends_on:
+      - searxng
+
+  # Web search for research (plan nguon-hoc.md A6). Internal only: no published port; the web
+  # service reaches it at http://searxng:8080 (KD_SEARXNG_URL). Remove this service and set
+  # KD_SEARXNG_URL empty to run without it.
+  searxng:
+    image: searxng/searxng:2026.11.20-cd6d28091
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-in-the-env-file}
+      # Wikipedia and Wikidata need a contact URL (their API etiquette); without it they stay off.
+      SEARXNG_CONTACT_URL: ${SEARXNG_CONTACT_URL:-}
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
 
 volumes:
   kd-learn-data:

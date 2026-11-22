@@ -42,7 +42,8 @@ describe('package boundaries', () => {
       "import { a } from '@kd-learn/core';",
       "import { b } from '@kd-learn/ai/port';",
       "import { c } from '@kd-learn/storage/port';",
-      'export const all = [a, b, c];',
+      "import { d } from '@kd-learn/search/port';",
+      'export const all = [a, b, c, d];',
     ].join('\n');
     expect(await ruleIds('packages/agent/src/fixture.ts', code)).toEqual([]);
   });
@@ -50,6 +51,7 @@ describe('package boundaries', () => {
   it.each([
     ["import { x } from '@kd-learn/ai';\nexport const y = x;"],
     ["import { x } from '@kd-learn/storage/sqlite-node';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/search/searxng';\nexport const y = x;"],
     ["import { x } from '@kd-learn/server';\nexport const y = x;"],
   ])('agent rejects adapters: %s', async (code) => {
     expect(await ruleIds('packages/agent/src/fixture.ts', code)).toContain('no-restricted-imports');
@@ -136,6 +138,13 @@ describe('package boundaries', () => {
   it('ai port still imports no other package', async () => {
     const code = "import type { DomainEvent } from '@kd-learn/core';\nexport type E = DomainEvent;";
     expect(await ruleIds('packages/ai/src/port/fixture.ts', code)).toContain(
+      'no-restricted-imports',
+    );
+  });
+
+  it('search port imports no other package and no Node API', async () => {
+    const code = "import { readFile } from 'node:fs';\nexport const r = readFile;";
+    expect(await ruleIds('packages/search/src/port/fixture.ts', code)).toContain(
       'no-restricted-imports',
     );
   });

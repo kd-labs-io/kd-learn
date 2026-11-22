@@ -27,7 +27,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
   - Ingest và research ghi trạng thái nguồn (`pending` → `ready` / `failed`) cùng lô với các đoạn (A2).
 - **Payload không chứa key.** Key provider và key Exa được lấy lúc chạy (cài đặt của người dùng, cấu hình admin), nên job chạy lại sau khởi động lại dùng key hiện hành và DB không có thêm bản sao key.
 - **Lần khởi động đầu sau migration v8:** extraction có `ExtractionStarted` còn mở mà không có dòng trong `jobs` (từ process phase 3) thành `Interrupted` như hiện nay, không tự chạy lại.
-- **Đồng thời:** extraction vẫn một job mỗi người (log kiến thức chung). Ingest và research có trần đồng thời toàn server (mặc định 2 mỗi loại) và một job mỗi người mỗi loại.
+- **Đồng thời:** extraction vẫn một job mỗi người (log kiến thức chung). Ingest một job toàn server (spike C1: canh bộ nhớ theo RSS của process); research tối đa 2 toàn server; một job mỗi người mỗi loại.
 - **Lượt học chính không vào bảng `jobs`.** Lượt đang chạy khi khởi động lại vẫn thành "bị ngắt" (rủi ro 25). Một instance như phase 2.
 - **Khách:** không có job bền. Việc nền chạy trong tab; đóng tab giữa chừng thì nguồn ở trạng thái `pending` mà không có ai chạy, màn nguồn hiện "bị ngắt" và nút chạy lại (rủi ro 4). Web Lock `kd-learn:source:<sourceId>` để hai tab không cùng chạy.
 - Phần giữ chỗ demo bị mất khi process chết ([mục 6](06-viec-mo.md)) không thuộc phase 4: demo không có job bền.
@@ -44,7 +44,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 - **Gắn nguồn vào buổi học:** event mới `SourceAttached {sourceId, title, kind}` và `SourceDetached {sourceId}` trong log buổi học; projection `Session` có danh sách nguồn đang gắn. Gắn lúc tạo buổi hoặc giữa buổi. Log cũ không có event này nên vẫn dựng được.
 - **Không job nào ghi vào log buổi học.** `SourceAttached` ghi ngay lúc người học yêu cầu, kể cả khi nguồn còn `pending` (research theo chủ đề lúc tạo buổi: nguồn `web` `pending` được tạo và gắn trong lô tạo buổi). Chọn lát (A3) bỏ qua nguồn chưa `ready`. Gắn / gỡ giữa buổi đi qua cùng chỗ ghi lô của lượt: tài khoản qua runner theo buổi (đang có lượt chạy thì xếp sau lô của lượt); khách dưới Web Lock `kd-learn:turn:<sessionId>`.
 - **Xoá nguồn đang gắn:** cho xoá. Buổi học và mệnh đề còn tham chiếu thì hiện "nguồn đã xoá"; không sửa log.
-- **Giới hạn** (mặc định, đổi được bằng env cho server): PDF tối đa 20 MiB và 500 trang; ghi chú tối đa 2 MiB mỗi file; chữ sau khi tách tối đa 2 MiB mỗi nguồn. Spike C1 kiểm lại các con số.
+- **Giới hạn** (mặc định, đổi được bằng env cho server): PDF tối đa 20 MiB và 500 trang; ghi chú tối đa 2 MiB mỗi file; chữ sau khi tách tối đa 4 MiB mỗi nguồn (nâng từ 2 MiB sau spike C1).
 
 ### A3. Dạy dựa trên nguồn và trích dẫn
 
@@ -60,11 +60,11 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 ### A4. Ingest: PDF và ghi chú
 
 - **Ghi chú:** file `.md` và `.txt`, chọn nhiều file một lần, mỗi file một nguồn. Bỏ front matter; link wiki `[[x]]` thành chữ; ảnh và HTML trong Markdown bị bỏ ([rủi ro 21](05-rui-ro.md)). Đọc và cắt đoạn ở client cho cả ba chế độ (việc nhẹ, không cần job); tài khoản gửi chữ đã cắt lên server.
-- **PDF:** chỉ lấy lớp chữ, không OCR. PDF không có chữ (bản scan) thì `failed` với mã `NoText`.
+- **PDF:** chỉ lấy lớp chữ, không OCR, bằng `pdfjs-dist` (spike C1). PDF không có chữ (bản scan, trung bình dưới 10 ký tự mỗi trang) thì `failed` với mã `NoText`; có mật khẩu mở thì `Encrypted`; hỏng thì `Invalid`; quá 500 trang thì `TooLarge`.
   - **Khách và demo:** tách chữ trong Worker ở trình duyệt. File không rời thiết bị, server không tốn gì.
   - **Tài khoản:** tải file lên (`POST /api/account/sources`, multipart, giới hạn kích thước đọc theo luồng như `HistoryTooLarge`), server tạo nguồn `pending` kèm file gốc và job `ingest`. Job tách chữ, cắt đoạn, ghi `ready` trong một lô. Đóng tab vẫn chạy; khởi động lại thì chạy lại (A1).
   - Cùng một thư viện tách chữ chạy được ở cả trình duyệt (Worker) và Node, để hai chế độ cho cùng kết quả. Thư viện chốt ở spike C1.
-  - Tách chữ trên server có trần thời gian và bộ nhớ, chạy ngoài luồng chính nếu spike cho thấy cần ([rủi ro 39](05-rui-ro.md)).
+  - Tách chữ trên server chạy trong `worker_threads`; luồng chính canh RSS và dừng worker khi vượt nền + 512 MiB, thời hạn 60 s; **một job `ingest` mỗi process** vì RSS tính chung ([rủi ro 39](05-rui-ro.md), spike C1).
 
 ### A5. Research web
 

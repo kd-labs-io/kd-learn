@@ -210,9 +210,9 @@ export default tseslint.config(
     ]),
   },
   // Ports are imported by agent, so they stay as pure as agent: Effect only.
-  // The AI port imports no other package; the storage port also uses the domain types of core.
+  // The AI and search ports import no other package; the storage port also uses core's types.
   {
-    files: ['packages/{ai,storage}/src/port/**/*.{ts,tsx}'],
+    files: ['packages/{ai,search,storage}/src/port/**/*.{ts,tsx}'],
     rules: {
       ...restrict([
         ...nodeBuiltinPatterns,

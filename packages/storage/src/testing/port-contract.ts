@@ -364,7 +364,7 @@ export const portContract = (name: string, make: () => StorageService) =>
         expect(bad._tag).toBe('Failure');
         const big = Array.from({ length: 600 }, (_, ordinal) => ({
           ordinal,
-          text: 'é'.repeat(2000),
+          text: 'é'.repeat(4000),
           locator: {},
         }));
         await Effect.runPromise(storage.createSource({ state: 'pending', info: info('b') }));
