@@ -422,5 +422,19 @@
   "admin_demo_images_hint": "Off by default. On: the Teacher may draw images with {model} on the server's key, each costing the calls below.",
   "admin_demo_images_no_model": "Set KD_LEARN_DEMO_IMAGE_MODEL (Gemini, or an endpoint with images) to allow images in demo mode.",
   "admin_demo_image_cost": "Calls per demo image",
-  "admin_demo_image_cost_hint": "Each image takes this many calls from the demo budget, reserved before the provider is called."
+  "admin_demo_image_cost_hint": "Each image takes this many calls from the demo budget, reserved before the provider is called.",
+  "appearance_title": "Appearance",
+  "appearance_mode": "Color mode",
+  "appearance_mode_system": "System",
+  "appearance_mode_light": "Light",
+  "appearance_mode_dark": "Dark",
+  "appearance_theme": "Theme",
+  "appearance_theme_kd": "kd-learn",
+  "appearance_theme_kd_hint": "Warm cream and terracotta, the default.",
+  "appearance_theme_kd_contrast": "High contrast",
+  "appearance_theme_kd_contrast_hint": "Stronger text and borders for easier reading.",
+  "appearance_theme_ocean": "Ocean",
+  "appearance_theme_ocean_hint": "Cool blues.",
+  "appearance_synced": "Saved to your account, so it follows you to other devices.",
+  "appearance_device": "Saved on this device."
 }

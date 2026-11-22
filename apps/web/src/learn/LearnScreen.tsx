@@ -281,8 +281,8 @@ function Conversation({
   loadFigure: FigureBodyLoader;
 }) {
   const titles = new Map(session.sources.map((s) => [s.sourceId, s.title]));
-  const { override } = useThemeControl();
-  const vars = figureVarsOf(override);
+  const { theme, resolvedMode } = useThemeControl();
+  const vars = figureVarsOf(theme, resolvedMode);
   const figures = useMemo(
     () => new Map(session.figures.map((figure) => [figure.figureId, figure])),
     [session.figures],

@@ -16,6 +16,7 @@ import { AppHeader } from './AppHeader';
 import { useGuestSourceLibrary } from '../sources/library';
 import { SearchPreference } from '../sources/SearchPreference';
 import { ProfileLink } from '../profile/ProfileLink';
+import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { useEndpoints, useStoragePersistent } from '../learn/hooks';
 import { runStorage, useGuestSettings } from '../storage';
 
@@ -205,6 +206,7 @@ export function GuestSettings() {
 
             <SearchPreference providers={library.providers} />
             <ProfileLink />
+            <AppearanceSettings isSynced={false} />
           </VStack>
         </LayoutContent>
       }

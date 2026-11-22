@@ -1,7 +1,7 @@
 // Figure bodies for the learning screen (phase 5 A7, A8): from the local DB for guests and demo,
 // from the account API otherwise. The API is Bearer-only, so bodies come through fetch and the UI
 // shows them from blob URLs; nothing here builds markup.
-import { defaultTheme, figureVars, type Theme } from '@kd-learn/tokens';
+import { figureVars, type ColorMode, type FigureVars, type Theme } from '@kd-learn/tokens';
 import type { FigureBodyLoader } from '@kd-learn/ui/components/LessonFigure';
 import { runStorage } from '../storage/client';
 import { apiBaseUrl } from './hooks';
@@ -40,15 +40,19 @@ export const accountFigureLoader = (token: string): FigureBodyLoader => {
   return loader;
 };
 
-const varsCache = new WeakMap<Theme, ReturnType<typeof figureVars>>();
+const varsCache = new WeakMap<Theme, Map<ColorMode, FigureVars>>();
 
-/** Figure colors of the theme in use; the same object while the theme stays. */
-export const figureVarsOf = (theme: Theme | null) => {
-  const current = theme ?? defaultTheme;
-  let vars = varsCache.get(current);
+/** Figure colors of the theme in use, in the resolved mode; the same object while both stay. */
+export const figureVarsOf = (theme: Theme, mode: ColorMode): FigureVars => {
+  let byMode = varsCache.get(theme);
+  if (byMode === undefined) {
+    byMode = new Map();
+    varsCache.set(theme, byMode);
+  }
+  let vars = byMode.get(mode);
   if (vars === undefined) {
-    vars = figureVars(current, 'light');
-    varsCache.set(current, vars);
+    vars = figureVars(theme, mode);
+    byMode.set(mode, vars);
   }
   return vars;
 };
