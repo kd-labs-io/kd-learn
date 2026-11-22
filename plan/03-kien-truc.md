@@ -7,7 +7,7 @@
 kd-learn/
 ├─ apps/
 │  ├─ web/          # TanStack Start: UI + mount API; build SSR (Docker) và SPA tĩnh (Capacitor)
-│  └─ mobile/       # Vỏ Capacitor bọc bản build SPA của web (phase 7, chưa có)
+│  └─ mobile/       # Vỏ Capacitor bọc bản build SPA của web (phase 8, chưa có)
 ├─ packages/
 │  ├─ core/         # Thuần TS + Effect Schema: record, event, projection, graph, registry loại bài tập. Không IO.
 │  ├─ agent/        # Prober/Teacher/Practitioner, tools, hồ sơ dạy học. Chỉ phụ thuộc core + port.

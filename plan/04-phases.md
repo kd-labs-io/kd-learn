@@ -10,11 +10,12 @@
 | 4. Nguồn học + việc nền | PDF, import ghi chú, research web với port tìm kiếm và UI cấu hình | Job của tài khoản sống sót khi server khởi động lại |
 | 5. Hình và demo | Sơ đồ SVG / Mermaid, demo HTML trong iframe sandbox, tool sinh ảnh | Teacher chèn được sơ đồ và demo vào bước dạy; mã sinh ra không đọc được dữ liệu app |
 | 6. Theme + web trên điện thoại | Dark mode (sáng / tối / theo hệ thống), chọn theme dựng sẵn, lựa chọn đồng bộ theo tài khoản, kiểm bản web trên Safari iOS và Chrome Android (hoãn từ phase 0) ([theme-va-dien-thoai.md](archive/theme-va-dien-thoai.md)) | Đăng nhập và học 1 buổi trên trình duyệt điện thoại; đổi theme và dark mode không vỡ sơ đồ, demo, graph |
-| 7. App mobile | Vỏ Capacitor, màn hình nhập URL server, WebView iOS / Android, phương án lùi SQLite native nếu OPFS trong WebView không dùng được ([rủi ro 5](05-rui-ro.md)) | Đăng nhập và học 1 buổi trong app trên điện thoại |
+| 7. Cải thiện UI / UX | Rà và sửa trải nghiệm trên mọi màn (web, cả điện thoại): bố cục, điều hướng, trạng thái chờ / lỗi / trống, header chung ở màn hẹp, đọc lại các luồng side chat cũ, công thức hiện mã TeX thô khi tải lại ([mục 6](06-viec-mo.md)). Phạm vi chốt khi lên plan | Chốt khi lên plan |
+| 8. App mobile | Vỏ Capacitor, màn hình nhập URL server, WebView iOS / Android, phương án lùi SQLite native nếu OPFS trong WebView không dùng được ([rủi ro 5](05-rui-ro.md)) | Đăng nhập và học 1 buổi trong app trên điện thoại |
 
-Thứ tự phase cũng là thứ tự cắt giảm nếu phạm vi quá lớn: cắt từ phase 7 ngược lên.
+Thứ tự phase cũng là thứ tự cắt giảm nếu phạm vi quá lớn: cắt từ phase 8 ngược lên.
 
-**Sau phase 7 (chưa xếp lịch):**
+**Sau phase 8 (chưa xếp lịch):**
 
 - **Theme tuỳ biến:** người dùng chỉnh token trong UI, xem trước trực tiếp, cảnh báo khi độ tương phản dưới chuẩn WCAG AA.
 - **Import / export theme:** file JSON theo schema theme. Import phải validate và từ chối mọi giá trị ngoài schema.

@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 xong (2026-11-21, [archive/phase-2.md](archive/phase-2.md); plan phần chính ở [archive/tai-khoan.md](archive/tai-khoan.md)). Phase 3 xong (2026-11-22, [archive/phase-3.md](archive/phase-3.md); plan phần chính ở [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md)). Phase 4 xong (2026-11-22, [archive/phase-4.md](archive/phase-4.md); plan phần chính ở [archive/nguon-hoc.md](archive/nguon-hoc.md)). Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md); plan phần chính ở [archive/hinh-va-demo.md](archive/hinh-va-demo.md)). Phase 6 xong (2026-11-22, [archive/phase-6.md](archive/phase-6.md); plan phần chính ở [archive/theme-va-dien-thoai.md](archive/theme-va-dien-thoai.md)). Phase 7: app mobile (Capacitor), chưa lên plan
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 xong (2026-11-21, [archive/phase-2.md](archive/phase-2.md); plan phần chính ở [archive/tai-khoan.md](archive/tai-khoan.md)). Phase 3 xong (2026-11-22, [archive/phase-3.md](archive/phase-3.md); plan phần chính ở [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md)). Phase 4 xong (2026-11-22, [archive/phase-4.md](archive/phase-4.md); plan phần chính ở [archive/nguon-hoc.md](archive/nguon-hoc.md)). Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md); plan phần chính ở [archive/hinh-va-demo.md](archive/hinh-va-demo.md)). Phase 6 xong (2026-11-22, [archive/phase-6.md](archive/phase-6.md); plan phần chính ở [archive/theme-va-dien-thoai.md](archive/theme-va-dien-thoai.md)). Phase 7: cải thiện UI / UX, chưa lên plan. Phase 8: app mobile (Capacitor)
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 
@@ -20,7 +20,7 @@ Số mục giữ nguyên làm ID ổn định: "mục 2.4", "rủi ro 12" vẫn 
 | 2.1–2.3 | [02-san-pham.md](02-san-pham.md)   | Tính năng, chế độ chạy (khách / tài khoản / demo), thiết kế mở, theme                         |
 | 2.4–2.5 | [02-ky-thuat.md](02-ky-thuat.md)   | Chọn thư viện, công cụ, stack; thư viện TanStack theo phase                                   |
 | 3       | [03-kien-truc.md](03-kien-truc.md) | Cấu trúc monorepo, ranh giới package, port AI, luồng một lượt học                             |
-| 4       | [04-phases.md](04-phases.md)       | Phạm vi và tiêu chí xong của từng phase, việc sau phase 7                                     |
+| 4       | [04-phases.md](04-phases.md)       | Phạm vi và tiêu chí xong của từng phase, việc sau phase 8                                     |
 | 5       | [05-rui-ro.md](05-rui-ro.md)       | Rủi ro, việc cần kiểm chứng, kết quả đã kiểm                                                  |
 | 6–7     | [06-viec-mo.md](06-viec-mo.md)     | Câu hỏi chưa chốt, bước tiếp theo                                                             |
 | 8       | `progress/`                        | Tiến độ phase đang làm, mỗi phase một file (`phase-<n>.md`); hiện chưa có (phase 7 chưa lên plan) |
@@ -47,7 +47,7 @@ Khi chuyển file hay dòng vào `archive/`, tìm và sửa link trỏ tới nó
 | Loại                                            | Làm gì                                                                                                             |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Quyết định                                      | Thêm dòng vào bảng đúng chủ đề trong `02-*.md`. Chủ đề mới thì thêm mục tiếp theo (2.6, ...)                       |
-| Tính năng hoặc phase mới                        | Thêm dòng vào `04-phases.md` (hoặc danh sách "sau phase 7"). Bắt đầu làm phase nào thì tạo `progress/phase-<n>.md` |
+| Tính năng hoặc phase mới                        | Thêm dòng vào `04-phases.md` (hoặc danh sách "sau phase 8"). Bắt đầu làm phase nào thì tạo `progress/phase-<n>.md` |
 | Rủi ro, việc còn mở                             | Thêm vào cuối `05-rui-ro.md`, `06-viec-mo.md`                                                                      |
 | Chủ đề lớn cần plan riêng (ví dụ spike port AI) | Tạo `plan/<chu-de>.md`, thêm một dòng vào bảng "Đọc file nào"                                                      |
 | File quá dài (hơn khoảng 150 dòng)              | Tách thành thư mục cùng tên (ví dụ `02-ky-thuat/`), giữ nguyên số mục, cập nhật bảng trên                          |

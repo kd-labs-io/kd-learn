@@ -3,7 +3,7 @@
 ## 6. Việc còn mở
 
 - Cơ chế tóm tắt lịch sử cho buổi học dài ở chế độ khách. Phase 1 chỉ đặt giới hạn kích thước request ([archive/loi-day-hoc.md](archive/loi-day-hoc.md) A8).
-- Phiên bản iOS tối thiểu cho app mobile (liên quan [rủi ro 5](05-rui-ro.md)). Đề xuất iOS 17.5; chưa kiểm trên thiết bị thật. Safari iOS kiểm ở phase 6, WebView ở phase 7.
+- Phiên bản iOS tối thiểu cho app mobile (liên quan [rủi ro 5](05-rui-ro.md)). Đề xuất iOS 17.5; chưa kiểm trên thiết bị thật. Safari iOS kiểm ở phase 6, WebView ở phase 8.
 - Panel side chat sau khi buổi học `done` chỉ hiện luồng `general`; các câu hỏi cũ ở luồng từng bước còn trong log nhưng không xem lại được (phát hiện ở bước 8 phase 1). Cần cách duyệt các luồng cũ.
 - Sau khi tải lại trang, công thức hiện mã TeX thô một thoáng cho tới khi KaTeX (nạp lười) xong. Cân nhắc nạp trước KaTeX khi buổi học đã có công thức.
 - Test Playwright trên Firefox chập chờn khi chạy song song (máy local; CI không chạy Firefox): mỗi lần chạy có 1–2 test hỏng do hết thời gian chờ, mỗi lần một test khác nhau (`without a key…`, `reload in the middle…`, `on a phone…`). Chạy lại hoặc chạy `--workers=1` thì xanh. Có cả trên `main` trước bước 2 phase 2 (2026-11-21).
@@ -17,4 +17,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 7 (app mobile, Capacitor): chưa lên plan; bước tiếp theo là lên plan phase 7. Phase 6 xong (2026-11-22, [archive/phase-6.md](archive/phase-6.md)).
+Phase 7 (cải thiện UI / UX): chưa lên plan; bước tiếp theo là lên plan phase 7. App mobile (Capacitor) chuyển sang phase 8 (2026-11-22). Phase 6 xong (2026-11-22, [archive/phase-6.md](archive/phase-6.md)).
