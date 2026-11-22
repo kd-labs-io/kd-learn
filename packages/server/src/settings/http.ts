@@ -94,6 +94,13 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
           `The admin does not allow this model for the agent of the role ${result.role}.`,
         );
       }
+      if (result._tag === 'RoleNotSupported') {
+        return ctx.reject(
+          409,
+          ErrorCode.RoleNotSupported,
+          `This connection cannot serve the role ${result.role}: it needs Gemini or an endpoint with images.`,
+        );
+      }
       return json(ctx, Schema.encodeSync(AccountSettings)(ctx.accounts.settings.get(user.id)));
     }),
   );

@@ -17,6 +17,7 @@ import type {
   AcpAgent,
   ConnectionInfo,
   CreateConnectionRequest,
+  EndpointInfo,
   ModelRole,
   RoleModels,
 } from '@kd-learn/api';
@@ -39,6 +40,7 @@ const ROLES: ReadonlyArray<ModelRole> = [
   'practitioner',
   'extractor',
   'researcher',
+  'illustrator',
 ];
 
 const roleLabel = (role: ModelRole) => {
@@ -55,6 +57,8 @@ const roleLabel = (role: ModelRole) => {
       return m.role_extractor();
     case 'researcher':
       return m.role_researcher();
+    case 'illustrator':
+      return m.role_illustrator();
   }
 };
 
@@ -78,6 +82,8 @@ const settingsErrorText = (error: unknown) => {
       return m.error_AcpAgentDisabled();
     case 'UnknownEndpoint':
       return m.error_UnknownEndpoint();
+    case 'RoleNotSupported':
+      return m.error_RoleNotSupported();
     default:
       return m.error_generic({ message: errorText(error) });
   }
@@ -116,7 +122,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
                   settings={settings.data}
                   endpoints={endpoints.data ?? []}
                 />
-                <Roles token={token} settings={settings.data} />
+                <Roles token={token} settings={settings.data} endpoints={endpoints.data ?? []} />
                 <SearchPreference providers={library.providers} />
                 <ProfileLink />
               </>
@@ -295,7 +301,15 @@ function Connections({
   );
 }
 
-function Roles({ token, settings }: { token: string; settings: AccountSettings }) {
+function Roles({
+  token,
+  settings,
+  endpoints,
+}: {
+  token: string;
+  settings: AccountSettings;
+  endpoints: ReadonlyArray<EndpointInfo>;
+}) {
   const { call } = useAccountApi();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Record<ModelRole, { connectionId: string; model: string }>>(
@@ -327,6 +341,13 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
   });
 
   const connectionOf = (id: string) => settings.connections.find((c) => c.id === id);
+  /** The illustrator needs an image API: Gemini, or an endpoint the operator marked (phase 5 A6). */
+  const makesImages = (connection: ConnectionInfo) =>
+    connection.provider === 'gemini' ||
+    (connection.provider === 'openai-compatible' &&
+      endpoints.some((e) => e.id === connection.endpointId && e.images === true));
+  const connectionsFor = (role: ModelRole) =>
+    role === 'illustrator' ? settings.connections.filter(makesImages) : settings.connections;
   const set = (role: ModelRole, patch: Partial<{ connectionId: string; model: string }>) =>
     setDraft((current) => ({ ...current, [role]: { ...current[role], ...patch } }));
 
@@ -352,6 +373,8 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
       practitioner: current.prober,
       extractor: current.prober,
       researcher: current.prober,
+      // Images need an image API and cost per picture: never copied.
+      illustrator: current.illustrator,
     }));
 
   return (
@@ -377,10 +400,18 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
                     {m.roles_fallback_hint({ role: roleLabel(fallback) })}
                   </Text>
                 )}
+                {role === 'illustrator' ? (
+                  <Text type="supporting">{m.roles_illustrator_hint()}</Text>
+                ) : null}
+                {role === 'illustrator' && connectionsFor(role).length === 0 ? (
+                  <Text type="supporting" data-testid="role-illustrator-none">
+                    {m.roles_illustrator_none()}
+                  </Text>
+                ) : null}
                 <Selector
                   label={m.roles_connection()}
                   placeholder={m.roles_connection_placeholder()}
-                  options={settings.connections.map((c) => ({ value: c.id, label: c.label }))}
+                  options={connectionsFor(role).map((c) => ({ value: c.id, label: c.label }))}
                   value={draft[role].connectionId}
                   onChange={(connectionId) => set(role, { connectionId, model: '' })}
                   data-testid={`role-${role}-connection`}
@@ -446,5 +477,6 @@ function draftOf(roles: RoleModels): Record<ModelRole, { connectionId: string; m
     practitioner: one('practitioner'),
     extractor: one('extractor'),
     researcher: one('researcher'),
+    illustrator: one('illustrator'),
   };
 }

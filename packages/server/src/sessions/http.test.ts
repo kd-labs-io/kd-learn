@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
+import type { ImagePort } from '@kd-learn/ai/port';
 import { makeSseParser } from '@kd-learn/api';
 import type { Handlers } from '../index.ts';
 import { make, type MakeOptions } from '../auth/test-support.ts';
@@ -296,6 +298,86 @@ describe('account turns', () => {
     expect(
       (await request(t.handlers.account, 'GET', `/api/account/figures/x`, undefined)).status,
     ).toBe(401);
+  });
+
+  it('makes an image with the illustrator, stores its bytes, and keeps the image key out', async () => {
+    const GKEY = 'AIza-image-SECRET-0123456789abcdef';
+    const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+    const asked: Array<{ model: string; apiKey: string; prompt: string }> = [];
+    const images: ImagePort['Service'] = {
+      generate: (request) =>
+        Effect.sync(() => {
+          asked.push({
+            model: request.model.model,
+            apiKey: request.model.apiKey,
+            prompt: request.prompt,
+          });
+          return {
+            mime: 'image/jpeg' as const,
+            bytes: JPEG,
+            usage: { inputTokens: 30, outputTokens: 1120 },
+          };
+        }),
+    };
+    const assessment = { level: 'beginner', summary: 's', strengths: [], gaps: ['adding'] };
+    const plan = { nodes: [{ id: 'add', title: 'Add', goal: 'Add fractions', dependsOn: [] }] };
+    const t = await setup(
+      [
+        say('Q1?'),
+        say('Q2?'),
+        say('Q3?'),
+        say('Q4?'),
+        callTool('submit_assessment', assessment, 'Thanks.'),
+        callTool('create_plan', plan, 'Here is the plan.'),
+        callTool('generate_image', { title: 'A pizza', prompt: 'A pizza cut in eighths' }, 'Look.'),
+      ],
+      { images },
+    );
+    const settings = (await (await t.account('GET', 'settings')).json()) as {
+      connections: Array<{ id: string }>;
+      roles: Json;
+    };
+    const anthropic = settings.connections[0]!.id;
+    // Anthropic has no image API: refused, and the roles stay as they were.
+    const refused = await t.account('PUT', 'roles', {
+      roles: {
+        ...settings.roles,
+        illustrator: { connectionId: anthropic, model: 'claude-haiku-5-5' },
+      },
+    });
+    expect(refused.status).toBe(409);
+    expect(JSON.stringify(await refused.json())).toContain('RoleNotSupported');
+    const { id: gemini } = (await (
+      await t.account('POST', 'connections', { label: 'G', provider: 'gemini', apiKey: GKEY })
+    ).json()) as { id: string };
+    const saved = await t.account('PUT', 'roles', {
+      roles: {
+        ...settings.roles,
+        illustrator: { connectionId: gemini, model: 'gemini-3.1-flash-lite-image' },
+      },
+    });
+    expect(saved.status).toBe(200);
+
+    await t.account('POST', `sessions/${t.sessionId}/turns`, { kind: 'auto' });
+    await t.idle();
+    for (const answer of ['a1', 'a2', 'a3', 'a4', 'teach me']) {
+      await t.account('POST', `sessions/${t.sessionId}/turns`, { kind: 'send', input: answer });
+      await t.idle();
+    }
+    expect(asked).toEqual([
+      { model: 'gemini-3.1-flash-lite-image', apiKey: GKEY, prompt: 'A pizza cut in eighths' },
+    ]);
+    const events = (await t.snapshot()).events.map((e) => e.event);
+    const added = events.find((e) => e._tag === 'FigureAdded') as Json | undefined;
+    expect(added).toMatchObject({ kind: 'image', mime: 'image/jpeg', bytes: JPEG.length });
+    expect(events).toContainEqual(
+      expect.objectContaining({ _tag: 'UsageRecorded', model: 'gemini-3.1-flash-lite-image' }),
+    );
+    const got = await t.account('GET', `figures/${String(added?.figureId)}`);
+    expect(got.headers.get('content-type')).toBe('application/octet-stream');
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(JPEG);
+    expect(JSON.stringify(events)).not.toContain(GKEY);
+    expect(JSON.stringify(t.logs)).not.toContain(GKEY);
   });
 
   it('runs a side turn next to a main turn, and refuses a second side turn', async () => {

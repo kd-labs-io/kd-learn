@@ -150,6 +150,8 @@ export const ErrorCode = {
   AcpAgentDisabled: 'AcpAgentDisabled',
   /** The model is not on the admin's list for this ACP agent (risk 30). */
   AcpModelNotAllowed: 'AcpModelNotAllowed',
+  /** The connection cannot serve this role: the illustrator needs an image API (phase 5 A6). */
+  RoleNotSupported: 'RoleNotSupported',
   /** Every ACP agent slot of the server is in use (plan A9). Retryable. */
   AcpBusy: 'AcpBusy',
   /** The session is already being extracted, or waits in the queue (phase 3 A3). */
@@ -196,7 +198,12 @@ export const Frame = Schema.Union([DeltaFrame, EventFrame, FigureFrame, ErrorFra
 export type Frame = typeof Frame.Type;
 
 /** An OpenAI-compatible endpoint the guest may pick. The base URL stays on the server. */
-export const EndpointInfo = Schema.Struct({ id: EndpointId, label: Schema.NonEmptyString });
+export const EndpointInfo = Schema.Struct({
+  id: EndpointId,
+  label: Schema.NonEmptyString,
+  /** The endpoint serves `/images/generations` (phase 5 A6): it may be the illustrator. */
+  images: Schema.optionalKey(Schema.Boolean),
+});
 export type EndpointInfo = typeof EndpointInfo.Type;
 
 /** `GET /api/endpoints`. */
@@ -271,6 +278,8 @@ export const ModelRole = Schema.Literals([
   'extractor',
   /** Web research (phase 4 A5). */
   'researcher',
+  /** Images for `generate_image` (phase 5 A6). No fallback: unset means no images. */
+  'illustrator',
 ]);
 export type ModelRole = typeof ModelRole.Type;
 
@@ -341,6 +350,7 @@ export const RoleModels = Schema.Struct({
   practitioner: Schema.optionalKey(RoleModel),
   extractor: Schema.optionalKey(RoleModel),
   researcher: Schema.optionalKey(RoleModel),
+  illustrator: Schema.optionalKey(RoleModel),
 });
 export type RoleModels = typeof RoleModels.Type;
 

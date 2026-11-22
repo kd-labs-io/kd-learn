@@ -405,5 +405,9 @@
   "profile_figures_demos": "Interactive demos (run in an isolated frame)",
   "profile_figures_images": "Generated images",
   "admin_figure_cdn": "Libraries in demos",
-  "admin_figure_cdn_hint": "Demos may load D3, Chart.js and Matter.js from jsDelivr (pinned versions, checked by hash). Off: plain JavaScript only."
+  "admin_figure_cdn_hint": "Demos may load D3, Chart.js and Matter.js from jsDelivr (pinned versions, checked by hash). Off: plain JavaScript only.",
+  "role_illustrator": "Images",
+  "roles_illustrator_hint": "Draws pictures for the lesson when the Teacher asks for one. Not set: no pictures. Needs Gemini or an endpoint that makes images; each picture costs a few cents on that key.",
+  "roles_illustrator_none": "Add a Gemini connection, or one to an endpoint that makes images, to use this role.",
+  "error_RoleNotSupported": "This connection cannot make images. Choose Gemini or an endpoint that makes images."
 }

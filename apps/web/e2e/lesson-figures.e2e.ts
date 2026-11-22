@@ -146,3 +146,61 @@ test('account: Mermaid and a demo come from the server, and stay after a reload'
   await expect(tutor(page).getByTestId('figure-demo')).toBeVisible();
   await hostileDemoStaysInside(page, outside);
 });
+
+test('account: the illustrator draws an image, only from an image endpoint, and it stays after a reload', async ({
+  page,
+}) => {
+  await page.goto('/register');
+  const email = `images-${unique()}@e2e.test`;
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('learner-password-1');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('who')).toHaveText(email);
+  await page.getByTestId('nav-settings').click();
+  const connect = async (endpoint: string, name: string) => {
+    await page.getByTestId('connection-provider').click();
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
+    await page.getByTestId('connection-endpoint').click();
+    await page.getByRole('option', { name: endpoint }).click();
+    await page.getByLabel('API key').fill(`acct-images-${unique()}-0123456789`);
+    await page.getByLabel('Name').fill(name);
+    await page.getByTestId('connection-save').click();
+  };
+  await connect('Fake model', 'Fake');
+  await expect(page.getByTestId('connection-item')).toHaveCount(1);
+  // A text-only endpoint cannot be the illustrator.
+  await expect(page.getByTestId('role-illustrator-none')).toBeVisible();
+  await connect('Fake images', 'Pics');
+  await expect(page.getByTestId('connection-item')).toHaveCount(2);
+  await expect(page.getByTestId('role-illustrator-none')).toHaveCount(0);
+
+  await page.getByTestId('role-prober-connection').click();
+  await page.getByRole('option', { name: 'Fake' }).click();
+  await page.getByTestId('role-prober-model').fill('fake-model');
+  await page.getByTestId('roles-copy').click();
+  // Copying never sets the illustrator.
+  await expect(page.getByTestId('role-illustrator-model')).toHaveValue('');
+  await page.getByTestId('role-illustrator-connection').click();
+  await expect(page.getByRole('option', { name: 'Fake', exact: true })).toHaveCount(0);
+  await page.getByRole('option', { name: 'Pics' }).click();
+  await page.getByTestId('role-illustrator-model').fill('fake-image');
+  await page.getByTestId('roles-save').click();
+  await expect(page.getByTestId('roles-message')).toContainText('Saved');
+  await page.getByTestId('nav-home').click();
+
+  await startTeaching(page, 'Colors');
+  await answer(page, '#image');
+  const image = tutor(page).last().getByRole('img', { name: 'A red square' });
+  await expect(image).toBeVisible({ timeout: 20_000 });
+  await expect
+    .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))
+    .toBe(16);
+  await tutor(page).last().getByRole('button', { name: 'Enlarge' }).click();
+  await expect(page.getByRole('dialog').getByRole('img', { name: 'A red square' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.reload();
+  await expect(tutor(page).getByRole('img', { name: 'A red square' })).toBeVisible({
+    timeout: 20_000,
+  });
+});

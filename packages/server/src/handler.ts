@@ -12,9 +12,10 @@ import type { DemoGate } from './demo/service.ts';
 import { Cause, Effect, Layer, Result, Schema, Stream } from 'effect';
 import { defaultProfile, runSideChat, runTurn } from '@kd-learn/agent';
 import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
-import { AiPort } from '@kd-learn/ai/port';
+import { AiPort, type ImagePort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
 import { layer as tanstackLayer } from '@kd-learn/ai/tanstack';
+import { makeImageService } from '@kd-learn/ai/image';
 import {
   EndpointsResponse,
   ErrorCode,
@@ -63,6 +64,8 @@ export interface HandlerDeps {
   readonly config: ServerConfig;
   /** The AI port. Defaults to the TanStack adapter. Tests pass a fake. */
   readonly ai?: Layer.Layer<AiPort>;
+  /** Image generation (phase 5 A6). Defaults to the HTTP adapters. Tests pass a fake. */
+  readonly images?: ImagePort['Service'];
   readonly log?: Logger;
   readonly newId?: () => string;
   /** False when an admin turned guest mode off (plan A7). Absent: allowed. */
@@ -455,7 +458,11 @@ export const handleEndpoints = async (request: Request, deps: HandlerDeps): Prom
     return failureResponse(405, ErrorCode.MethodNotAllowed, 'Use GET.', false, cors);
   }
   const body: typeof EndpointsResponse.Type = {
-    endpoints: config.endpoints.map(({ id, label }) => ({ id, label })),
+    endpoints: config.endpoints.map(({ id, label, images }) => ({
+      id,
+      label,
+      ...(images ? { images: true } : {}),
+    })),
   };
   return Response.json(body, {
     headers: { ...SECURITY_HEADERS, 'cache-control': 'no-store', ...cors },
@@ -578,6 +585,7 @@ export const createHandlers = (
         log,
         endpoints: () => config.endpoints,
         ai: options.ai ?? tanstackLayer(),
+        images: options.images ?? makeImageService(),
         ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
         ...(options.acp ? { acp: options.acp } : {}),
         ...(options.database ? { database: options.database } : {}),
