@@ -8,6 +8,7 @@ import {
   GraphSlice,
   KnowledgeEvent,
   SavedProfile,
+  SourceSlice,
   TeachingProfile,
 } from '@kd-learn/core';
 
@@ -75,10 +76,18 @@ export type TurnSelector = typeof TurnSelector.Type;
  * `SideMessageAppended` (side), written by the client before the request (plan A3).
  * Decode with `onExcessProperty: 'error'` so unknown fields are rejected, not dropped.
  */
+/** Largest `sourceSlice` of a turn request (UTF-8 of its JSON): the default budget plus margin. */
+export const MAX_SOURCE_SLICE_BYTES = 32 * 1024;
+
 export const TurnRequest = Schema.Struct({
   model: ModelChoice,
   turn: TurnSelector,
   log: EventLog,
+  /**
+   * Guest and demo (phase 4 A3): chunks of the attached sources, picked on the device for this
+   * turn. Main turns only; at most `MAX_SOURCE_SLICE_BYTES`.
+   */
+  sourceSlice: Schema.optionalKey(SourceSlice),
 });
 export type TurnRequest = typeof TurnRequest.Type;
 
@@ -369,8 +378,17 @@ export const CreateSessionRequest = Schema.Struct({
   topic: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
   /** Language of the lesson, a BCP 47 tag such as `vi` or `en`. */
   language: Schema.String.check(Schema.isPattern(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/)),
+  /** Sources to attach in the creating batch (phase 4 A2). Unknown ids are refused. */
+  sourceIds: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).check(Schema.isMaxLength(20))),
 });
 export type CreateSessionRequest = typeof CreateSessionRequest.Type;
+
+/** `POST /api/account/sessions/:id/sources`: attach and detach sources (phase 4 A2). */
+export const SessionSourcesRequest = Schema.Struct({
+  attach: Schema.Array(Schema.NonEmptyString).check(Schema.isMaxLength(20)),
+  detach: Schema.Array(Schema.NonEmptyString).check(Schema.isMaxLength(20)),
+});
+export type SessionSourcesRequest = typeof SessionSourcesRequest.Type;
 
 export const CreateSessionResponse = Schema.Struct({ sessionId: Schema.NonEmptyString });
 export type CreateSessionResponse = typeof CreateSessionResponse.Type;
@@ -559,7 +577,14 @@ export const ExtractRequest = Schema.Struct({
   slice: GraphSlice,
   /** The profile in use (A2). Absent: the default. Ignored in demo mode. */
   profile: Schema.optionalKey(SavedProfile),
+  /**
+   * Chunks the session was taught from (phase 4 A3, `sessionDocumentSlice`), picked by the client.
+   * At most `MAX_DOCUMENT_SLICE_BYTES`.
+   */
+  documentSlice: Schema.optionalKey(SourceSlice),
 });
+/** Largest `documentSlice` of an extract request (UTF-8 of its JSON). */
+export const MAX_DOCUMENT_SLICE_BYTES = 64 * 1024;
 export type ExtractRequest = typeof ExtractRequest.Type;
 
 /** The batch to write: graph events, then `SessionExtracted`. Fit it to the graph before writing. */

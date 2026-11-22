@@ -21,8 +21,10 @@ import {
   canSkipStep,
   currentStep,
   projectSession,
+  turnSourceSlice,
   type DomainEvent,
   type EventLog,
+  type SourceSlice,
 } from '@kd-learn/core';
 import { StorageBusy, type StorageService } from '@kd-learn/storage/port';
 import { isLockHeld, sideLockName, turnLockName, withLock, type WithLock } from './locks';
@@ -315,8 +317,14 @@ export class SessionRunner {
 
     this.setMain({ live: { turnId, text: '' }, failure: undefined });
     const parts = new Map<string, string>();
+    const sourceSlice = await this.sourceSlice(storage, withStarted, input);
     const collected = await this.collect(
-      { model, turn: { kind: 'main' }, log: withStarted },
+      {
+        model,
+        turn: { kind: 'main' },
+        log: withStarted,
+        ...(sourceSlice.length === 0 ? {} : { sourceSlice }),
+      },
       (frame) => {
         if (frame._tag !== 'delta') return;
         this.pushLive(() => {
@@ -481,6 +489,21 @@ export class SessionRunner {
   }
 
   // --- the request ---
+
+  /** Chunks of the attached sources for this turn, picked on the device (phase 4 A3). */
+  private async sourceSlice(
+    storage: StorageService,
+    log: EventLog,
+    input: string,
+  ): Promise<SourceSlice> {
+    const projected = projectSession(log);
+    if (Result.isFailure(projected) || projected.success.sources.length === 0) return [];
+    const session = projected.success;
+    const chunks = await Effect.runPromise(
+      storage.readChunks(session.sources.map((s) => s.sourceId)),
+    );
+    return turnSourceSlice(session, chunks, input);
+  }
 
   private async modelChoice(storage: StorageService): Promise<ModelChoice | undefined> {
     if (this.deps.demo?.() === true) return { provider: 'demo' };

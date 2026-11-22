@@ -12,7 +12,7 @@ import {
 import type { ExtractionUsage } from '@kd-learn/agent';
 import type { AiPort, ModelRef } from '@kd-learn/ai/port';
 import { layer as tanstackLayer } from '@kd-learn/ai/tanstack';
-import { ErrorCode, ExtractFrame, ExtractRequest } from '@kd-learn/api';
+import { ErrorCode, ExtractFrame, ExtractRequest, MAX_DOCUMENT_SLICE_BYTES } from '@kd-learn/api';
 import type { Failure } from '@kd-learn/api';
 import { DEMO_ROLE_OUTPUT_CAPS, meteredAi, type Meter } from '../demo/metered.ts';
 import type { DemoGate } from '../demo/service.ts';
@@ -82,6 +82,17 @@ export const handleExtract = async (request: Request, deps: HandlerDeps): Promis
     return reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure));
   }
   const input = decoded.success;
+  if (
+    input.documentSlice !== undefined &&
+    new TextEncoder().encode(JSON.stringify(input.documentSlice)).byteLength >
+      MAX_DOCUMENT_SLICE_BYTES
+  ) {
+    return reject(
+      413,
+      ErrorCode.HistoryTooLarge,
+      `documentSlice is limited to ${MAX_DOCUMENT_SLICE_BYTES} bytes.`,
+    );
+  }
   const choice = input.model;
   const misconfigured = () =>
     reject(500, ErrorCode.Misconfigured, 'The server is not configured correctly.');
@@ -164,6 +175,7 @@ export const handleExtract = async (request: Request, deps: HandlerDeps): Promis
   const program: Effect.Effect<Outcome> = runExtraction({
     log: input.log,
     slice: input.slice,
+    ...(input.documentSlice === undefined ? {} : { documentSlice: input.documentSlice }),
     profile,
     model,
     extractionId: input.extractionId,

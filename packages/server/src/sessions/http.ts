@@ -7,6 +7,7 @@ import {
   ErrorCode,
   SessionList,
   SessionSnapshot,
+  SessionSourcesRequest,
   SkipStepRequest,
   StartTurnRequest,
   StartTurnResponse,
@@ -101,8 +102,9 @@ export const makeSessionsHandler = (kit: Kit, log: Logger) => {
       }
       const input = await decode(ctx, CreateSessionRequest);
       if (input instanceof Response) return input;
-      const sessionId = runner.create(user.id, input.topic, input.language);
-      log({ event: 'session.created', fields: {} });
+      const sessionId = runner.create(user.id, input.topic, input.language, input.sourceIds);
+      if (sessionId === undefined) return notFound(ctx);
+      log({ event: 'session.created', fields: { sources: input.sourceIds?.length ?? 0 } });
       return json(ctx, Schema.encodeSync(CreateSessionResponse)({ sessionId }), 201);
     }),
   );
@@ -247,7 +249,33 @@ export const makeSessionsHandler = (kit: Kit, log: Logger) => {
       }),
     );
 
+  const sources = (sessionId: string) =>
+    route('sessions.sources', ['POST'], (ctx) =>
+      signedIn(ctx, async (user) => {
+        const input = await decode(ctx, SessionSourcesRequest);
+        if (input instanceof Response) return input;
+        const result = ctx.accounts.sessions.setSources(user.id, sessionId, input);
+        switch (result._tag) {
+          case 'Ok':
+            return noContent(ctx);
+          case 'NotFound':
+            return notFound(ctx);
+          case 'TurnInProgress':
+            return ctx.reject(
+              409,
+              ErrorCode.TurnInProgress,
+              'A turn is running: change the sources when it ends.',
+              true,
+            );
+          case 'NothingToRun':
+            // An unknown (or another user's) source id: same answer as a missing one.
+            return notFound(ctx);
+        }
+      }),
+    );
+
   const patterns: ReadonlyArray<[RegExp, (...ids: string[]) => Handler]> = [
+    [new RegExp(`^sessions/(${ID})/sources$`), sources],
     [new RegExp(`^sessions/(${ID})$`), snapshot],
     [new RegExp(`^sessions/(${ID})/stream$`), stream],
     [new RegExp(`^sessions/(${ID})/turns$`), start],

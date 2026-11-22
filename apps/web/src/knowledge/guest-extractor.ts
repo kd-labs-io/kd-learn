@@ -13,6 +13,8 @@ import {
   projectKnowledge,
   projectSession,
   selectSessionSlice,
+  sessionDocumentSlice,
+  usedSourceRefs,
   sessionQueryText,
   type KnowledgeEvent,
   type KnowledgeGraph,
@@ -23,6 +25,8 @@ import { modelChoiceOf } from '../learn/model';
 export const KNOWLEDGE_LOCK = 'kd-learn:knowledge';
 /** Slice budget in demo mode, where the whole request is capped at 256 KiB (A8). */
 const DEMO_SLICE_BYTES = 32 * 1024;
+/** Documents budget in demo mode (A3). */
+const DEMO_DOCUMENT_BYTES = 32 * 1024;
 
 /** Waits for the lock (unlike the turn lock, which refuses): extractions queue, they never fail. */
 export type QueuedLock = <A>(name: string, run: () => Promise<A>) => Promise<A>;
@@ -121,6 +125,19 @@ export const makeGuestExtractor = (deps: GuestExtractorDeps) => {
     );
 
     const profile = await Effect.runPromise(storage.getProfile);
+    // The chunks the session was taught from (phase 4 A3); a deleted source is skipped.
+    const used = usedSourceRefs(log);
+    const documentSlice =
+      used.length === 0
+        ? []
+        : sessionDocumentSlice(
+            log,
+            await Effect.runPromise(
+              storage.readChunks([...new Set(used.map((ref) => ref.sourceId))]),
+            ),
+            // The demo request is capped at 256 KiB with the log (A3).
+            model.provider === 'demo' ? DEMO_DOCUMENT_BYTES : undefined,
+          );
     const outcome: ExtractOutcome | ClientError = await Effect.runPromise(
       extractSession(
         {
@@ -134,6 +151,7 @@ export const makeGuestExtractor = (deps: GuestExtractorDeps) => {
             model.provider === 'demo' ? { maxBytes: DEMO_SLICE_BYTES } : {},
           ),
           ...(profile === undefined || model.provider === 'demo' ? {} : { profile }),
+          ...(documentSlice.length === 0 ? {} : { documentSlice }),
         },
         {
           ...(deps.baseUrl === undefined ? {} : { baseUrl: deps.baseUrl }),

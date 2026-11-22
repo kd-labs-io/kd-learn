@@ -268,3 +268,48 @@ describe('runExtraction', () => {
     expect(fake.requests).toHaveLength(0);
   });
 });
+
+describe('runExtraction with documents', () => {
+  it('assigns documents only from the slice, and splits inherit them', async () => {
+    const withDocuments = {
+      propositions: extracted.propositions.map((p) => ({
+        ...p,
+        documents: p.key === 'sorted' ? ['D1', 'D9'] : p.key === 'two' ? ['[D2]', 'D2'] : [],
+      })),
+      edges: extracted.edges,
+    };
+    const { fake, exit } = run([ok(withDocuments), ok(audited), ok(merged)], {
+      documentSlice: [
+        {
+          sourceId: 'pdf1',
+          ordinal: 4,
+          title: 'Giáo trình',
+          text: 'Mảng phải sắp xếp.',
+          locator: { page: 2 },
+        },
+        {
+          sourceId: 'pdf1',
+          ordinal: 7,
+          title: 'Giáo trình',
+          text: 'O(log n).',
+          locator: { page: 3 },
+        },
+      ],
+    });
+    const result = await exit;
+    if (result._tag === 'Failure') throw new Error(String(result.cause));
+    expect(fake.requests[0]!.messages[0]!.content).toContain('[D1] Giáo trình, page 2:');
+    const sourcesOf = (text: string) =>
+      result.value.events.flatMap((e) =>
+        e._tag === 'PropositionAdded' && e.text === text ? [e.source.documents] : [],
+      );
+    expect(sourcesOf('Binary search runs in O(log n) time.')).toEqual([
+      [{ sourceId: 'pdf1', ordinal: 7 }],
+    ]);
+    const sourced = result.value.events.find((e) => e._tag === 'PropositionSourced');
+    expect(sourced?._tag === 'PropositionSourced' && sourced.source.documents).toEqual([
+      { sourceId: 'pdf1', ordinal: 4 },
+    ]);
+    expect(result.value.dropped).toContain('extractor document "D9": not in the slice');
+  });
+});
