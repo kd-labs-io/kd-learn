@@ -2,6 +2,7 @@
 export { defaultProfile, needsAgentTurn, resolveProfile } from './client.ts';
 export { runTurn, InvalidTurn, failureOf, modelName } from './turn.ts';
 export type { AgentOutput, FailureInfo, TurnParams } from './turn.ts';
+export type { FigureOptions } from './figures.ts';
 export { runSideChat } from './side-chat.ts';
 export type { SideChatParams } from './side-chat.ts';
 export { mainSystem, sideSystem, NO_INPUT } from './context.ts';

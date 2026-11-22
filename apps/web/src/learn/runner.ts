@@ -16,7 +16,13 @@
 // Every append is therefore checked with `projectSession` first; a batch that fails is dropped.
 import { Cause, Effect, Result, Stream } from 'effect';
 import { shouldAutoStart } from '@kd-learn/agent/client';
-import { streamTurn, type Frame, type ModelChoice, type TurnRequest } from '@kd-learn/api';
+import {
+  streamTurn,
+  type FigureFrame,
+  type Frame,
+  type ModelChoice,
+  type TurnRequest,
+} from '@kd-learn/api';
 import {
   canSkipStep,
   currentStep,
@@ -24,6 +30,7 @@ import {
   turnSourceSlice,
   type DomainEvent,
   type EventLog,
+  type FigureBody,
   type SourceSlice,
 } from '@kd-learn/core';
 import { StorageBusy, type StorageService } from '@kd-learn/storage/port';
@@ -111,6 +118,8 @@ const storageFailure = (error: unknown): UiFailure =>
 /** What the stream gave: the frames of one request. */
 interface Collected {
   readonly events: Array<DomainEvent>;
+  /** Figure bodies of the turn (phase 5 A1), written in the same batch as the events. */
+  readonly figures: Array<FigureBody>;
   error: UiFailure | undefined;
   done: boolean;
 }
@@ -133,8 +142,12 @@ export class SessionRunner {
   }
 
   /** Every write of this runner: the end of the session is seen in one place, whatever wrote it. */
-  private async append(storage: StorageService, events: ReadonlyArray<DomainEvent>) {
-    await appendBatch(storage, this.sessionId, events);
+  private async append(
+    storage: StorageService,
+    events: ReadonlyArray<DomainEvent>,
+    figures: ReadonlyArray<FigureBody> = [],
+  ) {
+    await appendBatch(storage, this.sessionId, events, figures);
     if (events.some((event) => event._tag === 'SessionCompleted')) {
       this.deps.onSessionCompleted?.(this.sessionId);
     }
@@ -368,7 +381,7 @@ export class SessionRunner {
         });
         return 'failed';
       }
-      await this.append(storage, batch);
+      await this.append(storage, batch, collected.figures);
     }
     if (collected.error !== undefined) {
       this.setMain({ live: undefined, failure: collected.error });
@@ -518,7 +531,7 @@ export class SessionRunner {
     request: TurnRequest,
     onFrame: (frame: Frame) => void,
   ): Promise<Collected | undefined> {
-    const collected: Collected = { events: [], error: undefined, done: false };
+    const collected: Collected = { events: [], figures: [], error: undefined, done: false };
     const stream = streamTurn(request, {
       ...(this.deps.baseUrl === undefined ? {} : { baseUrl: this.deps.baseUrl }),
       ...(this.deps.fetch === undefined ? {} : { fetch: this.deps.fetch }),
@@ -527,6 +540,7 @@ export class SessionRunner {
       Stream.runForEach(stream, (frame) =>
         Effect.sync(() => {
           if (frame._tag === 'event') collected.events.push(frame.event);
+          else if (frame._tag === 'figure') collected.figures.push(figureOfFrame(frame));
           else if (frame._tag === 'error') collected.error = frame.error;
           else if (frame._tag === 'done') collected.done = true;
           onFrame(frame);
@@ -538,6 +552,15 @@ export class SessionRunner {
 }
 
 class InvalidBatch extends Error {}
+
+/** A `figure` frame as a body to store: images come base64 encoded. */
+const figureOfFrame = (frame: FigureFrame): FigureBody => ({
+  figureId: frame.figureId,
+  body:
+    frame.encoding === 'text'
+      ? frame.body
+      : Uint8Array.from(atob(frame.body), (char) => char.charCodeAt(0)),
+});
 
 const unwrap = <A, E>(result: Result.Result<A, E>): A | undefined =>
   Result.isSuccess(result) ? result.success : undefined;
@@ -556,9 +579,10 @@ export async function appendBatch(
   storage: StorageService,
   sessionId: string,
   events: ReadonlyArray<DomainEvent>,
+  figures: ReadonlyArray<FigureBody> = [],
 ): Promise<void> {
   for (let attempt = 0; ; attempt++) {
-    const exit = await Effect.runPromiseExit(storage.appendEvents(sessionId, events));
+    const exit = await Effect.runPromiseExit(storage.appendEvents(sessionId, events, figures));
     if (exit._tag === 'Success') return;
     const error = Cause.squash(exit.cause);
     if (!(error instanceof StorageBusy) || attempt >= 3) throw error;

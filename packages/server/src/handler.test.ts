@@ -552,3 +552,85 @@ describe('endpoints and configuration', () => {
     expect(wire).toBe('event: done\ndata: {"_tag":"done","outcome":"completed"}\n\n');
   });
 });
+
+describe('POST /api/turns: figures (phase 5)', () => {
+  const teachingLog = (): Array<DomainEvent> => [
+    {
+      _tag: 'SessionCreated',
+      id: 'f1',
+      at: 1,
+      sessionId: 's1',
+      topic: 'Circles',
+      profile: defaultProfile,
+    },
+    { _tag: 'TurnStarted', id: 'f2', at: 1, turnId: 't0', input: '' },
+    {
+      _tag: 'AssessmentRecorded',
+      id: 'f3',
+      at: 1,
+      turnId: 't0',
+      level: 'beginner',
+      summary: 's',
+      strengths: [],
+      gaps: [],
+    },
+    { _tag: 'TurnCompleted', id: 'f4', at: 1, turnId: 't0', reason: 'stop' },
+    { _tag: 'TurnStarted', id: 'f5', at: 1, turnId: 't1', input: '' },
+    {
+      _tag: 'PlanCreated',
+      id: 'f6',
+      at: 1,
+      turnId: 't1',
+      plan: { nodes: [{ id: 'a', title: 'Radius', goal: 'Say what a radius is', dependsOn: [] }] },
+    },
+    { _tag: 'TurnCompleted', id: 'f7', at: 1, turnId: 't1', reason: 'stop' },
+    { _tag: 'TurnStarted', id: 'f8', at: 2, turnId: 't2', input: 'go' },
+  ];
+  const callTool =
+    (name: string, input: unknown): Run =>
+    (request) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const spec = request.tools?.find((t) => t.name === name);
+          if (spec === undefined) throw new Error(`No tool ${name}`);
+          const decoded = yield* Schema.decodeUnknownEffect(spec.input)(input).pipe(Effect.orDie);
+          const output = yield* spec
+            .run(decoded)
+            .pipe(
+              Effect.catch((error) => Effect.succeed(`error: ${String((error as Error).message)}`)),
+            );
+          return Stream.fromIterable<TurnEvent<never>>([
+            { _tag: 'ToolCall', id: 'c1', name, input },
+            { _tag: 'ToolResult', id: 'c1', output: String(output) },
+            { _tag: 'TextDelta', messageId: 'pm2', delta: 'Look.' },
+            { _tag: 'Usage', inputTokens: 1, outputTokens: 1 },
+            { _tag: 'Finish', reason: 'stop' },
+          ]);
+        }),
+      );
+
+  it('sends the body as a figure frame before the events', async () => {
+    const html = '<button>go</button><script>1</script>';
+    const d = deps(callTool('show_demo', { title: 'Demo', html, libraries: ['d3'] }));
+    const frames = await readFrames(
+      await handleTurns(post(mainRequest({ log: teachingLog() })), d),
+    );
+    const figure = frames.findIndex((f) => f._tag === 'figure');
+    expect(frames[figure]).toMatchObject({ _tag: 'figure', encoding: 'text', body: html });
+    expect(figure).toBeLessThan(frames.findIndex((f) => f._tag === 'event'));
+    const added = frames.flatMap((f) =>
+      f._tag === 'event' && f.event._tag === 'FigureAdded' ? [f.event] : [],
+    );
+    expect(added).toMatchObject([{ kind: 'html', libraries: ['d3'] }]);
+  });
+
+  it('refuses demo libraries when the admin turned the CDN off', async () => {
+    const d = deps(callTool('show_demo', { title: 'Demo', html: '<p>x</p>', libraries: ['d3'] }), {
+      figureCdn: async () => false,
+    });
+    const frames = await readFrames(
+      await handleTurns(post(mainRequest({ log: teachingLog() })), d),
+    );
+    expect(frames.some((f) => f._tag === 'figure')).toBe(false);
+  });
+});

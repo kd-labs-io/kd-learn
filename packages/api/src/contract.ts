@@ -181,7 +181,18 @@ export const DoneFrame = Schema.TaggedStruct('done', {
   outcome: Schema.Literals(['completed', 'failed']),
 });
 
-export const Frame = Schema.Union([DeltaFrame, EventFrame, ErrorFrame, DoneFrame]);
+/**
+ * The body of a figure of the turn (phase 5 A1), sent before the turn's `event` frames. Text kinds
+ * as they are, images as base64. The client writes bodies and events in one batch.
+ */
+export const FigureFrame = Schema.TaggedStruct('figure', {
+  figureId: Schema.NonEmptyString,
+  encoding: Schema.Literals(['text', 'base64']),
+  body: Schema.String,
+});
+export type FigureFrame = typeof FigureFrame.Type;
+
+export const Frame = Schema.Union([DeltaFrame, EventFrame, FigureFrame, ErrorFrame, DoneFrame]);
 export type Frame = typeof Frame.Type;
 
 /** An OpenAI-compatible endpoint the guest may pick. The base URL stays on the server. */
@@ -488,6 +499,8 @@ export const PublicConfig = Schema.Struct({
   registration: RegistrationMode,
   guestMode: Schema.Boolean,
   demoMode: Schema.Boolean,
+  /** Demos of the Teacher may load the pinned CDN libraries (phase 5 A5). */
+  figureCdn: Schema.Boolean,
 });
 export type PublicConfig = typeof PublicConfig.Type;
 
@@ -509,6 +522,7 @@ export const AdminConfig = Schema.Struct({
   registration: RegistrationMode,
   guestMode: Schema.Boolean,
   demoMode: Schema.Boolean,
+  figureCdn: Schema.Boolean,
   demoBudget: DemoBudget,
   /** The demo model from the environment, without its key; absent when none is set. */
   demoModel: Schema.optionalKey(Schema.String),
@@ -531,6 +545,7 @@ export const UpdateAdminConfigRequest = Schema.Struct({
   registration: Schema.optionalKey(RegistrationMode),
   guestMode: Schema.optionalKey(Schema.Boolean),
   demoMode: Schema.optionalKey(Schema.Boolean),
+  figureCdn: Schema.optionalKey(Schema.Boolean),
   demoBudgetLimit: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000_000)),
   ),

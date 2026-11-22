@@ -239,6 +239,53 @@ describe('account turns', () => {
     expect(t.fake.requests.at(-1)?.system).toContain('Phase: planning');
   });
 
+  it('stores the figures of a teaching turn and serves them to their owner only', async () => {
+    const assessment = { level: 'beginner', summary: 's', strengths: [], gaps: ['adding'] };
+    const plan = { nodes: [{ id: 'add', title: 'Add', goal: 'Add fractions', dependsOn: [] }] };
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect width="2" height="2"/></svg>';
+    const t = await setup([
+      say('Q1?'),
+      say('Q2?'),
+      say('Q3?'),
+      say('Q4?'),
+      callTool('submit_assessment', assessment, 'Thanks.'),
+      callTool('create_plan', plan, 'Here is the plan.'),
+      callTool('show_diagram', { kind: 'svg', title: 'Halves', source: svg }, 'See the halves.'),
+    ]);
+    await t.account('POST', `sessions/${t.sessionId}/turns`, { kind: 'auto' });
+    await t.idle();
+    for (const answer of ['a1', 'a2', 'a3', 'a4', 'teach me']) {
+      await t.account('POST', `sessions/${t.sessionId}/turns`, { kind: 'send', input: answer });
+      await t.idle();
+    }
+    const events = (await t.snapshot()).events.map((e) => e.event);
+    const added = events.find((e) => e._tag === 'FigureAdded') as Json | undefined;
+    expect(added).toMatchObject({ kind: 'svg', title: 'Halves', mime: 'image/svg+xml' });
+    const message = events.filter((e) => e._tag === 'MessageAppended').at(-1) as Json;
+    expect(String(message.content)).toContain(`[[figure:${String(added?.figureId)}]]`);
+
+    const got = await t.account('GET', `figures/${String(added?.figureId)}`);
+    expect(got.status).toBe(200);
+    expect(got.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(got.headers.get('content-security-policy')).toContain('sandbox');
+    expect(await got.text()).toBe(svg);
+
+    const other = await t.signUp('b@kd.test');
+    const foreign = await t.account(
+      'GET',
+      `figures/${String(added?.figureId)}`,
+      undefined,
+      undefined,
+      other,
+    );
+    expect(foreign.status).toBe(404);
+    expect((await t.account('GET', 'figures/nope')).status).toBe(404);
+    expect(
+      (await request(t.handlers.account, 'GET', `/api/account/figures/x`, undefined)).status,
+    ).toBe(401);
+  });
+
   it('runs a side turn next to a main turn, and refuses a second side turn', async () => {
     const gate = gated('Main', ' turn.');
     const side = gated('Side', ' answer.');

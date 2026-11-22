@@ -16,6 +16,8 @@ export const scrubFrame = (frame: Frame, secret: string | undefined): Frame => {
       return frame.event._tag === 'TurnFailed' || frame.event._tag === 'SideTurnFailed'
         ? { ...frame, event: { ...frame.event, message: redact(frame.event.message, secret) } }
         : frame;
+    case 'figure':
+      return frame.encoding === 'text' ? { ...frame, body: redact(frame.body, secret) } : frame;
     default:
       return frame;
   }

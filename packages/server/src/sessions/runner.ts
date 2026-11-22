@@ -15,7 +15,7 @@
 import { Cause, Effect, Exit, Fiber, Layer, Result, Stream } from 'effect';
 import { runSideChat, runTurn } from '@kd-learn/agent';
 import { activeProfile } from '../profile.ts';
-import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
+import type { AgentOutput, FigureOptions, InvalidTurn } from '@kd-learn/agent';
 import { shouldAutoStart } from '@kd-learn/agent/client';
 import type { AiPort, ModelRef } from '@kd-learn/ai/port';
 import type { Failure, ModelRole, RunningTurn, StartTurnRequest } from '@kd-learn/api';
@@ -27,7 +27,7 @@ import {
   projectSession,
   turnSourceSlice,
 } from '@kd-learn/core';
-import type { DomainEvent, EventLog, Session, SourceSlice } from '@kd-learn/core';
+import type { DomainEvent, EventLog, FigureBody, Session, SourceSlice } from '@kd-learn/core';
 import type { SessionSummary, StorageService } from '@kd-learn/storage/port';
 import type { ServerStorage } from '@kd-learn/storage/sqlite-node';
 import type { Logger } from '../handler.ts';
@@ -117,6 +117,8 @@ export interface RunnerDeps {
   readonly turnTimeoutMs?: number;
   /** Called after a batch with `SessionCompleted` is written, by a turn or a skip (phase 3 A3). */
   readonly onSessionCompleted?: (userId: string, sessionId: string) => void;
+  /** Figure tools of teaching turns (phase 5). Absent: none. */
+  readonly figures?: () => FigureOptions;
 }
 
 interface Live {
@@ -146,6 +148,8 @@ const unwrap = (log: EventLog): Session | undefined => {
 interface Collected {
   readonly events: ReadonlyArray<DomainEvent>;
   readonly error: Failure | undefined;
+  /** Bodies of the turn's figures (phase 5 A1), written with `events`. */
+  readonly figures?: ReadonlyArray<FigureBody>;
 }
 
 export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
@@ -184,8 +188,9 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     userId: string,
     sessionId: string,
     events: ReadonlyArray<DomainEvent>,
+    figures: ReadonlyArray<FigureBody> = [],
   ) => {
-    const result = Effect.runSync(storage.appendEvents(sessionId, events));
+    const result = Effect.runSync(storage.appendEvents(sessionId, events, figures));
     if (events.some((event) => event._tag === 'SessionCompleted')) {
       deps.onSessionCompleted?.(userId, sessionId);
     }
@@ -217,6 +222,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     key: string | undefined,
   ): Effect.Effect<Collected> => {
     const events: DomainEvent[] = [];
+    const figures: FigureBody[] = [];
     let error: Failure | undefined;
     return outputs.pipe(
       Stream.runForEach((output) =>
@@ -235,6 +241,9 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
             }
             case 'Event':
               events.push(output.event);
+              return;
+            case 'Figure':
+              figures.push(output.figure);
               return;
             case 'Error':
               error = output.error;
@@ -256,7 +265,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
                 retryable: true,
               },
             }
-          : { events, error },
+          : { events, error, figures },
       ),
       Effect.catchTag('InvalidTurn', (invalid) =>
         Effect.succeed<Collected>({
@@ -312,7 +321,16 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
       };
       batch = [closing(error)];
     }
-    if (batch.length > 0) appendSync(storage, userId, sessionId, batch);
+    // A text body holding the key is dropped with its event, never written (risk 19).
+    const leaks = (figure: FigureBody) =>
+      typeof figure.body === 'string' && redact(figure.body, key) !== figure.body;
+    const dropped = new Set((collected.figures ?? []).filter(leaks).map((f) => f.figureId));
+    if (dropped.size > 0) {
+      batch = batch.filter((e) => !(e._tag === 'FigureAdded' && dropped.has(e.figureId)));
+    }
+    const added = new Set(batch.flatMap((e) => (e._tag === 'FigureAdded' ? [e.figureId] : [])));
+    const figures = (collected.figures ?? []).filter((figure) => added.has(figure.figureId));
+    if (batch.length > 0) appendSync(storage, userId, sessionId, batch, figures);
     return error;
   };
 
@@ -427,6 +445,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
             model: current.model,
             newId,
             sourceSlice: sourceSliceOf(storage, current.log),
+            ...(deps.figures === undefined ? {} : { figures: deps.figures() }),
           }),
           live,
           entry,

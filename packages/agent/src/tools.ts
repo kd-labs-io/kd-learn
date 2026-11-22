@@ -46,8 +46,16 @@ const apply = (ctx: ToolContext, drafts: ReadonlyArray<Draft>) =>
     return projected.success;
   });
 
+/** Events that move the session forward. Figures (phase 5 A1) do not count. */
+const MOVES: ReadonlySet<DomainEvent['_tag']> = new Set([
+  'AssessmentRecorded',
+  'PlanCreated',
+  'StepCompleted',
+  'SessionCompleted',
+]);
+
 const alreadyMoved = (ctx: ToolContext) =>
-  ctx.pending.length > 0
+  ctx.pending.some((event) => MOVES.has(event._tag))
     ? fail('The lesson already moved forward in this turn. Continue the conversation instead.')
     : Effect.void;
 
