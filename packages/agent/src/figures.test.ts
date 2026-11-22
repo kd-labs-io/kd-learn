@@ -7,6 +7,9 @@ import { defaultProfile } from './profile.ts';
 import { historyForModel } from './sources.ts';
 import { collect, counterIds, eventsOf, fakeAi, type Action } from './testing.ts';
 import { runTurn, type AgentOutput } from './turn.ts';
+import type { FigureOptions, ImageGenerator } from './figures.ts';
+import { Effect } from 'effect';
+import { ImageRefused, ProviderError } from '@kd-learn/ai/port';
 
 const model: ModelRef = {
   provider: 'anthropic',
@@ -50,7 +53,7 @@ const teaching = (profile = defaultProfile) => {
   ];
   const play = async (
     script: ReadonlyArray<ReadonlyArray<Action>>,
-    figures: { cdn: boolean } | null = { cdn: true },
+    figures: FigureOptions | null = { cdn: true },
   ) => {
     const fake = fakeAi(script);
     log.push({ _tag: 'TurnStarted', id: newId(), at: 2, turnId: newId(), input: 'go' });
@@ -222,5 +225,109 @@ describe('figure tools', () => {
     const last = history.at(-1)?.content ?? '';
     expect(last).toContain('[figure: svg "A circle"]');
     expect(last).not.toContain('<svg');
+  });
+});
+
+describe('generate_image', () => {
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9]);
+  const generator = (
+    answer: 'ok' | 'refused' | 'failed' = 'ok',
+    calls: Array<string> = [],
+  ): ImageGenerator => ({
+    model: 'image-model',
+    generate: (prompt) => {
+      calls.push(prompt);
+      if (answer === 'refused') {
+        return Effect.fail(
+          new ImageRefused({ message: 'No.', usage: { inputTokens: 3, outputTokens: 2 } }),
+        );
+      }
+      if (answer === 'failed') {
+        return Effect.fail(
+          new ProviderError({
+            message: 'The image provider failed (HTTP 500).',
+            code: 'ProviderError',
+          }),
+        );
+      }
+      return Effect.succeed({
+        mime: 'image/jpeg',
+        bytes: JPEG,
+        usage: { inputTokens: 30, outputTokens: 1120 },
+      });
+    },
+  });
+  const call = {
+    call: 'generate_image',
+    input: { title: 'A cell', prompt: 'A plant cell, cutaway' },
+  };
+
+  it('is offered only with an image model and the profile allowing images', async () => {
+    const offered = async (figures: FigureOptions | null, profile = defaultProfile) => {
+      const t = teaching(profile);
+      const { fake } = await t.play([[{ say: 'Hi.' }]], figures);
+      return (fake.requests[0]?.tools ?? []).some((tool) => tool.name === 'generate_image');
+    };
+    expect(await offered({ cdn: true, image: generator() })).toBe(true);
+    expect(await offered({ cdn: true })).toBe(false);
+    expect(
+      await offered(
+        { cdn: true, image: generator() },
+        { ...defaultProfile, figures: { diagrams: true, demos: true, images: false } },
+      ),
+    ).toBe(false);
+  });
+
+  it('stores the image as a figure with its bytes, and records the image usage', async () => {
+    const t = teaching();
+    const { outputs, events, fake } = await t.play([[call, { say: 'Here it is.' }]], {
+      cdn: true,
+      image: generator(),
+    });
+    expect(fake.toolResults.every((r) => !r.startsWith('Error'))).toBe(true);
+    const figure = events.find((e) => e._tag === 'FigureAdded');
+    expect(figure).toMatchObject({
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: JPEG.length,
+      title: 'A cell',
+    });
+    expect(bodies(outputs)[0]?.body).toEqual(JPEG);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: 'UsageRecorded',
+        model: 'image-model',
+        inputTokens: 30,
+        outputTokens: 1120,
+      }),
+    );
+  });
+
+  it('allows one image per message, and calls the provider only once', async () => {
+    const t = teaching();
+    const calls: Array<string> = [];
+    const { events, fake } = await t.play([[call, call, { say: 'Done.' }]], {
+      cdn: true,
+      image: generator('ok', calls),
+    });
+    expect(calls).toHaveLength(1);
+    expect(events.filter((e) => e._tag === 'FigureAdded')).toHaveLength(1);
+    expect(fake.toolResults.at(-1)).toContain('already has an image');
+  });
+
+  it('a refusal records usage and no figure; a provider failure tells the model to go on', async () => {
+    for (const answer of ['refused', 'failed'] as const) {
+      const t = teaching();
+      const { events, fake } = await t.play([[call, { say: 'Without it, then.' }]], {
+        cdn: true,
+        image: generator(answer),
+      });
+      expect(events.some((e) => e._tag === 'FigureAdded')).toBe(false);
+      expect(fake.toolResults.at(-1)).toContain('Continue without the image');
+      expect(events.some((e) => e._tag === 'UsageRecorded' && e.model === 'image-model')).toBe(
+        answer === 'refused',
+      );
+      expect(events.some((e) => e._tag === 'TurnCompleted')).toBe(true);
+    }
   });
 });

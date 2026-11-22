@@ -7,7 +7,8 @@
   "exports": {
     "./port": "./src/port/index.ts",
     "./acp": "./src/acp/index.ts",
-    "./tanstack": "./src/tanstack/index.ts"
+    "./tanstack": "./src/tanstack/index.ts",
+    "./image": "./src/image/index.ts"
   },
   "scripts": {
     "typecheck": "tsc",

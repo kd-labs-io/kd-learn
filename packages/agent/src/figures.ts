@@ -1,8 +1,9 @@
 // Figure tools of the Teacher (plan hinh-va-demo.md A1, A3-A5). A figure tool queues a
 // `FigureAdded` event (metadata), its body and a marker; the turn loop puts the marker into the
 // text where the tool ran and releases events and bodies only when the turn completes.
-import { Clock, Effect, Schema } from 'effect';
+import { Clock, Effect, Result, Schema } from 'effect';
 import { tool, ToolError } from '@kd-learn/ai/port';
+import type { GeneratedImage, ImageAspect, ImageError } from '@kd-learn/ai/port';
 import {
   DemoLibraryId,
   FigureTitle,
@@ -21,6 +22,20 @@ import type { ToolContext } from './tools.ts';
 export interface FigureOptions {
   /** Demos may declare CDN libraries (admin switch). */
   readonly cdn: boolean;
+  /**
+   * The image model of this turn (`illustrator` role, plan A6). Absent: no `generate_image`. The
+   * server binds the model, the key and any budget; the tool only asks for one image.
+   */
+  readonly image?: ImageGenerator;
+}
+
+export interface ImageGenerator {
+  /** Model name, for `UsageRecorded`. */
+  readonly model: string;
+  readonly generate: (
+    prompt: string,
+    aspect: ImageAspect,
+  ) => Effect.Effect<GeneratedImage, ImageError>;
 }
 
 /** Queued by the figure tools during a turn. */
@@ -166,6 +181,81 @@ const showDemo = (ctx: ToolContext, queue: FigureQueue, options: FigureOptions) 
       }),
   });
 
+const ImageInput = Schema.Struct({
+  title: FigureTitle,
+  prompt: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2000)),
+  aspect: Schema.optionalKey(Schema.Literals(['square', 'landscape', 'portrait'])),
+});
+
+const imagesIn = (events: ReadonlyArray<DomainEvent>) =>
+  events.filter((event) => event._tag === 'FigureAdded' && event.kind === 'image').length;
+
+const generateImage = (ctx: ToolContext, queue: FigureQueue, image: ImageGenerator) =>
+  tool({
+    name: 'generate_image',
+    description: [
+      'Generate one illustration and show it to the learner at this point of your message. Costly and slow (several seconds): use it only when a realistic or artistic picture helps understanding (an organism, a place, a historical scene, a physical object), never for diagrams, charts, text or code (use show_diagram), and never for decoration.',
+      "prompt: a precise visual description in English, with no text to be drawn in the image. title: a short caption in the learner's language. aspect: square (default), landscape or portrait.",
+      `At most ${figureCaps.imagesPerTurn} image per message and ${figureCaps.imagesPerSession} per session.`,
+    ].join(' '),
+    input: ImageInput,
+    run: (input) =>
+      Effect.gen(function* () {
+        if (imagesIn(ctx.pending) >= figureCaps.imagesPerTurn) {
+          return yield* fail('This message already has an image. Continue in text.');
+        }
+        // Check the caps that `addFigure` checks too, before paying for an image.
+        if (figuresInTurn(ctx) >= figureCaps.perTurn) {
+          return yield* fail(
+            `This message already has ${figureCaps.perTurn} figures, the most allowed. Continue in text.`,
+          );
+        }
+        const projected = projectSession([...ctx.log, ...ctx.pending]);
+        const before = Result.isSuccess(projected)
+          ? projected.success.figures.filter((figure) => figure.kind === 'image').length
+          : 0;
+        if (before >= figureCaps.imagesPerSession) {
+          return yield* fail(
+            'This session has used all its images. Continue in text or with a diagram.',
+          );
+        }
+        const usage = (used: { inputTokens: number; outputTokens: number }) =>
+          Effect.gen(function* () {
+            if (used.inputTokens === 0 && used.outputTokens === 0) return;
+            ctx.pending.push({
+              _tag: 'UsageRecorded',
+              id: ctx.newId(),
+              at: yield* Clock.currentTimeMillis,
+              turnId: ctx.turnId,
+              model: image.model,
+              ...used,
+            });
+          });
+        const made = yield* image.generate(input.prompt, input.aspect ?? 'square').pipe(
+          Effect.catchTag('ImageRefused', (refused) =>
+            usage(refused.usage).pipe(
+              Effect.andThen(
+                fail(
+                  `The image model declined this prompt: ${refused.message} Continue without the image.`,
+                ),
+              ),
+            ),
+          ),
+          Effect.catchTag('ProviderError', (error) =>
+            fail(`The image could not be made: ${error.message} Continue without the image.`),
+          ),
+        );
+        yield* usage(made.usage);
+        yield* addFigure(
+          ctx,
+          queue,
+          { kind: 'image', title: input.title, mime: made.mime },
+          made.bytes,
+        );
+        return 'The image is shown to the learner where you called the tool. Refer to it briefly; do not describe it at length.';
+      }),
+  });
+
 /** Figure tools of a teaching turn, as the profile and the server allow. */
 export const figureTools = (
   ctx: ToolContext,
@@ -177,5 +267,8 @@ export const figureTools = (
   return [
     ...(profile.figures.diagrams ? [showDiagram(ctx, queue)] : []),
     ...(profile.figures.demos ? [showDemo(ctx, queue, options)] : []),
+    ...(profile.figures.images && options.image !== undefined
+      ? [generateImage(ctx, queue, options.image)]
+      : []),
   ];
 };

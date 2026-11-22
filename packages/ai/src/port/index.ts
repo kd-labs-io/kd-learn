@@ -92,3 +92,56 @@ export class AiPort extends Context.Service<
     readonly runTurn: <A = never>(request: TurnRequest<A>) => Stream.Stream<TurnEvent<A>, AiError>;
   }
 >()('@kd-learn/ai/AiPort') {}
+
+// ---------------------------------------------------------------------------------------------
+// Image port (phase 5 A6): "make one image from this prompt". Separate from `AiPort`: no stream, no
+// tools. Adapters call the provider over HTTP (`@kd-learn/ai/image`).
+
+/** Which image model serves a call. ACP and Anthropic have no image models. */
+export type ImageModelRef =
+  | { readonly provider: 'gemini'; readonly model: string; readonly apiKey: string }
+  | {
+      readonly provider: 'openai-compatible';
+      readonly model: string;
+      readonly apiKey: string;
+      readonly baseURL: string;
+    };
+
+export type ImageAspect = 'square' | 'landscape' | 'portrait';
+export type ImageMime = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export interface ImageRequest {
+  readonly model: ImageModelRef;
+  readonly prompt: string;
+  readonly aspect: ImageAspect;
+}
+
+export interface ImageUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+export interface GeneratedImage {
+  readonly mime: ImageMime;
+  readonly bytes: Uint8Array;
+  readonly usage: ImageUsage;
+}
+
+/**
+ * The provider answered without an image (a content filter). Not a failure of the call: usage is
+ * still counted. `message` is fixed or the model's own short refusal, never a key.
+ */
+export class ImageRefused extends Data.TaggedError('ImageRefused')<{
+  readonly message: string;
+  readonly usage: ImageUsage;
+}> {}
+
+export type ImageError = ProviderError | ImageRefused;
+
+export class ImagePort extends Context.Service<
+  ImagePort,
+  {
+    /** Interrupting the effect cancels the request. */
+    readonly generate: (request: ImageRequest) => Effect.Effect<GeneratedImage, ImageError>;
+  }
+>()('@kd-learn/ai/ImagePort') {}
