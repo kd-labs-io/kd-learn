@@ -65,8 +65,10 @@ export function useGuestSourceLibrary(mode: 'guest' | 'demo'): SourceLibrary {
     providers: providers.data ?? [],
     addPdf: async (file) => {
       if (file.size > MAX_PDF_BYTES) throw new Error(m.sources_pdf_too_large());
-      // Stored pending at once; the reading goes on in this tab, past this screen.
-      void guestSources.addPdf(file).catch(() => undefined);
+      // The row is pending from the start; this resolves once the tab has read it (the reading
+      // goes on past this screen). A refusal or a storage failure (quota) is shown.
+      const added = await guestSources.addPdf(file);
+      if (added._tag === 'Refused') throw new Error(added.message);
     },
     addNotes: async (files) =>
       (await guestSources.addNotes(files)).flatMap((r) =>

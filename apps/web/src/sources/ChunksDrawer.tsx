@@ -80,6 +80,7 @@ export function ChunksDrawer({
               description={locatorText(chunk.locator)}
               isSelected={focus === chunk.ordinal}
               data-chunk={chunk.ordinal}
+              {...(focus === chunk.ordinal ? { 'data-cited': 'true' } : {})}
               data-testid="source-chunk"
             />
           ))}

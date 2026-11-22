@@ -105,10 +105,22 @@ const structuredAnswer = (request: ChatRequest, input: string): unknown => {
   }
   if (fields.includes('propositions')) {
     const tag = tagOf(input);
+    // With a DOCUMENTS block (phase 4), the first claim comes from excerpt D1.
+    const documents = input.includes('[D1]') ? { a: ['D1'], b: [] } : undefined;
     return {
       propositions: [
-        { key: 'a', text: `Fake claim ${tag} builds on the basics.`, stepId: 'basics' },
-        { key: 'b', text: `Fake claim ${tag} states the basics.`, stepId: 'basics' },
+        {
+          key: 'a',
+          text: `Fake claim ${tag} builds on the basics.`,
+          stepId: 'basics',
+          ...(documents ? { documents: documents.a } : {}),
+        },
+        {
+          key: 'b',
+          text: `Fake claim ${tag} states the basics.`,
+          stepId: 'basics',
+          ...(documents ? { documents: documents.b } : {}),
+        },
       ],
       edges: [{ from: 'a', to: 'b', relation: 'requires', label: 'needs' }],
     };

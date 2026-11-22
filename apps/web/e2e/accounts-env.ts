@@ -2,4 +2,6 @@
 export const accountsPort = 4174;
 export const fakeModelPort = 4175;
 export const fakeSearchPort = 4176;
+// A server of its own that `restart.e2e.ts` kills and starts again.
+export const restartPort = 4177;
 export const E2E_ADMIN = { email: 'admin@e2e.test', password: 'admin-password-e2e' };

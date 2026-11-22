@@ -341,7 +341,11 @@ function Search({ token }: { token: string }) {
   });
   const update = useMutation({
     mutationFn: (change: UpdateAdminSearchRequest) => call((api) => api.updateAdminSearch(change)),
-    onSuccess: (next) => queryClient.setQueryData(keys.adminSearch(token), next),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(keys.adminSearch(token), next);
+      // The sources and settings screens offer what the server now allows.
+      await queryClient.invalidateQueries({ queryKey: ['search'] });
+    },
   });
   const change = (patch: UpdateAdminSearchRequest) =>
     update.mutateAsync(patch).then(() => undefined);

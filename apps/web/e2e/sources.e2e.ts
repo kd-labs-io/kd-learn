@@ -74,7 +74,11 @@ async function learnWithSource(page: Page, topic: string, title: string, url: Re
   const citation = page.getByTestId('citation').first();
   await expect(citation).toContainText(title);
   await citation.click();
-  await expect(page.getByTestId('source-chunk').first()).toBeVisible();
+  // The cited chunk is the marked one, scrolled into view.
+  const cited = page.locator('[data-testid="source-chunk"][data-cited="true"]');
+  await expect(cited).toHaveCount(1);
+  await expect(cited).toBeInViewport();
+  await expect(cited).toContainText('moon');
   await closeDrawer(page);
 
   // Detach from the lesson panel: the next turn has no excerpts, so no citation.
@@ -82,7 +86,25 @@ async function learnWithSource(page: Page, topic: string, title: string, url: Re
   await page.getByTestId('lesson-source').filter({ hasText: title }).click();
   await expect(page.getByTestId('lesson-sources-open')).toHaveText('Sources (0)');
   await closeDrawer(page);
-  await expect(page.getByTestId('lesson-sources-open')).toHaveText('Sources (0)');
+
+  // Finish the lesson: its claims carry the cited chunk, which opens from the graph.
+  await page.getByLabel('Your answer').fill('#assess');
+  await page.getByTestId('composer-send').click();
+  await expect(page.getByTestId('composer-input')).toBeEditable();
+  await expect(page.getByText('Basics').first()).toBeVisible();
+  await page.getByLabel('Your answer').fill('#done');
+  await page.getByTestId('composer-send').click();
+  await expect(page.getByTestId('composer-input')).toHaveCount(0);
+  await page.getByTestId('nav-home').click();
+  await page.getByTestId('nav-graph').click();
+  await page.getByTestId('graph-item').filter({ hasText: 'builds on the basics' }).click();
+  const document = page.getByTestId('graph-document');
+  await expect(document).toHaveText(title);
+  await document.click();
+  await expect(page.locator('[data-testid="source-chunk"][data-cited="true"]')).toContainText(
+    'moon',
+  );
+  await closeDrawer(page);
 }
 
 test('guest: notes and a web research become sources; a lesson cites them', async ({ page }) => {
