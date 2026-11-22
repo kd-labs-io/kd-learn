@@ -37,5 +37,5 @@ for _ in $(seq 60); do
 done
 [ -n "$url" ] || { echo "The tunnel did not start; see $db/tunnel.log" >&2; exit 1; }
 echo "Open on the phone: $url"
-echo "Checklist: plan/progress/phase-6.md, step 7. Ctrl-C to stop."
+echo "Checklist: plan/archive/phase-6.md, step 7. Ctrl-C to stop."
 wait "$server"
