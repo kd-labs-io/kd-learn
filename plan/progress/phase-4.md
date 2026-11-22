@@ -16,7 +16,7 @@
 | Bước 6: ingest PDF và ghi chú | Xong (2026-11-22). Tài khoản: route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker. Khách / demo: `apps/web/src/sources/` (ghi chú cắt ở client, PDF qua pdfjs trong trình duyệt, "bị ngắt" theo Web Lock). Test trình duyệt thật ở bước 9–10 |
 | Bước 7: dạy dựa trên nguồn | Xong (2026-11-22). Lát trong prompt (khối `<source>` không thoát được), `citations`, `sourceRefs`, `documents` của mệnh đề, `sourceSlice` / `documentSlice` của khách, gắn / gỡ nguồn của tài khoản |
 | Bước 8: research | Xong (2026-11-22): pipeline `runResearch`, vai `researcher`; `POST /api/research` (khách / demo, SSE, giới hạn theo địa chỉ, ngân sách demo), job `research` của tài khoản (sống qua khởi động lại, tự gắn vào buổi), client khách và tài khoản |
-| Bước 9: model và nguồn tìm kiếm giả cho e2e | Chưa bắt đầu |
+| Bước 9: model và nguồn tìm kiếm giả cho e2e | Xong (2026-11-22): SearXNG giả (`e2e/fake-searxng.ts`), model giả trả truy vấn và bản tóm tắt research; test mẫu `research.e2e.ts` (khách, API) |
 | Bước 10: giao diện | Chưa bắt đầu |
 | Bước 11: kiểm tiêu chí phase | Chưa bắt đầu |
 
@@ -125,3 +125,8 @@
 - **Client:** `researchWeb`, `searchOptions` (khách / demo); `createResearch` (tài khoản).
 - **Test thêm của bước 7:** `documentSlice` tới extractor, quá 64 KiB thì 413, tính vào trần 256 KiB của demo.
 - **Còn lại cho bước 9 / 10:** e2e bằng SearXNG giả; UI chọn nguồn và nút research.
+## Bước 9: thành phần giả cho e2e (2026-11-22)
+
+- `e2e/fake-searxng.ts` (cổng 4176): `GET /search?format=json` trả hai kết quả mỗi truy vấn, URL trên `.invalid` nên bộ tải trang của server hỏng ngay và giữ đoạn trích (không cần mạng); `#down` trong truy vấn trả 503; `GET /queries` liệt kê truy vấn đã nhận. Cả hai server e2e có `KD_SEARXNG_URL` trỏ tới nó.
+- `e2e/fake-openai.ts`: schema có `queries` thì trả `[câu hỏi, câu hỏi + " examples"]`; prompt có khối kết quả thì trả bản tóm tắt trích `[R1]`, `[R2]`.
+- `e2e/research.e2e.ts`: research của khách qua API (chỉ chromium), kiểm `search/options`, frame `result`, nhãn đã thành host, key không lộ, hai truy vấn tới SearXNG giả. 40 test chromium xanh.

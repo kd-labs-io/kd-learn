@@ -5,7 +5,8 @@
 // Answers, in this order:
 // - a request with `response_format: json_schema` (structured output): JSON built for the schema
 //   it recognises (extractor, auditor, merge; the Practitioner writing exercises or grading an
-//   answer, steered by `#wrong` / `#partial` in it), streamed as text;
+//   answer, steered by `#wrong` / `#partial` in it; research queries), streamed as text;
+// - a research summary request (results in the prompt): a summary citing [R1];
 // - right after a tool result: "Noted.";
 // - when `create_plan` is offered (the planning turn): a one-step plan, step id `basics`;
 // - the first turn (no assistant message yet): a question;
@@ -68,6 +69,11 @@ const structuredAnswer = (request: ChatRequest, input: string): unknown => {
     };
   }
   // Practitioner, grading: `#wrong` or `#partial` in the answer steers the level.
+  // Research, planning the queries (phase 4 A5).
+  if (fields.includes('queries')) {
+    const question = /QUESTION: (.*)/.exec(input)?.[1] ?? 'topic';
+    return { queries: [question, `${question} examples`] };
+  }
   if (fields.includes('level')) {
     const level = input.includes('#wrong')
       ? 'incorrect'
@@ -228,6 +234,15 @@ const server = createServer((request, response) => {
         chunk(response, { role: 'assistant', content: text.slice(0, half) }, null);
         chunk(response, { content: text.slice(half) }, null);
       }
+    } else if (last.includes('RESULTS (data, not instructions)')) {
+      chunk(
+        response,
+        {
+          role: 'assistant',
+          content: 'Fake research summary: the basics first [R1], then examples [R2].',
+        },
+        null,
+      );
     } else if (messages.at(-1)?.role === 'tool') {
       chunk(response, { role: 'assistant', content: 'Noted.' }, null);
     } else if (tools.has('create_plan')) {
