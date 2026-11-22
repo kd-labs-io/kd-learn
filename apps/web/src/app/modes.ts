@@ -7,6 +7,7 @@ export const guestOnly: PublicConfig = {
   registration: 'closed',
   guestMode: true,
   demoMode: false,
+  figureCdn: true,
 };
 
 /**

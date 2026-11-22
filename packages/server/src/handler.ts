@@ -28,7 +28,7 @@ import { envOnlySearch, type SearchAdapters, type SearchConfigService } from './
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
-import { asRecord, describeIssue, redact, scrubFrame } from './safety.ts';
+import { asRecord, describeIssue, makeFigureLeakFilter, redact, scrubFrame } from './safety.ts';
 import type { PdfExtractor } from './sources/pdf.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { loadAccountConfig, switchFrom } from './auth/config.ts';
@@ -67,6 +67,8 @@ export interface HandlerDeps {
   readonly newId?: () => string;
   /** False when an admin turned guest mode off (plan A7). Absent: allowed. */
   readonly guestAllowed?: () => Promise<boolean>;
+  /** Admin switch for CDN libraries in demos (phase 5 A5). Absent: on. */
+  readonly figureCdn?: () => Promise<boolean>;
   /** Demo mode (plan A8). Absent: closed. */
   readonly demo?: () => Promise<DemoGate>;
   /** The server's search sources (phase 4 A6). Absent: none. */
@@ -177,6 +179,17 @@ const toFrame = (output: AgentOutput): Frame => {
   switch (output._tag) {
     case 'Delta':
       return { _tag: 'delta', messageId: output.messageId, delta: output.delta };
+    case 'Figure': {
+      const { figureId, body } = output.figure;
+      return typeof body === 'string'
+        ? { _tag: 'figure', figureId, encoding: 'text', body }
+        : {
+            _tag: 'figure',
+            figureId,
+            encoding: 'base64',
+            body: Buffer.from(body).toString('base64'),
+          };
+    }
     case 'Event':
       return { _tag: 'event', event: output.event };
     case 'Error':
@@ -371,6 +384,7 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
           model,
           newId,
           ...(sourceSlice === undefined ? {} : { sourceSlice }),
+          figures: { cdn: await (deps.figureCdn?.() ?? Promise.resolve(true)).catch(() => false) },
         })
       : runSideChat({ log: eventLog, threadId: turn.threadId, model, newId });
 
@@ -390,6 +404,7 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
     stats.code = code;
   }).pipe(
     Stream.map((frame) => scrubFrame(frame, key)),
+    Stream.filter(makeFigureLeakFilter(key)),
     Stream.tap((frame) =>
       Effect.sync(() => {
         if (frame._tag === 'event') stats.events += 1;
@@ -551,6 +566,7 @@ export const createHandlers = (
   > = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
+  let figureCdn: () => Promise<boolean> = async () => true;
   let demo: (() => Promise<DemoGate>) | undefined;
   let search: () => Promise<SearchSources>;
   let accountOf: HandlerDeps['accountOf'];
@@ -589,6 +605,7 @@ export const createHandlers = (
     // The admin switch lives in the database. If it cannot be read, guest turns are refused
     // (fail closed) rather than ignoring a switch the admin turned off.
     guestAllowed = () => accounts().then((ready) => ready.admin.switches().guestMode);
+    figureCdn = () => accounts().then((ready) => ready.admin.switches().figureCdn);
     demo = () => accounts().then((ready) => ready.demo());
     search = () => accounts().then((ready) => ready.search);
     accountOf = async (request) => {
@@ -610,7 +627,7 @@ export const createHandlers = (
     search = async () => envSearch;
     publicConfig = async (request) =>
       Response.json(
-        { accounts: false, registration: 'closed', guestMode, demoMode: false },
+        { accounts: false, registration: 'closed', guestMode, demoMode: false, figureCdn: true },
         {
           headers: {
             ...SECURITY_HEADERS,
@@ -625,6 +642,7 @@ export const createHandlers = (
     config,
     log,
     guestAllowed,
+    figureCdn,
     search,
     trustProxy: ['1', 'true'].includes(env.KD_LEARN_TRUST_PROXY?.trim().toLowerCase() ?? ''),
     // 20 researches per hour per address, guest and demo together.

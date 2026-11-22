@@ -72,6 +72,7 @@ export const makeAdmin = (
     registration: auth.registrationMode(),
     guestMode: bool(read('guestMode'), defaults.guestMode),
     demoMode: bool(read('demoMode'), defaults.demoMode),
+    figureCdn: bool(read('figureCdn'), true),
   });
   const acpAgents = (): ReadonlyArray<AcpAgent> => {
     const stored = read('acpAgents');
@@ -141,6 +142,7 @@ export const makeAdmin = (
         }
         if (change.guestMode !== undefined) q.put.run('guestMode', String(change.guestMode));
         if (change.demoMode !== undefined) q.put.run('demoMode', String(change.demoMode));
+        if (change.figureCdn !== undefined) q.put.run('figureCdn', String(change.figureCdn));
         if (change.demoBudgetLimit !== undefined) demo.budget.setLimit(change.demoBudgetLimit);
         if (change.demoBudgetPeriod !== undefined) demo.budget.setPeriod(change.demoBudgetPeriod);
         if (change.acpAgents !== undefined) {

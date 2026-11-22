@@ -22,6 +22,27 @@ export const scrubFrame = (frame: Frame, secret: string | undefined): Frame => {
 };
 
 /**
+ * Drops figures whose text body holds `secret`, with their `FigureAdded` (risk 19). Redacting the
+ * body instead would break its byte count, and the client would refuse the whole batch. Bodies come
+ * before events, so one pass is enough. Stateful: one per stream.
+ */
+export const makeFigureLeakFilter = (secret: string | undefined) => {
+  const dropped = new Set<string>();
+  return (frame: Frame): boolean => {
+    if (frame._tag === 'figure' && frame.encoding === 'text') {
+      if (redact(frame.body, secret) === frame.body) return true;
+      dropped.add(frame.figureId);
+      return false;
+    }
+    return !(
+      frame._tag === 'event' &&
+      frame.event._tag === 'FigureAdded' &&
+      dropped.has(frame.event.figureId)
+    );
+  };
+};
+
+/**
  * Describes a decoding failure by paths and kinds only, never by the offending values: a value
  * can be the key itself (a key sent where a number is expected).
  */

@@ -12,7 +12,7 @@
 | Bước 2: spike Teacher vẽ hình với Haiku (C3) | Chưa làm |
 | Bước 3: spike sinh ảnh (C4) | Xong (2026-11-22). Adapter gọi thẳng HTTP (không dùng `generateImage` của TanStack AI 1.4); Gemini `gemini-3.1-flash-lite-image` (JPEG, 6 s, 0,4 MB, $0,034) và endpoint tương thích OpenAI `/images/generations`. Xem ghi chú bước 3 |
 | Bước 4: hình trong `core` và `storage` | Xong (2026-11-22). `figure.ts` trong `core`, `FigureAdded`, `Session.figures`; bảng `figures` (khách v5, server v10), `appendEvents(..., figures)` kiểm lô, `readFigure`. Xem ghi chú bước 4 |
-| Bước 5: tool hình trong `agent`, hợp đồng, route | Chưa làm |
+| Bước 5: tool hình trong `agent`, hợp đồng, route | Xong (2026-11-22). Tool `show_diagram` (svg, mermaid) và `show_demo` chỉ ở pha dạy; frame `figure` trước các frame `event`; công tắc admin `figureCdn`; `GET /api/account/figures/:id`. Xem ghi chú bước 5 |
 | Bước 6: khung sandbox và hiện hình trong `ui` | Chưa làm |
 | Bước 7: model giả cho e2e | Chưa làm |
 | Bước 8: giao diện, demo thù địch | Chưa làm |
@@ -60,3 +60,14 @@
 - **`storage`:** `appendEvents(sessionId, events, figures?)` ghi nội dung hình trong cùng transaction; `checkFigures` (trong `sqlite/codec.ts`, dùng ở cả ba driver) từ chối cả lô khi hình thiếu nội dung, nội dung không có `FigureAdded`, sai kích thước, sai loại (chữ / blob) hay vượt trần. `readFigure(figureId)`. Bảng `figures (owner, figure_id, session_id, text, blob)`.
 - **Lệch plan A1:** không có `listFigures` và `FiguresChanged`: hình đi cùng lô event nên `SessionChanged` là đủ, siêu dữ liệu đã có trong log.
 - **Test:** bộ test port (memory, sqlite-node) thêm ghi / đọc chữ và blob, năm kiểu lô sai không ghi gì; hai người dùng không đọc được hình của nhau. Driver WASM kiểm bằng Playwright ở bước 8.
+
+## Bước 5: tool hình trong agent, hợp đồng, route (2026-11-22)
+
+- **`agent`** (`figures.ts`): `show_diagram` (svg phải là một `<svg>` trọn vẹn, không `<script>`; mermaid không rỗng) và `show_demo` (`html`, `libraries?`; từ chối `<script src>`, từ chối thư viện khi CDN tắt). Bỏ code fence. Kiểm trần mỗi lượt và trần kích thước trước khi xếp hàng. Dấu `[[figure:id]]` chèn vào chữ khi kết quả tool về; lúc xong lượt xoá dấu lạ (`keepKnownFigureMarkers`). Tool chỉ có ở pha dạy, lọc theo `profile.figures`; `TurnParams.figures` vắng thì không có tool nào. Lịch sử gửi model thay dấu bằng `[figure: kind "title"]`. `alreadyMoved` không tính `FigureAdded`.
+- **Hợp đồng:** frame `figure {figureId, encoding: text|base64, body}`, gửi trước các frame `event` của lượt. `PublicConfig.figureCdn`, `AdminConfig.figureCdn`, `UpdateAdminConfigRequest.figureCdn` (mặc định bật). Không làm `GET /api/figures/options` riêng: `GET /api/config` đã đủ cho công tắc CDN; cờ ảnh thêm ở bước 9.
+- **Server:** khách / demo nhận `figures: { cdn }` từ công tắc admin (đọc lỗi thì tắt CDN). Runner tài khoản gom body và ghi cùng lô qua `appendEvents(..., figures)`; body chữ chứa khoá bị bỏ cùng event của nó (rủi ro 19); frame `figure` của khách được redact như event. `GET /api/account/figures/:id`: chỉ chủ sở hữu (người khác 404), `text/plain` hoặc `application/octet-stream`, CSP `sandbox; default-src 'none'`, cache immutable.
+- **Web (khách):** `runner.ts` gom frame `figure` (base64 → bytes) và ghi cùng lô event.
+- **Lọt khoá (rủi ro 19):** body chữ chứa khoá bị bỏ cùng `FigureAdded` của nó, ở cả runner tài khoản và luồng frame của khách (`makeFigureLeakFilter`). Không redact: đổi body làm sai `bytes`, client sẽ từ chối cả lô.
+- **ACP:** tool hình là `tool()` thường; adapter ACP chạy mọi tool trong tiến trình và phát `ToolCall` / `ToolResult` (test `runs kd-learn tools in-process` trong `packages/ai`), nên dấu hình chèn như với TanStack. Không có `ToolResult` thì dấu được nối vào cuối lượt.
+- **Test:** agent 46; server: frame `figure` trước event, CDN tắt thì demo có thư viện bị từ chối, tài khoản lưu hình và chỉ chủ đọc được, hình chứa khoá không được ghi, bộ lọc frame; web: runner khách ghi body chữ và base64 cùng lô.
+

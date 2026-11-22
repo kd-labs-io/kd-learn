@@ -37,6 +37,14 @@ export const PromptKey = Schema.Literals([
 ]);
 export type PromptKey = typeof PromptKey.Type;
 
+/** Which figure tools the Teacher gets (phase 5 A1). Absent in a profile: all on. */
+export const FigureSettings = Schema.Struct({
+  diagrams: Schema.Boolean,
+  demos: Schema.Boolean,
+  images: Schema.Boolean,
+});
+export type FigureSettings = typeof FigureSettings.Type;
+
 export const TeachingProfile = Schema.Struct({
   /** Stable id so a session can say which profile it was started with. */
   id: Schema.NonEmptyString,
@@ -60,6 +68,8 @@ export const TeachingProfile = Schema.Struct({
     researchQueries: Schema.optionalKey(Schema.NonEmptyString),
     researchSummary: Schema.optionalKey(Schema.NonEmptyString),
   }),
+  /** Phase 5: figure tools. Absent: the default profile's. */
+  figures: Schema.optionalKey(FigureSettings),
 });
 export type TeachingProfile = typeof TeachingProfile.Type;
 
@@ -67,6 +77,7 @@ export type TeachingProfile = typeof TeachingProfile.Type;
 export type ResolvedProfile = TeachingProfile & {
   readonly name: string;
   readonly prompts: Readonly<Record<PromptKey, string>>;
+  readonly figures: FigureSettings;
 };
 
 // Limits of a profile a person saves (phase 3 A2). Only for saving: the event schema above stays
@@ -102,5 +113,6 @@ export const SavedProfile = Schema.Struct({
     researchQueries: Schema.optionalKey(Prompt),
     researchSummary: Schema.optionalKey(Prompt),
   }),
+  figures: Schema.optionalKey(FigureSettings),
 });
 export type SavedProfile = typeof SavedProfile.Type;

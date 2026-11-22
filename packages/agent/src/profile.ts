@@ -109,6 +109,7 @@ export const defaultProfile: ResolvedProfile = {
     researchQueries,
     researchSummary,
   },
+  figures: { diagrams: true, demos: true, images: true },
 };
 
 /**
@@ -119,4 +120,5 @@ export const resolveProfile = (profile: TeachingProfile): ResolvedProfile => ({
   ...profile,
   name: profile.name ?? profile.id,
   prompts: { ...defaultProfile.prompts, ...profile.prompts },
+  figures: profile.figures ?? defaultProfile.figures,
 });

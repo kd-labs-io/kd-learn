@@ -4,6 +4,7 @@
 // a label outside the slice is removed. A label only means something within its own turn: when old
 // messages go back to the model, their labels become the source title, so they never mix with the
 // numbers of a new slice. Pure.
+import { describeFigureMarkers } from '@kd-learn/core';
 import type { Citation, HistoryMessage, Session, SourceSlice } from '@kd-learn/core';
 
 const LABEL = /\[S(\d{1,3})\]/g;
@@ -64,7 +65,16 @@ export const resolveCitations = (
  * History for the model: in old teacher messages, `[S<n>]` becomes `[source: <title>]` (the title of
  * the cited source, if it is still attached).
  */
-export const historyForModel = (session: Session): ReadonlyArray<HistoryMessage> =>
+export const historyForModel = (session: Session): ReadonlyArray<HistoryMessage> => {
+  const figures = new Map(session.figures.map((figure) => [figure.figureId, figure]));
+  return withCitationTitles(session).map((message) =>
+    message.role === 'assistant' && message.content.includes('[[figure:')
+      ? { ...message, content: describeFigureMarkers(message.content, figures) }
+      : message,
+  );
+};
+
+const withCitationTitles = (session: Session): ReadonlyArray<HistoryMessage> =>
   session.history.map((message) => {
     if (message.role !== 'assistant' || message.citations === undefined) return message;
     const titles = new Map(session.sources.map((s) => [s.sourceId, s.title]));

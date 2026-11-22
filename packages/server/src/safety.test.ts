@@ -1,7 +1,7 @@
 import { Result, Schema } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { TurnRequest } from '@kd-learn/api';
-import { describeIssue, redact, scrubFrame } from './safety.ts';
+import { describeIssue, makeFigureLeakFilter, redact, scrubFrame } from './safety.ts';
 
 const KEY = 'sk-ant-SECRET-key-0123456789';
 
@@ -41,5 +41,32 @@ describe('describeIssue', () => {
     const message = Result.isFailure(result) ? describeIssue(result.failure) : '';
     expect(message).toMatch(/^Invalid request: /);
     expect(message).not.toContain(KEY);
+  });
+});
+
+describe('makeFigureLeakFilter', () => {
+  it('drops a text figure holding the key and its FigureAdded, keeps the others', () => {
+    const keep = makeFigureLeakFilter(KEY);
+    const added = (figureId: string) =>
+      ({
+        _tag: 'event',
+        event: {
+          _tag: 'FigureAdded',
+          id: `e-${figureId}`,
+          at: 1,
+          turnId: 't',
+          figureId,
+          kind: 'svg',
+          title: 'x',
+          mime: 'image/svg+xml',
+          bytes: 3,
+        },
+      }) as const;
+    expect(
+      keep({ _tag: 'figure', figureId: 'bad', encoding: 'text', body: `<svg>${KEY}</svg>` }),
+    ).toBe(false);
+    expect(keep({ _tag: 'figure', figureId: 'ok', encoding: 'text', body: '<svg/>' })).toBe(true);
+    expect(keep(added('bad'))).toBe(false);
+    expect(keep(added('ok'))).toBe(true);
   });
 });

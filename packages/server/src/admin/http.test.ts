@@ -87,6 +87,7 @@ describe('admin switches', () => {
       registration: 'open',
       guestMode: true,
       demoMode: false,
+      figureCdn: true,
       demoBudget: { limit: 0, period: 'day', used: 0 },
       acpAgents: [],
       acpModels: {},
@@ -108,6 +109,7 @@ describe('admin switches', () => {
       registration: 'open',
       guestMode: false,
       demoMode: false,
+      figureCdn: true,
     });
     await call(t.handlers.admin, 'PUT', '/api/admin/config', t.admin, { guestMode: true });
     expect((await guestTurn(t.handlers)).status).toBe(200);
@@ -129,6 +131,7 @@ describe('admin switches', () => {
       guestMode: false,
       // The switch is on, but there is no demo model and no budget: demo cannot run.
       demoMode: false,
+      figureCdn: true,
     });
     const bad = make({ KD_LEARN_GUEST_MODE: 'maybe' });
     expect((await call(bad.handlers.login, 'POST', '/api/auth/login', undefined, {})).status).toBe(
@@ -146,6 +149,7 @@ describe('admin switches', () => {
       registration: 'closed',
       guestMode: false,
       demoMode: false,
+      figureCdn: true,
     });
   });
 });

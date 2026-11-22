@@ -6,8 +6,23 @@
 import { Clock, Data, Effect, Result, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import type { AiError, ModelRef, TurnEvent } from '@kd-learn/ai/port';
-import { findInterruptedTurn, projectSession } from '@kd-learn/core';
-import type { DomainEvent, EventLog, FinishReason, Session, SourceSlice } from '@kd-learn/core';
+import {
+  figureMarker,
+  findInterruptedTurn,
+  keepKnownFigureMarkers,
+  projectSession,
+} from '@kd-learn/core';
+import type {
+  DomainEvent,
+  EventLog,
+  FigureBody,
+  FinishReason,
+  Session,
+  SourceSlice,
+} from '@kd-learn/core';
+import { figureTools, makeFigureQueue } from './figures.ts';
+import type { FigureOptions } from './figures.ts';
+import { resolveProfile } from './profile.ts';
 import { mainSystem, toMessages } from './context.ts';
 import { historyForModel, resolveCitations, sourceBlock } from './sources.ts';
 import { toolsFor } from './tools.ts';
@@ -23,6 +38,11 @@ export interface FailureInfo {
 export type AgentOutput =
   /** Live text of the assistant message `messageId`. Display only; not stored. */
   | { readonly _tag: 'Delta'; readonly messageId: string; readonly delta: string }
+  /**
+   * The body of a figure of this turn (phase 5 A1). Comes just before the events, only when the turn
+   * completes; the writer stores it in the same batch as its `FigureAdded`.
+   */
+  | { readonly _tag: 'Figure'; readonly figure: FigureBody }
   /** A complete domain event. The client appends it to its log. */
   | { readonly _tag: 'Event'; readonly event: DomainEvent }
   /** The turn failed. Follows the `TurnFailed` / `SideTurnFailed` event that records it. */
@@ -43,6 +63,8 @@ export interface TurnParams {
   readonly maxSteps?: number;
   /** Chunks of the attached sources for this turn (phase 4 A3), already cut to the byte budget. */
   readonly sourceSlice?: SourceSlice;
+  /** Figure tools the server allows (phase 5). Absent: the Teacher gets none. */
+  readonly figures?: FigureOptions;
 }
 
 /** Name used in `UsageRecorded`. */
@@ -75,7 +97,13 @@ export interface RunCollector {
   readonly finish: () => FinishReason;
 }
 
-export const makeCollector = (): RunCollector => {
+/**
+ * `takeMarkers` (phase 5 A1): figure ids whose marker goes into the text when the tool result that
+ * produced them arrives, so the figure sits where the model called the tool.
+ */
+export const makeCollector = (
+  takeMarkers: () => ReadonlyArray<string> = () => [],
+): RunCollector => {
   let text = '';
   let lastSource: string | undefined;
   let inputTokens = 0;
@@ -100,6 +128,13 @@ export const makeCollector = (): RunCollector => {
         case 'Finish':
           finish = event.reason;
           return [];
+        case 'ToolResult': {
+          const ids = takeMarkers();
+          if (ids.length === 0) return [];
+          const delta = ids.map((id) => `\n\n${figureMarker(id)}\n\n`).join('');
+          text += delta;
+          return [delta];
+        }
         default:
           return [];
       }
@@ -151,7 +186,9 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
       const ai = yield* AiPort;
 
       const ctx: ToolContext = { log: params.log, turnId, newId: params.newId, pending: [] };
-      const collector = makeCollector();
+      const figures = makeFigureQueue();
+      const takeMarkers = () => figures.markers.splice(0);
+      const collector = makeCollector(takeMarkers);
       const messageId = params.newId();
       const agent = session.state._tag === 'Probing' ? 'prober' : 'teacher';
       const stamp = (at: number) => ({ id: params.newId(), at });
@@ -164,7 +201,12 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
           system:
             references === '' ? mainSystem(session) : `${mainSystem(session)}\n\n${references}`,
           messages: toMessages([...historyForModel(session), { role: 'user', content: input }]),
-          tools: toolsFor(session, ctx),
+          tools: [
+            ...toolsFor(session, ctx),
+            ...(session.state._tag === 'Teaching'
+              ? figureTools(ctx, figures, resolveProfile(session.profile), params.figures)
+              : []),
+          ],
           maxSteps: params.maxSteps ?? 6,
         })
         .pipe(
@@ -194,7 +236,15 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
 
       const completed = Stream.unwrap(
         Effect.map(Clock.currentTimeMillis, (at) => {
-          const { content: text, citations } = resolveCitations(collector.text(), slice);
+          // Markers of figures whose tool result never came through go at the end.
+          const late = takeMarkers()
+            .map((id) => `\n\n${figureMarker(id)}`)
+            .join('');
+          const known = new Set(figures.bodies.map((body) => body.figureId));
+          const { content: text, citations } = resolveCitations(
+            keepKnownFigureMarkers(`${collector.text()}${late}`, known),
+            slice,
+          );
           const events: Array<DomainEvent> = [
             ...(text.trim() === ''
               ? []
@@ -222,6 +272,7 @@ export const runTurn = (params: TurnParams): Stream.Stream<AgentOutput, InvalidT
             },
           ];
           return fromIterable<AgentOutput>([
+            ...figures.bodies.map((figure): AgentOutput => ({ _tag: 'Figure', figure })),
             ...events.map((event): AgentOutput => ({ _tag: 'Event', event })),
             { _tag: 'Done', outcome: 'completed' },
           ]);

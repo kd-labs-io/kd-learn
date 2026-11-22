@@ -178,6 +178,7 @@ export const initAccounts = async (
     ai,
     log: options.log,
     onSessionCompleted: extractions.sessionCompleted,
+    figures: () => ({ cdn: admin.switches().figureCdn }),
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
   late.sessions = sessions;

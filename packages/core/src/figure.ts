@@ -86,6 +86,28 @@ export const DemoLibraryId = Schema.Literals(['d3', 'chart.js', 'matter-js']);
 export const demoLibrary = (id: string): DemoLibrary | undefined =>
   demoLibraries.find((library) => library.id === id);
 
+/**
+ * Color tokens a figure may use (`var(--kd-<name>)`), filled from the app theme at display time so
+ * figures follow theme changes (plan A3, A8).
+ */
+export const figureColorTokens = [
+  'fg',
+  'bg',
+  'muted',
+  'accent',
+  'border',
+  'cat-1',
+  'cat-2',
+  'cat-3',
+  'cat-4',
+  'cat-5',
+  'cat-6',
+] as const;
+export type FigureColorToken = (typeof figureColorTokens)[number];
+
+/** The tokens as the model is told about them. */
+export const figureColorList = figureColorTokens.map((name) => `--kd-${name}`).join(', ');
+
 /** Metadata of one figure, as the log holds it. */
 export const FigureInfo = Schema.Struct({
   figureId: FigureId,
