@@ -33,7 +33,8 @@ test('account: duplicate the default profile, edit a prompt, and a new session s
   await expect(page.getByTestId('who')).toHaveText(email);
 
   // A connection to the fake model for every role.
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('connection-provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('connection-endpoint').click();

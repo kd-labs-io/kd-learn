@@ -75,7 +75,8 @@ test('guest: a finished session shows up on the graph screen by itself', async (
   const key = `slow-extract-guest-${unique()}-0123456789`;
   await page.goto('/');
   await page.getByTestId('choose-guest').click();
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('endpoint').click();
@@ -101,7 +102,8 @@ test('account: a finished session shows up on the graph screen by itself', async
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('who')).toHaveText(email);
 
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('connection-provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('connection-endpoint').click();

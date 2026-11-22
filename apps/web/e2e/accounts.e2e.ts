@@ -36,7 +36,8 @@ async function register(page: Page): Promise<string> {
 /** Adds a connection to the fake model and gives every role to it. Returns the key. */
 async function connectFakeModel(page: Page): Promise<string> {
   const key = `key-${unique()}-0123456789`;
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('connection-provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('connection-endpoint').click();

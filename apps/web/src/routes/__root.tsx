@@ -22,7 +22,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-      { title: 'kd-learn' },
+      { title: 'KD Learn' },
     ],
     // Dev only: Start renders its own HTML, so the StyleX Vite plugin cannot add
     // its dev stylesheet. Production builds put StyleX CSS in the main bundle.

@@ -2,7 +2,21 @@ import { astryxStylex } from '@astryxdesign/build/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseEnv } from 'node:util';
 import { defineConfig, type Plugin } from 'vite';
+
+// `pnpm dev`: read the repo-root .env (the same file Docker Compose reads), so the dev server gets
+// KD_LEARN_* (secret key, admin, provider keys) without sourcing it by hand. Variables already set
+// in the shell win. Builds never read it: the deployed server gets its env from Compose.
+const loadRootEnv = () => {
+  const file = fileURLToPath(new URL('../../.env', import.meta.url));
+  if (!existsSync(file)) return;
+  for (const [key, value] of Object.entries(parseEnv(readFileSync(file, 'utf8')))) {
+    process.env[key] ??= value;
+  }
+};
 
 // One config, two outputs (plan 2.4):
 // - default: SSR server for Docker (`.output/`)
@@ -39,29 +53,35 @@ const katexWoff2Only = (): Plugin => ({
   },
 });
 
-export default defineConfig({
-  server: { port: 3000 },
-  // Read by the root route: the SPA shell is prerendered in the base locale (see __root.tsx).
-  define: { 'import.meta.env.VITE_KD_SPA': JSON.stringify(spa ? '1' : '') },
-  plugins: [
-    katexWoff2Only(),
-    tanstackStart(
-      spa
-        ? { spa: { enabled: true, prerender: { outputPath: '/index.html', crawlLinks: false } } }
-        : {},
-    ),
-    // pdfjs-dist is loaded by path in a worker thread (server PDF extraction, phase 4 A4), so the
-    // bundler cannot see it: trace it next to the server output.
-    ...(spa
-      ? []
-      : [
-          nitro({
-            traceDeps: ['pdfjs-dist*', ...(acp ? ['@agentclientprotocol/claude-agent-acp*'] : [])],
-          }),
-        ]),
-    // StyleX for kd-learn components; splits Astryx and product CSS into layers.
-    ...astryx(),
-    // React's plugin must come after Start's.
-    react(),
-  ],
+export default defineConfig(({ command }) => {
+  if (command === 'serve') loadRootEnv();
+  return {
+    server: { port: 3000 },
+    // Read by the root route: the SPA shell is prerendered in the base locale (see __root.tsx).
+    define: { 'import.meta.env.VITE_KD_SPA': JSON.stringify(spa ? '1' : '') },
+    plugins: [
+      katexWoff2Only(),
+      tanstackStart(
+        spa
+          ? { spa: { enabled: true, prerender: { outputPath: '/index.html', crawlLinks: false } } }
+          : {},
+      ),
+      // pdfjs-dist is loaded by path in a worker thread (server PDF extraction, phase 4 A4), so the
+      // bundler cannot see it: trace it next to the server output.
+      ...(spa
+        ? []
+        : [
+            nitro({
+              traceDeps: [
+                'pdfjs-dist*',
+                ...(acp ? ['@agentclientprotocol/claude-agent-acp*'] : []),
+              ],
+            }),
+          ]),
+      // StyleX for kd-learn components; splits Astryx and product CSS into layers.
+      ...astryx(),
+      // React's plugin must come after Start's.
+      react(),
+    ],
+  };
 });
