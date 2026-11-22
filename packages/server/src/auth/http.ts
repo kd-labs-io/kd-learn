@@ -21,6 +21,7 @@ import {
   type ServerStorage,
 } from '@kd-learn/storage/sqlite-node';
 import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
+import { makeJobRunner, type JobRunner } from '../jobs/runner.ts';
 import { makeExtractionJobs, type ExtractionJobs } from '../knowledge/jobs.ts';
 import { makePracticeService, type PracticeService } from '../practice/account.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
@@ -47,6 +48,7 @@ export interface Accounts {
   readonly settings: SettingsService;
   readonly sessions: SessionRunner;
   /** Extraction jobs of account sessions (phase 3 A3). */
+  readonly jobs: JobRunner;
   readonly extractions: ExtractionJobs;
   /** Practice on the knowledge log (phase 3 A7). */
   readonly practice: PracticeService;
@@ -110,8 +112,11 @@ export const initAccounts = async (
     acp: options.acp ?? lazyAcp!.layer,
     maxConcurrent: admin.acpMaxConcurrent,
   });
-  const extractions = makeExtractionJobs({ storage, settings, ai, log: options.log });
-  // No job survives a restart (A3): attempts left open by the last process are interrupted.
+  const jobs = makeJobRunner({ database, log: options.log });
+  const extractions = makeExtractionJobs({ storage, settings, ai, log: options.log, jobs });
+  // Background jobs survive a restart (phase 4 A1): take over the rows of the last process, then
+  // close the extraction attempts left open without a job.
+  jobs.resume();
   extractions.recoverInterrupted(storage.extractionOwners());
   const sessions = makeSessionRunner({
     storage,
@@ -135,6 +140,7 @@ export const initAccounts = async (
     auth,
     settings,
     sessions,
+    jobs,
     extractions,
     practice,
     admin,
