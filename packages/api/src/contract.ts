@@ -624,3 +624,50 @@ export type ExtractionList = typeof ExtractionList.Type;
 /** `POST /api/account/knowledge/extractions`: extract now, or retry (202, then the list changes). */
 export const ExtractSessionRequest = Schema.Struct({ sessionId: Schema.NonEmptyString });
 export type ExtractSessionRequest = typeof ExtractSessionRequest.Type;
+// Search sources of the server (phase 4 A6).
+
+export const ADMIN_SEARCH_PATH = '/api/admin/search';
+export const SEARCH_OPTIONS_PATH = '/api/search/options';
+
+export const SearchProvider = Schema.Literals(['searxng', 'exa']);
+export type SearchProvider = typeof SearchProvider.Type;
+
+/** `GET /api/admin/search`. The Exa key never leaves the server: only whether one is set. */
+export const AdminSearchConfig = Schema.Struct({
+  searxng: Schema.Struct({
+    /** `KD_SEARXNG_URL` is set: SearXNG can be turned on. */
+    configured: Schema.Boolean,
+    enabled: Schema.Boolean,
+  }),
+  exa: Schema.Struct({
+    hasKey: Schema.Boolean,
+    keyLast4: Schema.optionalKey(Schema.String),
+    enabled: Schema.Boolean,
+  }),
+  /** What guests may use: only the server's own SearXNG, or nothing (A6). */
+  guest: Schema.Literals(['searxng', 'off']),
+  /** What demo research uses; each search counts in the demo budget (A9). */
+  demo: Schema.Literals(['searxng', 'exa', 'off']),
+});
+export type AdminSearchConfig = typeof AdminSearchConfig.Type;
+
+/** `PUT /api/admin/search`: only the fields given change. `exaKey: null` removes the key. */
+export const UpdateAdminSearchRequest = Schema.Struct({
+  searxngEnabled: Schema.optionalKey(Schema.Boolean),
+  exaEnabled: Schema.optionalKey(Schema.Boolean),
+  exaKey: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(512), Schema.isTrimmed()),
+    ),
+  ),
+  guest: Schema.optionalKey(Schema.Literals(['searxng', 'off'])),
+  demo: Schema.optionalKey(Schema.Literals(['searxng', 'exa', 'off'])),
+});
+export type UpdateAdminSearchRequest = typeof UpdateAdminSearchRequest.Type;
+
+/**
+ * `GET /api/search/options`: the search sources usable in the caller's mode, the first being the
+ * default. With a token: the account's; `?mode=demo`: the demo's; otherwise the guest's.
+ */
+export const SearchOptions = Schema.Struct({ providers: Schema.Array(SearchProvider) });
+export type SearchOptions = typeof SearchOptions.Type;

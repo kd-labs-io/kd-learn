@@ -19,10 +19,12 @@ import {
   EndpointsResponse,
   ErrorCode,
   MAX_SOURCE_SLICE_BYTES,
+  SearchOptions,
   TurnRequest,
   encodeFrame,
 } from '@kd-learn/api';
-import type { Failure, Frame, ModelChoice } from '@kd-learn/api';
+import type { Failure, Frame, ModelChoice, SearchProvider } from '@kd-learn/api';
+import { envOnlySearch, type SearchAdapters, type SearchConfigService } from './search/config.ts';
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
@@ -38,7 +40,7 @@ import {
   type Accounts,
 } from './auth/http.ts';
 import type { AuthOptions } from './auth/service.ts';
-import { makeRouteKit } from './routes.ts';
+import { bearerToken, makeRouteKit } from './routes.ts';
 import { makeSettingsHandler } from './settings/http.ts';
 import { handleExtract } from './knowledge/extract-route.ts';
 import { makePracticeHandler } from './practice/guest.ts';
@@ -65,7 +67,45 @@ export interface HandlerDeps {
   readonly guestAllowed?: () => Promise<boolean>;
   /** Demo mode (plan A8). Absent: closed. */
   readonly demo?: () => Promise<DemoGate>;
+  /** The server's search sources (phase 4 A6). Absent: none. */
+  readonly search?: () => Promise<SearchSources>;
+  /** The signed-in user of a bearer token: `undefined` no token, `null` a bad one. */
+  readonly accountOf?: (request: Request) => Promise<{ readonly id: string } | null | undefined>;
 }
+
+/** What a guest or demo route needs of the search config. */
+export type SearchSources = Pick<SearchConfigService, 'providers' | 'service'>;
+
+/** `GET /api/search/options` (phase 4 A6): sources usable in the caller's mode, no key. */
+export const handleSearchOptions = async (
+  request: Request,
+  deps: HandlerDeps,
+): Promise<Response> => {
+  const cors = corsHeaders(request, deps.config);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (request.method !== 'GET') {
+    return failureResponse(405, ErrorCode.MethodNotAllowed, 'Use GET.', false, cors);
+  }
+  const answer = (providers: ReadonlyArray<SearchProvider>) =>
+    Response.json(Schema.encodeSync(SearchOptions)({ providers }), {
+      headers: { ...SECURITY_HEADERS, 'cache-control': 'no-store', ...cors },
+    });
+  const search = deps.search === undefined ? undefined : await deps.search().catch(() => undefined);
+  if (search === undefined) return answer([]);
+  const user = request.headers.has('authorization')
+    ? await (deps.accountOf?.(request) ?? Promise.resolve(null)).catch(() => null)
+    : undefined;
+  if (user === null) {
+    return failureResponse(401, ErrorCode.Unauthorized, 'Sign in again.', false, cors);
+  }
+  if (user !== undefined) return answer(search.providers('account'));
+  if (new URL(request.url).searchParams.get('mode') === 'demo') {
+    const gate = await (deps.demo?.() ?? Promise.resolve({ _tag: 'Disabled' as const }));
+    return answer(gate._tag === 'Ready' ? search.providers('demo') : []);
+  }
+  const allowed = await (deps.guestAllowed?.() ?? Promise.resolve(true)).catch(() => false);
+  return answer(allowed ? search.providers('guest') : []);
+};
 
 const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8}){0,3}$/;
 
@@ -414,6 +454,8 @@ export interface Handlers extends AccountHandlers {
   readonly admin: Handler;
   /** `GET /api/config`, public. */
   readonly config: Handler;
+  /** `GET /api/search/options`, public (phase 4 A6). */
+  readonly searchOptions: Handler;
 }
 
 export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
@@ -426,6 +468,8 @@ export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
   readonly turnTimeoutMs?: number;
   /** The ACP adapter for account turns. Default: loaded on the first ACP turn. Tests pass a fake. */
   readonly acp?: Layer.Layer<AiPort>;
+  /** Search adapters; tests pass fakes. */
+  readonly searchAdapters?: SearchAdapters;
 }
 
 /** Wraps a handler so an unexpected throw becomes a fixed 500, never a message with request data. */
@@ -484,6 +528,7 @@ export const createHandlers = (
       practice: broken,
       endpoints: broken,
       config: broken,
+      searchOptions: broken,
       ...accountsBroken,
     };
   }
@@ -491,11 +536,15 @@ export const createHandlers = (
   // Accounts are optional: a bad account variable breaks only the account routes, and the guest
   // routes keep working with the environment defaults. The database opens on the first request
   // that needs it.
-  let accountRoutes: Omit<Handlers, 'turns' | 'extract' | 'practice' | 'endpoints' | 'config'> =
-    accountsBroken;
+  let accountRoutes: Omit<
+    Handlers,
+    'turns' | 'extract' | 'practice' | 'endpoints' | 'config' | 'searchOptions'
+  > = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
   let demo: (() => Promise<DemoGate>) | undefined;
+  let search: () => Promise<SearchSources>;
+  let accountOf: HandlerDeps['accountOf'];
   try {
     const accountConfig = loadAccountConfig(env);
     let ready: Promise<Accounts> | undefined;
@@ -509,6 +558,8 @@ export const createHandlers = (
         ...(options.database ? { database: options.database } : {}),
         ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
         ...(options.auth ? { auth: options.auth } : {}),
+        searxngUrl: config.searxngUrl,
+        ...(options.searchAdapters ? { searchAdapters: options.searchAdapters } : {}),
       }).catch((error: unknown) => {
         log({
           event: 'accounts.unavailable',
@@ -530,6 +581,12 @@ export const createHandlers = (
     // (fail closed) rather than ignoring a switch the admin turned off.
     guestAllowed = () => accounts().then((ready) => ready.admin.switches().guestMode);
     demo = () => accounts().then((ready) => ready.demo());
+    search = () => accounts().then((ready) => ready.search);
+    accountOf = async (request) => {
+      const token = bearerToken(request);
+      if (token === undefined) return null;
+      return (await accounts()).auth.authenticate(token) ?? null;
+    };
   } catch (error) {
     configFailed(error);
     const guestMode = (() => {
@@ -540,6 +597,8 @@ export const createHandlers = (
       }
     })();
     guestAllowed = async () => guestMode;
+    const envSearch = envOnlySearch(config.searxngUrl, options.searchAdapters);
+    search = async () => envSearch;
     publicConfig = async (request) =>
       Response.json(
         { accounts: false, registration: 'closed', guestMode, demoMode: false },
@@ -557,7 +616,9 @@ export const createHandlers = (
     config,
     log,
     guestAllowed,
+    search,
     ...(demo === undefined ? {} : { demo }),
+    ...(accountOf === undefined ? {} : { accountOf }),
   };
 
   const wrap = (handler: Handler) => safely(handler, log);
@@ -567,6 +628,7 @@ export const createHandlers = (
     practice: wrap(makePracticeHandler(deps)),
     endpoints: wrap((request) => handleEndpoints(request, deps)),
     config: wrap(publicConfig),
+    searchOptions: wrap((request) => handleSearchOptions(request, deps)),
     register: wrap(accountRoutes.register),
     login: wrap(accountRoutes.login),
     logout: wrap(accountRoutes.logout),
