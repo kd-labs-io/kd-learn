@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 5 (hình và demo, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 5 (quyết định nền, các bước, câu hỏi spike, như [archive/nguon-hoc.md](archive/nguon-hoc.md) của phase 4): sơ đồ SVG / Mermaid, demo HTML trong iframe sandbox, tool sinh ảnh. Bắt đầu làm thì tạo `progress/phase-5.md`. Việc còn mở từ phase 4 ghi ở cuối phần "Bước 11" của [archive/phase-4.md](archive/phase-4.md).
+Phase 5 (hình và demo, [mục 4](04-phases.md)): đang làm, plan phần chính ở [hinh-va-demo.md](hinh-va-demo.md), tiến độ ở [progress/phase-5.md](progress/phase-5.md). Bước hiện tại: bước 0–3 (spike khung sandbox, SVG / Mermaid, Teacher vẽ hình với Haiku, sinh ảnh), làm song song được.
