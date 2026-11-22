@@ -66,7 +66,7 @@ export const lexicalSimilarity = (a: ReadonlySet<string>, b: ReadonlySet<string>
 };
 
 /** UTF-8 length of a string, without TextEncoder (core imports no platform API). */
-const utf8Length = (text: string): number => {
+export const utf8Length = (text: string): number => {
   let bytes = 0;
   for (const char of text) {
     const code = char.codePointAt(0)!;

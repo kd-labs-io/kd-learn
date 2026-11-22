@@ -9,3 +9,5 @@ export * from './practice.ts';
 export * from './profile.ts';
 export * from './session.ts';
 export * from './slice.ts';
+export * from './source.ts';
+export * from './source-schema.ts';

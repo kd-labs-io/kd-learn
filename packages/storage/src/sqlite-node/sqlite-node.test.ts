@@ -216,6 +216,33 @@ describe('sqlite-node: two users', () => {
     expect((await Effect.runPromise(bob.readKnowledge)).map((e) => e.id)).toEqual(['b1', 'a1']);
   });
 
+  it("neither reads, writes nor deletes another user's sources", async () => {
+    const { alice, bob } = await setup();
+    const info = {
+      sourceId: 'doc',
+      kind: 'note' as const,
+      title: 'Doc',
+      origin: 'a.md',
+      createdAt: 1,
+    };
+    await Effect.runPromise(
+      alice.createSource({ state: 'pending', info, file: new Uint8Array([1]) }),
+    );
+    expect(await Effect.runPromise(bob.listSources)).toEqual([]);
+    expect(await Effect.runPromise(bob.getSource('doc'))).toBeUndefined();
+    expect(await Effect.runPromise(bob.readSourceFile('doc'))).toBeUndefined();
+    const chunks = [{ ordinal: 0, text: 'Bob text', locator: {} }];
+    expect((await Effect.runPromiseExit(bob.completeSource('doc', chunks)))._tag).toBe('Failure');
+    expect(
+      (await Effect.runPromiseExit(bob.failSource('doc', { code: 'x', message: '' })))._tag,
+    ).toBe('Failure');
+    await Effect.runPromise(bob.deleteSource('doc'));
+    // The same id is free for Bob: ids are per owner.
+    await Effect.runPromise(bob.createSource({ state: 'ready', info, chunks }));
+    expect(await Effect.runPromise(alice.readChunks(['doc']))).toEqual([]);
+    expect((await Effect.runPromise(alice.getSource('doc')))?.state).toBe('pending');
+  });
+
   it('does not store guest settings', async () => {
     const { alice } = await setup();
     expect(await Effect.runPromise(alice.getSettings)).toBeUndefined();

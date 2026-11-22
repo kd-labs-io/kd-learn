@@ -44,6 +44,41 @@ export const knowledgeEventsTable: ReadonlyArray<string> = [
      BEGIN SELECT RAISE(ABORT, 'knowledge events are append-only'); END`,
 ];
 
+/**
+ * DDL of learning sources (plan nguon-hoc.md A2): not events, so rows change (state) and are
+ * deleted with their source. `owner` as for the knowledge log. The original file is kept only until
+ * ingest ends, to run it again after an interruption.
+ */
+export const sourcesTables: ReadonlyArray<string> = [
+  `CREATE TABLE sources (
+     owner TEXT NOT NULL,
+     source_id TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     title TEXT NOT NULL,
+     origin TEXT NOT NULL,
+     state TEXT NOT NULL CHECK (state IN ('pending', 'ready', 'failed')),
+     failure TEXT,
+     bytes INTEGER NOT NULL,
+     chunk_count INTEGER NOT NULL,
+     created_at INTEGER NOT NULL,
+     PRIMARY KEY (owner, source_id)
+   ) WITHOUT ROWID`,
+  `CREATE TABLE source_chunks (
+     owner TEXT NOT NULL,
+     source_id TEXT NOT NULL,
+     ordinal INTEGER NOT NULL,
+     text TEXT NOT NULL,
+     locator TEXT NOT NULL,
+     PRIMARY KEY (owner, source_id, ordinal)
+   ) WITHOUT ROWID`,
+  `CREATE TABLE source_files (
+     owner TEXT NOT NULL,
+     source_id TEXT NOT NULL,
+     bytes BLOB NOT NULL,
+     PRIMARY KEY (owner, source_id)
+   ) WITHOUT ROWID`,
+];
+
 /** The only owner of a guest database (one person per local DB). */
 export const guestOwner = 'guest';
 
@@ -67,6 +102,8 @@ export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
   ],
   // v3: knowledge log (phase 3 step 2).
   [...knowledgeEventsTable],
+  // v4: learning sources (phase 4 step 4).
+  [...sourcesTables],
 ];
 
 /** The schema version this build of the code expects. */

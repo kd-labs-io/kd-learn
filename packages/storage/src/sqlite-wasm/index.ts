@@ -7,6 +7,7 @@ import { Effect, Queue, Stream } from 'effect';
 import type { EventLog, KnowledgeLog } from '@kd-learn/core';
 import {
   KnowledgeConflict,
+  SourceConflict,
   StorageBusy,
   StorageFailure,
   StorageUnavailable,
@@ -25,9 +26,15 @@ import {
   summarize,
   toEventRow,
   toKnowledgeRow,
+  checkChunks,
+  checkNewSourceInfo,
+  fromChunkRow,
+  fromSourceRow,
+  toChunkRow,
+  type SourceRow,
 } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
-import type { AppendReply, Operation, Response, WireSession } from './protocol.ts';
+import type { AppendReply, Operation, Response, WireSession, WireStoredChunk } from './protocol.ts';
 
 export interface WasmStorageOptions {
   /** Database file name in OPFS. */
@@ -92,6 +99,8 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
       call.reject(
         new KnowledgeConflict({ expectedLastSeq: reply.expectedLastSeq, lastSeq: reply.lastSeq }),
       );
+    } else if (reply.kind === 'sourceConflict') {
+      call.reject(new SourceConflict({ message: reply.message }));
     } else {
       call.reject(
         reply.kind === 'unavailable'
@@ -135,6 +144,26 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     emit(change);
     channel?.postMessage(change);
   };
+
+  /** A worker call that may also fail with `SourceConflict`. */
+  const callSource = <T>(operation: Operation) =>
+    Effect.tryPromise({
+      try: () => send<T>(operation),
+      catch: (error) =>
+        error instanceof SourceConflict ||
+        error instanceof StorageBusy ||
+        error instanceof StorageFailure ||
+        error instanceof StorageUnavailable
+          ? error
+          : new StorageFailure({ message: error instanceof Error ? error.message : String(error) }),
+    });
+  const sourcesChanged = Effect.tap(() => Effect.sync(() => committed({ _tag: 'SourcesChanged' })));
+  const checked = <T>(work: () => T) =>
+    Effect.try({
+      try: work,
+      catch: (error) =>
+        new StorageFailure({ message: error instanceof Error ? error.message : String(error) }),
+    });
 
   /** Runs a worker call as an Effect, mapping any thrown value to a typed storage error. */
   const call = <T>(operation: Operation) =>
@@ -280,6 +309,82 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
         Effect.flatMap((payload) => call<void>({ op: 'putProfile', payload, at: Date.now() })),
         Effect.tap(() => Effect.sync(() => committed({ _tag: 'ProfileChanged' }))),
       ),
+
+    createSource: (source) =>
+      checked(() => {
+        const info = checkNewSourceInfo(source.info);
+        const bytes = source.state === 'ready' ? checkChunks(source.chunks) : 0;
+        return { info, bytes };
+      }).pipe(
+        Effect.flatMap(({ info, bytes }) =>
+          call<void>({
+            op: 'createSource',
+            row: {
+              source_id: info.sourceId,
+              kind: info.kind,
+              title: info.title,
+              origin: info.origin,
+              state: source.state,
+              bytes,
+              chunk_count: source.state === 'ready' ? source.chunks.length : 0,
+              created_at: info.createdAt,
+            },
+            chunks: source.state === 'ready' ? source.chunks.map(toChunkRow) : [],
+            file: source.state === 'pending' ? source.file : undefined,
+          }),
+        ),
+        sourcesChanged,
+      ),
+
+    completeSource: (sourceId, chunks, options) =>
+      checked(() => checkChunks(chunks)).pipe(
+        Effect.flatMap((bytes) =>
+          callSource<void>({
+            op: 'completeSource',
+            sourceId,
+            chunks: chunks.map(toChunkRow),
+            bytes,
+            title: options?.title,
+          }),
+        ),
+        sourcesChanged,
+      ),
+
+    failSource: (sourceId, failure) =>
+      callSource<void>({ op: 'failSource', sourceId, failure: JSON.stringify(failure) }).pipe(
+        sourcesChanged,
+      ),
+
+    retrySource: (sourceId) =>
+      callSource<void>({ op: 'retrySource', sourceId }).pipe(sourcesChanged),
+
+    listSources: call<SourceRow[]>({ op: 'listSources' }).pipe(
+      Effect.flatMap((rows) => checked(() => rows.map(fromSourceRow))),
+    ),
+
+    getSource: (sourceId) =>
+      call<SourceRow | undefined>({ op: 'getSource', sourceId }).pipe(
+        Effect.flatMap((row) =>
+          checked(() => (row === undefined ? undefined : fromSourceRow(row))),
+        ),
+      ),
+
+    readSourceFile: (sourceId) => call<Uint8Array | undefined>({ op: 'readSourceFile', sourceId }),
+
+    readChunks: (sourceIds) =>
+      call<WireStoredChunk[]>({ op: 'readChunks', sourceIds }).pipe(
+        Effect.flatMap((rows) =>
+          checked(() =>
+            rows.map((row) => ({
+              sourceId: row.sourceId,
+              title: row.title,
+              chunk: fromChunkRow(row),
+            })),
+          ),
+        ),
+      ),
+
+    deleteSource: (sourceId) => call<void>({ op: 'deleteSource', sourceId }).pipe(sourcesChanged),
 
     changes: Stream.callback<StorageChange>((queue) =>
       Effect.acquireRelease(

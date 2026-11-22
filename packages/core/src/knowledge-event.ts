@@ -2,6 +2,7 @@
 // holds the graph of every session and, from step 6, the practice results. Plain JSON, like the
 // session events, but a separate union: the two logs live in different tables and never mix.
 import { Schema } from 'effect';
+import { SourceChunkRef } from './source-schema.ts';
 import {
   ExerciseAnswer,
   ExerciseContent,
@@ -35,6 +36,8 @@ const Label = Schema.String.check(Schema.isMaxLength(200));
 export const PropositionSource = Schema.Struct({
   sessionId: Schema.NonEmptyString,
   stepId: Schema.optionalKey(StepId),
+  /** Chunks of the session's sources the proposition comes from (phase 4 A3). */
+  documents: Schema.optionalKey(Schema.Array(SourceChunkRef)),
 });
 export type PropositionSource = typeof PropositionSource.Type;
 

@@ -7,7 +7,15 @@ import wasmUrl from '@journeyapps/wa-sqlite/dist/wa-sqlite.wasm?url';
 import * as SQLite from '@journeyapps/wa-sqlite';
 import { OPFSCoopSyncVFS } from '@journeyapps/wa-sqlite/src/examples/OPFSCoopSyncVFS.js';
 import { guestOwner, migrations, schemaVersion } from '../sqlite/schema.ts';
-import type { AppendReply, Request, Response, WireEvent, WireSession } from './protocol.ts';
+import type {
+  AppendReply,
+  Request,
+  Response,
+  WireChunk,
+  WireEvent,
+  WireSession,
+  WireStoredChunk,
+} from './protocol.ts';
 
 type Row = Record<string, unknown>;
 type Sqlite3 = ReturnType<typeof SQLite.Factory>;
@@ -17,6 +25,8 @@ let handle = 0;
 let vfs: { close(): Promise<void> } | undefined;
 
 class Unavailable extends Error {}
+
+class SourceStateError extends Error {}
 
 class Conflict extends Error {
   constructor(
@@ -162,6 +172,139 @@ async function list(): Promise<WireSession[]> {
   }));
 }
 
+const insertChunks = async (sourceId: string, chunks: ReadonlyArray<WireChunk>) => {
+  for (const chunk of chunks) {
+    await run(
+      'INSERT INTO source_chunks (owner, source_id, ordinal, text, locator) VALUES (?, ?, ?, ?, ?)',
+      [guestOwner, sourceId, chunk.ordinal, chunk.text, chunk.locator],
+    );
+  }
+};
+
+const sourceRow = async (sourceId: string) =>
+  (await run('SELECT * FROM sources WHERE owner = ? AND source_id = ?', [guestOwner, sourceId]))[0];
+
+async function handleSources(request: Request): Promise<unknown> {
+  switch (request.op) {
+    case 'createSource':
+      return transaction(async () => {
+        const { row } = request;
+        await run(
+          `INSERT INTO sources (owner, source_id, kind, title, origin, state, failure, bytes, chunk_count, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+          [
+            guestOwner,
+            row.source_id,
+            row.kind,
+            row.title,
+            row.origin,
+            row.state,
+            row.bytes,
+            row.chunk_count,
+            row.created_at,
+          ],
+        );
+        await insertChunks(row.source_id, request.chunks);
+        if (request.file !== undefined) {
+          await run('INSERT INTO source_files (owner, source_id, bytes) VALUES (?, ?, ?)', [
+            guestOwner,
+            row.source_id,
+            request.file,
+          ]);
+        }
+      });
+    case 'completeSource':
+      return transaction(async () => {
+        const row = await sourceRow(request.sourceId);
+        if (row?.state !== 'pending') throw new SourceStateError('The source is not pending.');
+        await run('DELETE FROM source_chunks WHERE owner = ? AND source_id = ?', [
+          guestOwner,
+          request.sourceId,
+        ]);
+        await insertChunks(request.sourceId, request.chunks);
+        await run(
+          `UPDATE sources SET state = 'ready', failure = NULL, bytes = ?, chunk_count = ?,
+                  title = COALESCE(?, title) WHERE owner = ? AND source_id = ?`,
+          [
+            request.bytes,
+            request.chunks.length,
+            request.title ?? null,
+            guestOwner,
+            request.sourceId,
+          ],
+        );
+        await run('DELETE FROM source_files WHERE owner = ? AND source_id = ?', [
+          guestOwner,
+          request.sourceId,
+        ]);
+      });
+    case 'failSource':
+      return transaction(async () => {
+        const row = await sourceRow(request.sourceId);
+        if (row?.state !== 'pending') throw new SourceStateError('The source is not pending.');
+        await run(
+          "UPDATE sources SET state = 'failed', failure = ? WHERE owner = ? AND source_id = ?",
+          [request.failure, guestOwner, request.sourceId],
+        );
+      });
+    case 'retrySource':
+      return transaction(async () => {
+        const row = await sourceRow(request.sourceId);
+        if (row === undefined || row.state === 'ready') {
+          throw new SourceStateError('The source cannot run again.');
+        }
+        await run(
+          "UPDATE sources SET state = 'pending', failure = NULL WHERE owner = ? AND source_id = ?",
+          [guestOwner, request.sourceId],
+        );
+      });
+    case 'listSources':
+      return run('SELECT * FROM sources WHERE owner = ? ORDER BY created_at DESC, source_id', [
+        guestOwner,
+      ]);
+    case 'getSource':
+      return sourceRow(request.sourceId);
+    case 'readSourceFile': {
+      const [row] = await run('SELECT bytes FROM source_files WHERE owner = ? AND source_id = ?', [
+        guestOwner,
+        request.sourceId,
+      ]);
+      return row === undefined ? undefined : new Uint8Array(row.bytes as Uint8Array);
+    }
+    case 'readChunks': {
+      const out: WireStoredChunk[] = [];
+      for (const sourceId of request.sourceIds) {
+        const row = await sourceRow(sourceId);
+        if (row === undefined) continue;
+        for (const chunk of await run(
+          'SELECT ordinal, text, locator FROM source_chunks WHERE owner = ? AND source_id = ? ORDER BY ordinal',
+          [guestOwner, sourceId],
+        )) {
+          out.push({
+            sourceId,
+            title: String(row.title),
+            ordinal: Number(chunk.ordinal),
+            text: String(chunk.text),
+            locator: String(chunk.locator),
+          });
+        }
+      }
+      return out;
+    }
+    case 'deleteSource':
+      return transaction(async () => {
+        for (const table of ['source_chunks', 'source_files', 'sources']) {
+          await run(`DELETE FROM ${table} WHERE owner = ? AND source_id = ?`, [
+            guestOwner,
+            request.sourceId,
+          ]);
+        }
+      });
+    default:
+      throw new Error(`Unknown operation ${request.op}`);
+  }
+}
+
 async function handleRequest(request: Request): Promise<unknown> {
   switch (request.op) {
     case 'open':
@@ -208,6 +351,8 @@ async function handleRequest(request: Request): Promise<unknown> {
       await sqlite3?.close(handle);
       await vfs?.close();
       return undefined;
+    default:
+      return handleSources(request);
   }
 }
 
@@ -236,7 +381,12 @@ self.onmessage = (event: MessageEvent<Request>) => {
           : {
               id: request.id,
               ok: false,
-              kind: error instanceof Unavailable ? 'unavailable' : 'failure',
+              kind:
+                error instanceof Unavailable
+                  ? 'unavailable'
+                  : error instanceof SourceStateError
+                    ? 'sourceConflict'
+                    : 'failure',
               message: error instanceof Error ? error.message : String(error),
             };
     }

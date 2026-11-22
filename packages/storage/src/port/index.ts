@@ -15,6 +15,9 @@ import type {
   KnowledgeEvent,
   KnowledgeLog,
   SavedProfile,
+  SourceChunk,
+  SourceFailure,
+  SourceInfo,
   TeachingProfile,
 } from '@kd-learn/core';
 
@@ -65,7 +68,29 @@ export type StorageChange =
   | { readonly _tag: 'SessionChanged'; readonly sessionId: string }
   | { readonly _tag: 'SettingsChanged' }
   | { readonly _tag: 'ProfileChanged' }
-  | { readonly _tag: 'KnowledgeChanged' };
+  | { readonly _tag: 'KnowledgeChanged' }
+  | { readonly _tag: 'SourcesChanged' };
+
+/** A new source (phase 4 A2): `pending` with the original file, or `ready` with its chunks. */
+export type NewSource =
+  | {
+      readonly state: 'pending';
+      readonly info: Omit<SourceInfo, 'state' | 'failure' | 'bytes' | 'chunkCount'>;
+      /** The original file, kept until `completeSource` or `deleteSource`. Absent for research. */
+      readonly file?: Uint8Array;
+    }
+  | {
+      readonly state: 'ready';
+      readonly info: Omit<SourceInfo, 'state' | 'failure' | 'bytes' | 'chunkCount'>;
+      readonly chunks: ReadonlyArray<SourceChunk>;
+    };
+
+/** A chunk with the source it belongs to (`readChunks`). */
+export interface StoredChunk {
+  readonly sourceId: string;
+  readonly title: string;
+  readonly chunk: SourceChunk;
+}
 
 /** No usable storage in this context (no OPFS, no Worker). The caller may fall back to memory. */
 export class StorageUnavailable extends Data.TaggedError('StorageUnavailable')<{
@@ -91,6 +116,14 @@ export type StorageError = StorageUnavailable | StorageBusy | StorageFailure;
 export class KnowledgeConflict extends Data.TaggedError('KnowledgeConflict')<{
   readonly expectedLastSeq: number;
   readonly lastSeq: number;
+}> {}
+
+/**
+ * A source call that does not fit the source's state (`completeSource` on a source that is not
+ * pending, `retrySource` without a file). Nothing was written.
+ */
+export class SourceConflict extends Data.TaggedError('SourceConflict')<{
+  readonly message: string;
 }> {}
 
 export interface StorageService {
@@ -146,6 +179,46 @@ export interface StorageService {
    * is not a valid `SavedProfile` (limits of length and range) with `StorageFailure`.
    */
   readonly saveProfile: (profile: SavedProfile | undefined) => Effect.Effect<void, StorageError>;
+
+  /** Creates a source (phase 4 A2). A duplicate id fails. Chunks over the size limit fail. */
+  readonly createSource: (source: NewSource) => Effect.Effect<void, StorageError>;
+
+  /**
+   * Writes the chunks of a `pending` source and makes it `ready` in one batch; drops its file. The
+   * `title` replaces the first one when given (a PDF title read from the file).
+   */
+  readonly completeSource: (
+    sourceId: string,
+    chunks: ReadonlyArray<SourceChunk>,
+    options?: { readonly title?: string },
+  ) => Effect.Effect<void, StorageError | SourceConflict>;
+
+  /** Marks a `pending` source `failed`. The file stays, so `retrySource` can run it again. */
+  readonly failSource: (
+    sourceId: string,
+    failure: SourceFailure,
+  ) => Effect.Effect<void, StorageError | SourceConflict>;
+
+  /** Puts a `failed` source (or a `pending` one nobody runs) back to `pending`. */
+  readonly retrySource: (sourceId: string) => Effect.Effect<void, StorageError | SourceConflict>;
+
+  /** Every source, newest first. */
+  readonly listSources: Effect.Effect<ReadonlyArray<SourceInfo>, StorageError>;
+
+  readonly getSource: (sourceId: string) => Effect.Effect<SourceInfo | undefined, StorageError>;
+
+  /** The original file of a pending or failed source. */
+  readonly readSourceFile: (
+    sourceId: string,
+  ) => Effect.Effect<Uint8Array | undefined, StorageError>;
+
+  /** Every chunk of these sources (unknown ids are skipped), in source then chunk order. */
+  readonly readChunks: (
+    sourceIds: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<StoredChunk>, StorageError>;
+
+  /** Deletes the source with its chunks and file. Unknown ids are a no-op. */
+  readonly deleteSource: (sourceId: string) => Effect.Effect<void, StorageError>;
 
   /**
    * Commits made through this driver or by other tabs. Each subscriber gets its own queue.
