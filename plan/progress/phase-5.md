@@ -96,3 +96,10 @@
 - Lượt 2 ("Could I try it myself, interactively?"): một `show_demo` 3,5 KB, không thư viện (chọn đích, Start, Next step, Reset). Hiện trong `/dev/figures` trên Chromium, Firefox, WebKit: không lỗi CSP, không request ra ngoài; bấm thử đi đúng từng bước tìm kiếm.
 - Kết luận: mô tả tool hiện tại đủ; không đổi trần (3 hình mỗi lượt, 64 / 128 KiB). Mermaid và thư viện CDN chưa được Haiku chọn trong hai lượt này; e2e đã phủ cả hai.
 
+## Bước 9a: cổng ảnh và tool (2026-11-22)
+
+- `ImagePort` trong `@kd-learn/ai/port` (`generate({model, prompt, aspect})`, lỗi `ProviderError` hoặc `ImageRefused` mang usage). Adapter HTTP trong `@kd-learn/ai/image`: Gemini Interactions API (JPEG 1K, key ở header `x-goog-api-key`) và `{base}/images/generations` tương thích OpenAI (JPEG, nén 75). Timeout 90 s, đọc tối đa ~3 MiB, ảnh tối đa 2 MiB, mime lấy từ magic bytes (không tin kiểu khai báo). Lỗi chỉ mang thông điệp cố định và mã HTTP, không bao giờ chuyển nội dung lỗi của nhà cung cấp.
+- Tool `generate_image` trong `agent`, chỉ có khi server truyền `FigureOptions.image` và hồ sơ cho phép ảnh. Kiểm trần (1 ảnh mỗi lượt, 6 mỗi phiên, 3 hình mỗi lượt) trước khi gọi nhà cung cấp. Ghi `UsageRecorded` riêng với tên model ảnh, kể cả khi bị từ chối. Lỗi thành `ToolError` để Teacher viết tiếp.
+- Ranh giới lint: `agent` không import được `@kd-learn/ai/image` (có test).
+- Chưa nối vào server: vai `illustrator`, khách và demo làm ở 9b, 9c.
+

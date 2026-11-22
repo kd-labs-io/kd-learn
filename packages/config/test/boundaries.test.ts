@@ -54,6 +54,7 @@ describe('package boundaries', () => {
   it.each([
     ["import { x } from '@kd-learn/ai';\nexport const y = x;"],
     ["import { x } from '@kd-learn/storage/sqlite-node';\nexport const y = x;"],
+    ["import { x } from '@kd-learn/ai/image';\nexport const y = x;"],
     ["import { x } from '@kd-learn/search/searxng';\nexport const y = x;"],
     ["import { x } from '@kd-learn/server';\nexport const y = x;"],
   ])('agent rejects adapters: %s', async (code) => {
