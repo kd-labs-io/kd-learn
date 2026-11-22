@@ -13,7 +13,6 @@ import { accountClient } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { clientOptions, errorCode, errorText, run, usePublicConfig } from './api';
 import { signIn, useWho } from './auth';
 import { Block } from '../app/Block';
@@ -83,7 +82,6 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack maxWidth="480px">

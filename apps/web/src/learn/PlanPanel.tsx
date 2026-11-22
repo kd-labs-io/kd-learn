@@ -21,7 +21,9 @@ export function PlanPanel({ session }: { session: Session }) {
   const resolved = session.completedSteps.length + session.skippedSteps.length;
   return (
     <VStack gap={3} data-testid="plan-panel">
-      <Heading level={2}>{m.plan_title()}</Heading>
+      <Heading level={4} accessibilityLevel={2}>
+        {m.plan_title()}
+      </Heading>
       {rows.length === 0 ? (
         <Text type="supporting" data-testid="plan-phase">
           {session.state._tag === 'Planning' ? m.plan_phase_planning() : m.plan_phase_probing()}

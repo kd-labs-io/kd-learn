@@ -458,5 +458,8 @@
   "side_hide": "Hide side chat",
   "side_thread_label": "Ask about",
   "side_history": "Earlier questions",
-  "settings_learning": "Learning"
+  "settings_learning": "Learning",
+  "rail_label": "Main navigation",
+  "rail_places": "Places",
+  "lesson_tools": "Lesson tools"
 }

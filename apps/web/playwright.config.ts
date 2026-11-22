@@ -1,7 +1,13 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_ADMIN, accountsPort, fakeModelPort, fakeSearchPort } from './e2e/accounts-env';
+import {
+  E2E_ADMIN,
+  accountsPort,
+  fakeModelPort,
+  fakeSearchPort,
+  guestPort,
+} from './e2e/accounts-env';
 
 // Browser tests run against the production SSR build (`pnpm build`, then `node .output/server`).
 // CI installs Chromium only; Firefox and WebKit run locally (`pnpm exec playwright install`).
@@ -11,7 +17,7 @@ import { E2E_ADMIN, accountsPort, fakeModelPort, fakeSearchPort } from './e2e/ac
 // - `accountsPort`: accounts on, with a fresh database and a fake OpenAI-compatible model
 //   (e2e/fake-openai.ts on `fakeModelPort`), so account turns run through the real server.
 // Both use a fake SearXNG (e2e/fake-searxng.ts on `fakeSearchPort`) for research.
-const port = 4173;
+const port = guestPort;
 const phoneTests = '**/phone.e2e.ts';
 const dbDir = join(tmpdir(), 'kd-learn-e2e');
 

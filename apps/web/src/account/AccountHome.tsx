@@ -10,7 +10,6 @@ import { getLocale, m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { PracticeLink } from '../practice/PracticeLink';
 import { homeColumn, SessionRows, StartTopic } from '../app/HomeParts';
 import { preferredProvider, useAccountSourceLibrary } from '../sources/library';
@@ -72,7 +71,6 @@ export function AccountHome({ token }: { token: string }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6}>

@@ -2,6 +2,7 @@
 // Not a test of behaviour: it only fails when a screen cannot be reached. Look at the pictures.
 import { expect, test, type Page } from '@playwright/test';
 import { E2E_ADMIN, accountsPort } from '../accounts-env';
+import { expectWho } from '../rail';
 
 test.use({ locale: 'en-US', baseURL: `http://localhost:${accountsPort}` });
 test.setTimeout(480_000);
@@ -83,7 +84,7 @@ test('account', async ({ page }) => {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('learner-password-1');
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('who')).toHaveText(email);
+  await expectWho(page, email);
   await page.waitForLoadState('networkidle');
   await page.goto('/');
   await shoot(page, 'home-new-account');
@@ -133,7 +134,7 @@ test('admin', async ({ page }) => {
   await page.getByLabel('Email').fill(E2E_ADMIN.email);
   await page.getByLabel('Password').fill(E2E_ADMIN.password);
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('who')).toHaveText(E2E_ADMIN.email);
+  await expectWho(page, E2E_ADMIN.email);
   await page.goto('/admin');
   await shoot(page, 'admin');
 });

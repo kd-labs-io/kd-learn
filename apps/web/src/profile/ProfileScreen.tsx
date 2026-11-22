@@ -29,7 +29,6 @@ import { useForm } from '@tanstack/react-form';
 import { Schema } from 'effect';
 import { useState } from 'react';
 import { errorText } from '../account/api';
-import { AppHeader } from '../app/AppHeader';
 import type { ProfileSource } from './source';
 import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
@@ -162,7 +161,6 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={5} maxWidth="80ch">

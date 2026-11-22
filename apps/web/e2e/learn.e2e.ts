@@ -264,8 +264,7 @@ test('the side chat answers about the current step and keeps out of the lesson',
   await answer(page, 'Not much');
   await expect(page.getByTestId('plan-steps')).toBeVisible();
 
-  // Closed until asked for (plan cai-thien-ux.md B2); a column on a wide screen.
-  await expect(page.getByTestId('side-chat')).toBeHidden();
+  // The right column of a wide screen shows the side chat by default.
   await page.getByTestId('side-open').click();
   const side = page.getByTestId('side-chat');
   await expect(side.getByTestId('side-step')).toContainText('First idea');
@@ -282,7 +281,7 @@ test('the side chat answers about the current step and keeps out of the lesson',
   // the question is not in the main conversation
   await expect(page.getByTestId('conversation')).not.toContainText('What is a fraction?');
 
-  // Still open after a reload: the choice is remembered on the device.
+  // Still there after a reload.
   await page.reload();
   await expect(page.getByTestId('side-chat')).toContainText('What is a fraction?');
   await expect(page.getByTestId('side-chat')).toContainText('Short side answer.');
@@ -301,8 +300,10 @@ test('on a phone the plan folds away, the side chat is a drawer and nothing over
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await page.getByRole('button', { name: 'Plan' }).click();
-  await expect(page.getByTestId('plan-step-one')).toBeVisible();
+  // The plan is in the rail, a drawer behind the menu button on a phone.
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await expect(page.getByTestId('plan-step-one').filter({ visible: true })).toBeVisible();
+  await page.keyboard.press('Escape');
 
   await page.getByTestId('side-open').click();
   const side = page.getByTestId('side-chat');

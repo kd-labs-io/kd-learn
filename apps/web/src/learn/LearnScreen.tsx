@@ -2,9 +2,10 @@ import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
 import { Card } from '@astryxdesign/core/Card';
 import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
-import { Collapsible } from '@astryxdesign/core/Collapsible';
 import { Drawer } from '@astryxdesign/core/Drawer';
 import { Heading } from '@astryxdesign/core/Heading';
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
+import { SideNavSection } from '@astryxdesign/core/SideNav';
 import { useMediaQuery } from '@astryxdesign/core/hooks';
 import { HStack } from '@astryxdesign/core/HStack';
 import {
@@ -24,6 +25,7 @@ import { LessonFigure, type FigureBodyLoader } from '@kd-learn/ui/components/Les
 import { preloadMath } from '@kd-learn/ui/components/LessonMarkdown';
 import { Result } from 'effect';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RailSlot } from '../app/AppRail';
 import { useThemeControl } from '../theme/ThemeRoot';
 import { figureVarsOf } from './figures';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
@@ -42,27 +44,29 @@ import {
   type TurnBanner,
 } from './view';
 
-const sideKey = 'kd-learn.side-open';
+const toolKey = 'kd-learn.lesson-tool';
 
-/** Whether the side chat is open, remembered on this device (a convenience: may fail silently). */
-function useSideOpen(): [boolean, (open: boolean) => void] {
-  const [open, setOpen] = useState(false);
+type Tool = 'side' | 'sources';
+
+/** Which tool the right column shows, remembered on this device (a convenience: may fail silently). */
+function useLessonTool(): [Tool, (tool: Tool) => void] {
+  const [tool, setTool] = useState<Tool>('side');
   useEffect(() => {
     try {
-      setOpen(localStorage.getItem(sideKey) === '1');
+      if (localStorage.getItem(toolKey) === 'sources') setTool('sources');
     } catch {
-      // Storage blocked: start closed.
+      // Storage blocked: start on the side chat.
     }
   }, []);
-  const set = (next: boolean) => {
-    setOpen(next);
+  const set = (next: Tool) => {
+    setTool(next);
     try {
-      localStorage.setItem(sideKey, next ? '1' : '0');
+      localStorage.setItem(toolKey, next);
     } catch {
       // Not remembered, still applied.
     }
   };
-  return [open, set];
+  return [tool, set];
 }
 
 /** Where the lesson stands, under its title: probing, planning, step x of y, finished. */
@@ -88,14 +92,12 @@ export interface LearnScreenProps {
  */
 export function LearnScreen({ source, onHome: home, onSettings: settings }: LearnScreenProps) {
   const { view, state, actions: runner, elsewhere, persistent } = source;
-  const showPlanColumn = useMediaQuery('(min-width: 900px)');
-  const wideSide = useMediaQuery('(min-width: 1180px)');
-  // Side chat is closed until asked for (plan cai-thien-ux.md B2): a column on a wide screen, a
-  // drawer elsewhere. The choice is remembered on this device.
-  // Only the column is remembered: a drawer that opens by itself on load would hide the lesson.
-  const [columnOpen, setColumnOpen] = useSideOpen();
+  // Three columns on a wide screen: the rail (places and the plan), the lesson, and the lesson's
+  // tools (quick questions, sources). Narrower, the tools open as drawers from the lesson's title
+  // row; on a phone the rail itself is a drawer behind the menu button.
+  const wideTools = useMediaQuery('(min-width: 1180px)');
+  const [tool, setTool] = useLessonTool();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const showSideColumn = wideSide && columnOpen;
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [cited, setCited] = useState<Citation | undefined>(undefined);
 
@@ -177,91 +179,100 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
     );
   }
 
-  const planPanel = <PlanPanel session={session} />;
   const sideChat = <SideChat session={session} log={log} runner={runner} state={state.side} />;
+  const sourcesPanel =
+    source.sources === undefined ? null : (
+      <LessonSourcesPanel session={session} sources={source.sources} />
+    );
+  const sourcesLabel = m.lesson_sources({ count: session.sources.length });
+  const shownTool: Tool = sourcesPanel === null ? 'side' : tool;
 
   return (
     <>
+      <RailSlot>
+        <SideNavSection title={m.plan_title()} isHeaderHidden>
+          <PlanPanel session={session} />
+        </SideNavSection>
+      </RailSlot>
       <Layout
-        header={
-          <LayoutHeader hasDivider padding={3}>
-            {/* Wraps on a phone: the actions go under the topic instead of being cut off. */}
-            <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
-              <HStack gap={2} vAlign="center">
-                <Button
-                  label={m.nav_home()}
-                  variant="ghost"
-                  size="sm"
-                  onClick={home}
-                  data-testid="nav-home"
-                />
-                <VStack gap={0}>
-                  <Heading
-                    level={3}
-                    accessibilityLevel={1}
-                    maxLines={1}
-                    data-testid="session-topic"
-                  >
-                    {session.topic}
-                  </Heading>
-                  <Text type="supporting" data-testid="lesson-progress">
-                    {lessonProgress(session)}
-                  </Text>
-                </VStack>
-              </HStack>
-              <HStack gap={2} vAlign="center" wrap="wrap">
-                {source.sources === undefined ? null : (
-                  <Button
-                    label={m.lesson_sources({ count: session.sources.length })}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSourcesOpen(true)}
-                    data-testid="lesson-sources-open"
-                  />
-                )}
-                <Button
-                  label={showSideColumn ? m.side_hide() : m.side_open()}
-                  variant={showSideColumn ? 'ghost' : 'secondary'}
-                  size="sm"
-                  onClick={() => (wideSide ? setColumnOpen(!columnOpen) : setDrawerOpen(true))}
-                  aria-expanded={wideSide ? columnOpen : drawerOpen}
-                  data-testid="side-open"
-                />
-                <Button label={m.nav_settings()} variant="ghost" size="sm" onClick={settings} />
-              </HStack>
-            </HStack>
-          </LayoutHeader>
-        }
-        start={
-          showPlanColumn ? (
-            <LayoutPanel width={280} hasDivider label={m.plan_title()}>
-              {planPanel}
-            </LayoutPanel>
-          ) : undefined
-        }
         end={
-          showSideColumn ? (
-            <LayoutPanel width={360} hasDivider label={m.side_title()}>
-              {sideChat}
+          wideTools ? (
+            <LayoutPanel width={360} hasDivider label={m.lesson_tools()} padding={4}>
+              <VStack gap={4}>
+                {sourcesPanel === null ? null : (
+                  <SegmentedControl
+                    label={m.lesson_tools()}
+                    value={shownTool}
+                    onChange={(value) => setTool(value === 'sources' ? 'sources' : 'side')}
+                    layout="fill"
+                    size="sm"
+                  >
+                    <SegmentedControlItem
+                      value="side"
+                      label={m.side_title()}
+                      data-testid="side-open"
+                    />
+                    <SegmentedControlItem
+                      value="sources"
+                      label={sourcesLabel}
+                      data-testid="lesson-sources-open"
+                    />
+                  </SegmentedControl>
+                )}
+                {shownTool === 'side' ? sideChat : sourcesPanel}
+              </VStack>
             </LayoutPanel>
           ) : undefined
         }
         content={
-          // One centred reading column for the conversation and the answer box, so the box sits
-          // under what it answers (plan cai-thien-ux.md A2 #6, #7).
+          // One centred reading column for the title, the conversation and the answer box, so the
+          // box sits under what it answers (plan cai-thien-ux.md A2 #6, #7).
           <Layout
             contentWidth="72ch"
+            header={
+              <LayoutHeader padding={4}>
+                {/* Wraps on a phone: the tools go under the topic instead of being cut off. */}
+                <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
+                  <VStack gap={0.5}>
+                    <Heading
+                      level={2}
+                      accessibilityLevel={1}
+                      maxLines={2}
+                      data-testid="session-topic"
+                    >
+                      {session.topic}
+                    </Heading>
+                    <Text type="supporting" data-testid="lesson-progress">
+                      {lessonProgress(session)}
+                    </Text>
+                  </VStack>
+                  {wideTools ? null : (
+                    <HStack gap={2} vAlign="center" wrap="wrap">
+                      {sourcesPanel === null ? null : (
+                        <Button
+                          label={sourcesLabel}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSourcesOpen(true)}
+                          data-testid="lesson-sources-open"
+                        />
+                      )}
+                      <Button
+                        label={m.side_open()}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setDrawerOpen(true)}
+                        aria-expanded={drawerOpen}
+                        data-testid="side-open"
+                      />
+                    </HStack>
+                  )}
+                </HStack>
+              </LayoutHeader>
+            }
             content={
               <LayoutContent padding={4} label={m.conv_tutor()}>
                 <VStack gap={5} data-testid="conversation">
-                  {showPlanColumn ? null : (
-                    <Collapsible
-                      trigger={<Text type="label">{m.plan_title()}</Text>}
-                      defaultIsOpen={false}
-                    >
-                      {planPanel}
-                    </Collapsible>
-                  )}
                   <Conversation
                     session={session}
                     state={state}
@@ -272,7 +283,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
               </LayoutContent>
             }
             footer={
-              <LayoutFooter hasDivider padding={3}>
+              <LayoutFooter padding={3}>
                 <VStack gap={3}>
                   {persistent === false ? (
                     <Banner
@@ -306,14 +317,16 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
       />
       {source.sources === undefined ? null : (
         <>
-          <Drawer
-            isOpen={sourcesOpen}
-            onOpenChange={setSourcesOpen}
-            label={m.lesson_sources_title()}
-            padding={4}
-          >
-            <LessonSourcesPanel session={session} sources={source.sources} />
-          </Drawer>
+          {wideTools ? null : (
+            <Drawer
+              isOpen={sourcesOpen}
+              onOpenChange={setSourcesOpen}
+              label={m.lesson_sources_title()}
+              padding={4}
+            >
+              {sourcesPanel}
+            </Drawer>
+          )}
           <ChunksDrawer
             title={
               cited === undefined
@@ -327,7 +340,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
           />
         </>
       )}
-      {wideSide ? null : (
+      {wideTools ? null : (
         <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label={m.side_title()} padding={4}>
           {sideChat}
         </Drawer>

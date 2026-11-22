@@ -16,7 +16,6 @@ import { masteryBoxes, type ExerciseAnswer } from '@kd-learn/core';
 import { getLocaleTag, m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { ExerciseBody, ExerciseSolution, exerciseRenderers, renderedTypes } from './renderers';
 import type { PracticeSource } from './source';
 import { Block } from '../app/Block';
@@ -289,7 +288,6 @@ export function PracticeScreen({ source }: { readonly source: PracticeSource }) 
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="68ch">

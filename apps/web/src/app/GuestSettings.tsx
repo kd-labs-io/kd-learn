@@ -12,7 +12,6 @@ import { m } from '@kd-learn/i18n';
 import type { EndpointInfo } from '@kd-learn/api';
 import type { GuestImageSettings, GuestProvider, GuestSettings } from '@kd-learn/storage/port';
 import { useEffect, useState } from 'react';
-import { AppHeader } from './AppHeader';
 import { useGuestSourceLibrary } from '../sources/library';
 import { SearchPreference } from '../sources/SearchPreference';
 import { ProfileLink } from '../profile/ProfileLink';
@@ -108,7 +107,6 @@ export function GuestSettings() {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="720px">

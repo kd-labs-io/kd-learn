@@ -18,7 +18,6 @@ import { MAX_PDF_BYTES, MAX_RESEARCH_QUESTION, type SearchProvider } from '@kd-l
 import type { SourceInfo } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
 import { useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { ChunksDrawer } from './ChunksDrawer';
 import {
   preferredProvider,
@@ -82,7 +81,6 @@ export function SourcesScreen({ library }: { readonly library: SourceLibrary }) 
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6}>
