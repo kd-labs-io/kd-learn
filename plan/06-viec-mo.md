@@ -12,9 +12,9 @@
 - Marketplace theme: chạy riêng trên từng server hay dùng một registry chung, cách kiểm duyệt, và theme dùng chung giấy phép nào.
 - Adapter ảnh tương thích OpenAI (`/images/generations`) chưa gọi thật tới endpoint nào; tham số khớp danh sách của OpenRouter (phase 5).
 - Với yêu cầu mơ hồ ("something interactive"), Haiku đôi khi vẽ sơ đồ thay vì làm demo (bước 10 phase 5). Cân nhắc chỉnh mô tả tool nếu người dùng gặp nhiều.
-- Hình do Haiku vẽ ở dark mode chưa thấy với model thật (bước 6 phase 6: Haiku để hình cho bước sau). Kiểm khi kiểm máy thật.
-- Header chung (`AppHeader`) xuống ba dòng ở 393 px, chiếm khoảng một phần tư màn hình (bước 5 phase 6): xem lại sau khi người dùng kiểm trên máy thật.
+- Hình do Haiku vẽ ở dark mode chưa thấy với model thật (bước 6 phase 6: Haiku để hình cho bước sau). Kiểm ở bước 7.
+- Header chung (`AppHeader`) xuống ba dòng ở 393 px, chiếm khoảng một phần tư màn hình (bước 5 phase 6): xem lại theo kết quả bước 7.
 
 ## 7. Bước tiếp theo
 
-Phase 7 (app mobile): chưa lên plan. Việc đầu tiên: người dùng kiểm bản web trên điện thoại thật theo danh sách ở [archive/phase-6.md](archive/phase-6.md) (`scripts/phone-check.sh`). Phase 6 xong (2026-11-22, [archive/phase-6.md](archive/phase-6.md)), trừ bước kiểm máy thật đó.
+Phase 6 (theme + web trên điện thoại, [theme-va-dien-thoai.md](theme-va-dien-thoai.md)): plan xong (2026-11-22). Bước hiện tại: bước 7, chờ người dùng kiểm trên điện thoại thật (`scripts/phone-check.sh`, danh sách kiểm cuối file progress); các bước 0–6 xong, tiến độ ở [progress/phase-6.md](progress/phase-6.md). Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md)).
