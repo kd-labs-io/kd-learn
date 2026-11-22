@@ -143,9 +143,26 @@ test('Mermaid renders to an image, and bad code shows an error', async ({ page }
   });
   const image = page.getByTestId('figure-image');
   await expect(image).toHaveCount(1, { timeout: 20_000 });
+  // Sized from the viewBox: Mermaid's own `width="100%"` must not become 100 px.
   await expect
     .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
-    .toBeGreaterThan(0);
+    .toBeGreaterThan(150);
+  // The drawing is there: a pixel in the middle of the image is not the background.
+  await expect
+    .poll(() =>
+      image.evaluate((img: HTMLImageElement) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(img, 0, 0);
+        const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+        let inked = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i]! > 0) inked += 1;
+        return inked;
+      }),
+    )
+    .toBeGreaterThan(500);
   await expect(page.getByTestId('figure-error')).toHaveCount(1);
 });
 

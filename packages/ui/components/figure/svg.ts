@@ -21,15 +21,37 @@ export const prepareSvg = (source: string, rootCss: string): PreparedSvg => {
     .trim()
     .split(/[\s,]+/)
     .map(Number);
-  const [, , boxWidth, boxHeight] = box;
-  const width = Number.parseFloat(root.getAttribute('width') ?? '') || boxWidth || 300;
-  const height = Number.parseFloat(root.getAttribute('height') ?? '') || boxHeight || 150;
+  const [, , boxWidth = 0, boxHeight = 0] = box;
+  const ratio = boxWidth > 0 && boxHeight > 0 ? boxHeight / boxWidth : undefined;
+  // Only plain lengths count: Mermaid writes `width="100%"`, which an image cannot size from.
+  const length = (name: string) => {
+    const value = (root.getAttribute(name) ?? '').trim();
+    const number = /^\d+(\.\d+)?(px)?$/.test(value) ? Number.parseFloat(value) : 0;
+    return number > 0 ? number : undefined;
+  };
+  let width = length('width');
+  let height = length('height');
+  if (width === undefined && height === undefined) {
+    width = boxWidth > 0 ? boxWidth : 300;
+    height = boxHeight > 0 ? boxHeight : 150;
+  } else if (width === undefined) {
+    width = ratio === undefined ? 300 : height! / ratio;
+  } else if (height === undefined) {
+    height = ratio === undefined ? 150 : width * ratio;
+  }
   root.setAttribute('width', String(width));
   root.setAttribute('height', String(height));
+  // An inline max-width would shrink the drawing inside the image.
+  root.style.removeProperty('max-width');
   const style = doc.createElementNS(SVG_NS, 'style');
   style.textContent = rootCss;
   root.insertBefore(style, root.firstChild);
-  return { ok: true, svg: new XMLSerializer().serializeToString(root), width, height };
+  return {
+    ok: true,
+    svg: new XMLSerializer().serializeToString(root),
+    width: width!,
+    height: height!,
+  };
 };
 
 /** An object URL for the SVG. The caller revokes it. */
