@@ -7,12 +7,12 @@
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Plan phần chính | Xong (2026-11-22). Chốt: chỉ việc nền sống sót khi khởi động lại (lượt học giữ quy tắc "bị ngắt"); nguồn vừa làm tư liệu dạy có trích dẫn vừa gắn vào mệnh đề; demo dùng được nguồn và research (tính chung ngân sách); SearXNG và Exa do admin cấu hình, web search của provider dùng key của người dùng |
-| Bước 0: spike tách chữ PDF (C1) | Chưa bắt đầu |
+| Bước 0: spike tách chữ PDF (C1) | Xong (2026-11-22). `pdfjs-dist` 6.5.438 (Apache-2.0) ở trình duyệt và Node; trên server chạy trong `worker_threads`, canh RSS; thêm mã `Encrypted`, `Invalid`; trần chữ 4 MiB; một job ingest mỗi process. Xem ghi chú bước 0 bên dưới |
 | Bước 1: spike tìm kiếm (C2) | Xong (2026-11-22). SearXNG `searxng/searxng:2026.11.20-cd6d28091` chạy được, đoạn trích quá ngắn (khoảng 160 ký tự) nên thêm bộ tải trang có chặn SSRF cho SearXNG; Exa dùng `highlights`; cắt web search của provider (không vừa `SearchPort`). Xem ghi chú bước 1 bên dưới |
 | Bước 2: spike dạy dựa trên nguồn (C3) | Chưa bắt đầu |
 | Bước 3: job bền | Xong (2026-11-22). Bảng `jobs` (migration server v8), runner trong `packages/server/src/jobs/runner.ts`, job extraction chạy qua runner; chạy lại sau khởi động lại tối đa 3 lần. Xem ghi chú bước 3 bên dưới |
 | Bước 4: nguồn trong core và storage | Xong (2026-11-22). Schema và hàm cắt đoạn, chọn lát trong `core`; bảng nguồn ở cả ba driver (khách v4, server v9). Xem ghi chú bước 4 bên dưới |
-| Bước 5: `packages/search` | Chưa bắt đầu |
+| Bước 5: `packages/search` | Đang làm. Xong phần package (port, SearXNG kèm bộ tải trang, Exa), lint, service SearXNG trong compose (2026-11-22); còn cấu hình admin và key Exa mã hoá |
 | Bước 6: ingest PDF và ghi chú | Chưa bắt đầu |
 | Bước 7: dạy dựa trên nguồn | Chưa bắt đầu |
 | Bước 8: research | Chưa bắt đầu |
@@ -50,3 +50,23 @@
 - **`storage`:** bảng `sources`, `source_chunks`, `source_files` (DDL chung `sourcesTables`; migration khách v4, server v9). Port thêm `createSource` (`pending` kèm file, hay `ready` kèm đoạn), `completeSource` (chỉ từ `pending`, xoá file), `failSource`, `retrySource`, `listSources`, `getSource`, `readSourceFile`, `readChunks`, `deleteSource`, lỗi `SourceConflict`, thay đổi `SourcesChanged`. Kiểm đoạn (thứ tự `ordinal`, trần 2 MiB) trước khi ghi, ở mọi driver.
 - **Test:** bộ test port thêm 5 test nguồn (memory, sqlite-node); test hai người dùng cho nguồn (không đọc, ghi, xoá được nguồn của người kia; id theo owner). Driver WASM chưa có test riêng cho nguồn: kiểm bằng Playwright ở bước 6.
 
+## Bước 0: spike tách chữ PDF (2026-11-22)
+
+- **Thư viện:** `pdfjs-dist` 6.5.438 (Apache-2.0, phát hành 2026-11-01, Node ≥ 22.13). Loại `unpdf` (chỉ bọc pdfjs, vẫn cần `pdfjs-dist` và `@napi-rs/canvas`).
+- **Trình duyệt:** nạp lười `pdfjs-dist/build/pdf.mjs`, `GlobalWorkerOptions.workerPort = new Worker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url), {type: 'module'})`; luồng chính trễ 2–4 ms. Không import `pdf.worker.mjs` vào Worker của mình (treo). Gzip: 136 KB + 378 KB.
+- **Node:** `pdfjs-dist/legacy/build/pdf.mjs`, gán `globalThis.pdfjsWorker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')` trước khi gọi. `@napi-rs/canvas` không cần cho tách chữ. Chưa thử trong bản build Nitro (bước 6).
+- **Mã chung:** `getDocument({data, isEvalSupported: false, disableFontFace: true, verbosity: 0})`, mỗi trang `getTextContent()`, nối `item.str`, xuống dòng khi `hasEOL`, `normalize('NFC')`. Bản 6.x đóng bằng `loadingTask.destroy()`.
+- **Lỗi:** PDF có mật khẩu mở thì promise treo nếu không gán `loadingTask.onPassword` → mã mới `Encrypted`. Bản scan: trung bình dưới 10 ký tự mỗi trang → `NoText`. File hỏng / không phải PDF ném `InvalidPDFException` trong khoảng 30 ms → mã mới `Invalid`. `numPages` có ngay khi mở → từ chối quá 500 trang trước khi đọc trang nào.
+- **Đo:** 5 trang tiếng Việt 45 ms (Node), 52 / 81 / 73 ms (Chromium / Firefox / WebKit); 500 trang 20 MiB 0,4–0,5 s, RSS khoảng 200 MB; tiếng Việt đúng dấu, NFD ra NFC. Bom Flate 1,5 MB nở 1,5 GB: RSS 3,2 GB trong 5 s.
+- **Server:** chạy trong `worker_threads`, không vì độ trễ (event loop chỉ trễ khoảng 24 ms) mà vì bộ nhớ: `resourceLimits` không chặn được ArrayBuffer, nên luồng chính đọc RSS mỗi 20 ms và `terminate()` khi vượt nền + 512 MiB (bom bị dừng sau 0,5 s, đỉnh khoảng 650 MB). Thời hạn 60 s. **Một job ingest mỗi process** (RSS tính chung). Luôn `isEvalSupported: false`, cập nhật pdfjs thường xuyên (CVE cũ qua font).
+- **Trần chữ sau khi tách: 4 MiB** (500 trang dày đặc khoảng 1,9 MB UTF-8, sát trần 2 MiB cũ); đã sửa `maxSourceTextBytes`.
+- **Cắt đoạn:** `hasEOL` là dòng hiển thị, không phải đoạn văn: tách đoạn theo khoảng cách dọc (`item.transform[5]` lớn hơn khoảng 1,5 lần chiều cao dòng). Bỏ dòng ngắn lặp ở ít nhất 50% số trang (đầu trang, chân trang) sau khi thay chữ số bằng `#`. PDF hai cột từ LaTeX / Word chưa thử.
+
+## Bước 5: `packages/search` (2026-11-22, phần package)
+
+- **Port** (`@kd-learn/search/port`, chỉ `effect`; lint như port AI): `SearchPort.search({query, limit, language?})` → `SearchResult[]` (`title`, `url`, `snippet`, `content?`, `publishedAt?`); `SearchError` có `reason` (`Unavailable`, `Unauthorized`, `PaymentRequired`, `RateLimited` kèm `retryAfterSeconds`, `Invalid`), thông báo cố định không chứa key hay thân phản hồi.
+- **SearXNG** (`./searxng`): `GET /search?format=json`, bỏ URL trùng và không phải http(s); không có kết quả mà có `unresponsive_engines` thì `Unavailable`; 403 thì báo chưa bật định dạng json. Tải 4 trang đầu (mặc định) để điền `content` (tối đa 12.000 ký tự), trang hỏng giữ đoạn trích.
+- **Bộ tải trang** (`./fetch`): `http.get` với `lookup` tự viết kiểm địa chỉ lúc kết nối (DNS đổi giữa chừng không lọt), bất kỳ địa chỉ nào phân giải ra không công khai thì từ chối; tự theo chuyển hướng (tối đa 3, kiểm từng lần); trần 2 MiB (cả sau giải nén) và 10 s; chỉ `text/html`, `text/plain`; HTML sang chữ bỏ script / style.
+- **Exa** (`./exa`): `POST /search`, `type: 'auto'`, `contents.highlights`; 401/403 `Unauthorized`, 402 `PaymentRequired`, 429 `RateLimited` (đọc `Retry-After`), 400 `Invalid`.
+- **Compose:** service `searxng` (`searxng/searxng:2026.11.20-cd6d28091`, không mở cổng, `settings.yml` mount chỉ đọc ở `deploy/searxng/`, `SEARXNG_SECRET`, `SEARXNG_CONTACT_URL` để bật Wikipedia / Wikidata); `web` có `KD_SEARXNG_URL=http://searxng:8080`. `scripts/compose-smoke.sh` kiểm `web` gọi được SearXNG JSON; chạy local xanh.
+- **Test:** 32 test (địa chỉ công khai / riêng kể cả IPv4 trong IPv6, chuyển hướng tới `::1` và `localhost`, vòng chuyển hướng, kích thước, loại, thời gian, scheme, adapter với `fetch` giả, key không lộ).

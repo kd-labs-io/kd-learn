@@ -15,7 +15,7 @@ import { lexicalSimilarity, tokenize, utf8Length } from './slice.ts';
 import { currentStep, type Session } from './session.ts';
 
 /** Most text one source may hold (UTF-8 of its chunks). */
-export const maxSourceTextBytes = 2 * 1024 * 1024;
+export const maxSourceTextBytes = 4 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------------------------
 // Chunking

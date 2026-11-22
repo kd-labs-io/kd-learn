@@ -15,6 +15,7 @@ cat >"$work/env" <<ENV
 KD_LEARN_SECRET_KEY=$(openssl rand -base64 32)
 KD_LEARN_ADMIN_EMAIL=$email
 KD_LEARN_ADMIN_PASSWORD=$password
+SEARXNG_SECRET=$(openssl rand -hex 16)
 ENV
 
 compose() { KD_LEARN_ENV_FILE=$work/env KD_LEARN_PORT=$port docker compose -p "$project" "$@"; }
@@ -46,6 +47,10 @@ curl -fsS "$base/api/config" | grep -q '"accounts":true' || fail 'accounts are o
 echo 'healthy, accounts on'
 token >/dev/null || fail 'admin sign-in failed'
 echo 'admin signed in'
+
+# SearXNG answers JSON on the internal network (no published port).
+compose exec -T web node -e "fetch(process.env.KD_SEARXNG_URL+'/search?q=test&format=json').then(r=>{if(r.status!==200)process.exit(1);console.log('searxng json ok')})" \
+  || fail 'searxng is not reachable from the web service'
 
 curl -fsS -o /dev/null -X POST "$base/api/account/sessions" -H "authorization: Bearer $(token)" \
   -H 'content-type: application/json' --data '{"topic":"Smoke test","language":"en"}'

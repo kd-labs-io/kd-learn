@@ -1,0 +1,27 @@
+{
+  "name": "@kd-learn/search",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Search port and its adapters: SearXNG (with a guarded page fetcher), Exa.",
+  "type": "module",
+  "exports": {
+    "./port": "./src/port/index.ts",
+    "./searxng": "./src/searxng/index.ts",
+    "./exa": "./src/exa/index.ts",
+    "./fetch": "./src/fetch/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@kd-learn/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
