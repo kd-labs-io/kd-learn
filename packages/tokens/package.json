@@ -29,7 +29,8 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@kd-learn/core": "workspace:*"
   },
   "peerDependencies": {
     "@astryxdesign/core": "catalog:"

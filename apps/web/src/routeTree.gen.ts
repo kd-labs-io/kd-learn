@@ -23,6 +23,7 @@ import { Route as ApiConfigRouteImport } from './routes/api.config'
 import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
 import { Route as ApiResearchRouteImport } from './routes/api.research'
 import { Route as ApiTurnsRouteImport } from './routes/api.turns'
+import { Route as DevFiguresRouteImport } from './routes/dev.figures'
 import { Route as DevStorageRouteImport } from './routes/dev.storage'
 import { Route as SSessionIdRouteImport } from './routes/s.$sessionId'
 import { Route as ApiAccountSplatRouteImport } from './routes/api.account.$'
@@ -103,6 +104,11 @@ const ApiTurnsRoute = ApiTurnsRouteImport.update({
   path: '/api/turns',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevFiguresRoute = DevFiguresRouteImport.update({
+  id: '/dev/figures',
+  path: '/dev/figures',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevStorageRoute = DevStorageRouteImport.update({
   id: '/dev/storage',
   path: '/dev/storage',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/research': typeof ApiResearchRoute
   '/api/turns': typeof ApiTurnsRoute
+  '/dev/figures': typeof DevFiguresRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/research': typeof ApiResearchRoute
   '/api/turns': typeof ApiTurnsRoute
+  '/dev/figures': typeof DevFiguresRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
@@ -215,6 +223,7 @@ export interface FileRoutesById {
   '/api/endpoints': typeof ApiEndpointsRoute
   '/api/research': typeof ApiResearchRoute
   '/api/turns': typeof ApiTurnsRoute
+  '/dev/figures': typeof DevFiguresRoute
   '/dev/storage': typeof DevStorageRoute
   '/s/$sessionId': typeof SSessionIdRoute
   '/api/account/$': typeof ApiAccountSplatRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/api/endpoints'
     | '/api/research'
     | '/api/turns'
+    | '/dev/figures'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/api/endpoints'
     | '/api/research'
     | '/api/turns'
+    | '/dev/figures'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '/api/endpoints'
     | '/api/research'
     | '/api/turns'
+    | '/dev/figures'
     | '/dev/storage'
     | '/s/$sessionId'
     | '/api/account/$'
@@ -318,6 +330,7 @@ export interface RootRouteChildren {
   ApiEndpointsRoute: typeof ApiEndpointsRoute
   ApiResearchRoute: typeof ApiResearchRoute
   ApiTurnsRoute: typeof ApiTurnsRoute
+  DevFiguresRoute: typeof DevFiguresRoute
   DevStorageRoute: typeof DevStorageRoute
   SSessionIdRoute: typeof SSessionIdRoute
   ApiAccountSplatRoute: typeof ApiAccountSplatRoute
@@ -429,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTurnsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/figures': {
+      id: '/dev/figures'
+      path: '/dev/figures'
+      fullPath: '/dev/figures'
+      preLoaderRoute: typeof DevFiguresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/storage': {
       id: '/dev/storage'
       path: '/dev/storage'
@@ -510,6 +530,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEndpointsRoute: ApiEndpointsRoute,
   ApiResearchRoute: ApiResearchRoute,
   ApiTurnsRoute: ApiTurnsRoute,
+  DevFiguresRoute: DevFiguresRoute,
   DevStorageRoute: DevStorageRoute,
   SSessionIdRoute: SSessionIdRoute,
   ApiAccountSplatRoute: ApiAccountSplatRoute,

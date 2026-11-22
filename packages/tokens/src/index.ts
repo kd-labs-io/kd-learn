@@ -8,3 +8,4 @@ export * from './contrast.ts';
 
 /** The default kd-learn theme, from DESIGN.md. */
 export const defaultTheme: Theme = Schema.decodeUnknownSync(Theme)(defaultThemeJson);
+export * from './figure-vars.ts';

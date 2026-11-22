@@ -382,5 +382,21 @@
   "admin_search_demo": "Demo research bằng",
   "admin_search_demo_hint": "Mỗi lần tìm tính vào ngân sách demo.",
   "admin_search_off": "Không (tắt)",
-  "settings_search": "Nguồn tìm kiếm khi research"
+  "settings_search": "Nguồn tìm kiếm khi research",
+  "figure_preparing": "Đang chuẩn bị hình…",
+  "figure_missing": "Hình này không còn.",
+  "figure_load_failed": "Không tải được hình.",
+  "figure_zoom": "Phóng to",
+  "figure_show_code": "Xem mã",
+  "figure_hide_code": "Ẩn mã",
+  "figure_close": "Đóng",
+  "figure_invalid_svg": "Không vẽ được sơ đồ này: {reason}",
+  "figure_invalid_mermaid": "Không vẽ được sơ đồ Mermaid này: {reason}",
+  "figure_demo_label": "Mã do AI sinh, chạy cách ly",
+  "figure_demo_run": "Chạy",
+  "figure_demo_stop": "Dừng",
+  "figure_demo_rerun": "Chạy lại",
+  "figure_demo_error": "Demo báo lỗi: {message}",
+  "figure_demo_unavailable": "Demo chỉ chạy được qua HTTPS hoặc trên localhost.",
+  "figure_demo_libraries": "Thư viện: {list}"
 }
