@@ -1,17 +1,23 @@
 import { Result } from 'effect';
 import { describe, expect, it } from 'vitest';
-import defaultThemeJson from '../src/default-theme.json' with { type: 'json' };
+import defaultThemeJson from '../src/themes/kd.json' with { type: 'json' };
 import {
+  builtInThemes,
   checkContrast,
   contrastRatio,
   decodeTheme,
   defaultTheme,
+  textPairs,
+  themeById,
   toAstryxVars,
 } from '../src/index.ts';
 
 const withColor = (key: string, value: unknown) => ({
   ...defaultThemeJson,
-  colors: { ...defaultThemeJson.colors, [key]: value },
+  colors: {
+    ...defaultThemeJson.colors,
+    light: { ...defaultThemeJson.colors.light, [key]: value },
+  },
 });
 
 describe('theme schema', () => {
@@ -39,8 +45,15 @@ describe('theme schema', () => {
     expect(Result.isFailure(decodeTheme(theme))).toBe(true);
   });
 
-  it('rejects an unknown schema version', () => {
-    expect(Result.isFailure(decodeTheme({ ...defaultThemeJson, version: 2 }))).toBe(true);
+  it('rejects an unknown schema version, v1 included', () => {
+    expect(Result.isFailure(decodeTheme({ ...defaultThemeJson, version: 3 }))).toBe(true);
+    const v1 = { ...defaultThemeJson, version: 1, colors: defaultThemeJson.colors.light };
+    expect(Result.isFailure(decodeTheme(v1))).toBe(true);
+  });
+
+  it('rejects a theme without a dark set', () => {
+    const theme = { ...defaultThemeJson, colors: { light: defaultThemeJson.colors.light } };
+    expect(Result.isFailure(decodeTheme(theme))).toBe(true);
   });
 });
 
@@ -50,13 +63,35 @@ describe('contrast', () => {
     expect(contrastRatio('#FFFFFF', '#FFFFFF')).toBeCloseTo(1, 5);
   });
 
-  it('the default theme passes AA', () => {
-    expect(checkContrast(defaultTheme)).toEqual([]);
+  it.each(builtInThemes.map((theme) => [theme.name, theme] as const))(
+    'built-in theme %s passes AA in both modes',
+    (_, theme) => {
+      expect(checkContrast(theme)).toEqual([]);
+    },
+  );
+
+  it('kd-contrast reaches 7:1 for body text in both modes', () => {
+    const theme = themeById('kd-contrast');
+    for (const mode of ['light', 'dark'] as const) {
+      const c = theme.colors[mode];
+      for (const fg of ['text', 'text-muted'] as const)
+        for (const bg of ['bg', 'surface'] as const)
+          expect(contrastRatio(c[fg], c[bg])).toBeGreaterThanOrEqual(7);
+    }
   });
 
-  it('flags low-contrast text', () => {
-    const theme = { ...defaultTheme, colors: { ...defaultTheme.colors, text: '#EEEEEE' } };
-    expect(checkContrast(theme).map((issue) => issue.foreground)).toContain('text');
+  it('flags low-contrast text in the dark set', () => {
+    const theme = {
+      ...defaultTheme,
+      colors: { ...defaultTheme.colors, dark: { ...defaultTheme.colors.dark, text: '#333333' } },
+    };
+    expect(checkContrast(theme)).toContainEqual(
+      expect.objectContaining({ mode: 'dark', foreground: 'text' }),
+    );
+  });
+
+  it('checks every documented pair', () => {
+    expect(textPairs).toHaveLength(15);
   });
 });
 
@@ -64,21 +99,32 @@ describe('toAstryxVars', () => {
   const vars = toAstryxVars(defaultTheme);
 
   it('maps DESIGN.md tokens to Astryx variables', () => {
-    expect(vars['--color-background-body']).toBe('#FAF9F5');
-    expect(vars['--color-accent']).toBe('#A8502F');
-    expect(vars['--color-error']).toBe('#B53B33');
-    expect(vars['--kd-color-text-subtle']).toBe('#87867F');
+    expect(vars['--color-background-body']).toBe('light-dark(#FAF9F5, #1A1915)');
+    expect(vars['--color-accent']).toBe('light-dark(#A8502F, #E8906F)');
+    expect(vars['--color-error']).toBe('light-dark(#B53B33, #EC8078)');
+    expect(vars['--kd-color-text-subtle']).toBe('light-dark(#87867F, #8A877E)');
+    expect(vars['--color-success-muted']).toBe(
+      'light-dark(color-mix(in srgb, #46704A 12%, #FAF9F5), color-mix(in srgb, #82B988 12%, #1A1915))',
+    );
     expect(vars['--radius-container']).toBe('16px');
-    expect(vars['--shadow-med']).toBe('0 4px 12px rgba(20, 20, 19, 0.08)');
+    expect(vars['--shadow-med']).toBe(
+      '0 4px 12px light-dark(rgba(20, 20, 19, 0.08), rgba(0, 0, 0, 0.16))',
+    );
     expect(vars['--font-family-heading']).toBe(
       '"Source Serif 4 Variable", "Source Serif 4", Georgia, serif',
     );
+  });
+
+  it('keeps the accent stable when an unknown theme id comes back', () => {
+    expect(themeById('removed-theme')).toBe(defaultTheme);
+    expect(builtInThemes.map((theme) => theme.name)).toEqual(['kd', 'kd-contrast', 'ocean']);
   });
 
   it('emits only custom properties with safe values', () => {
     for (const [name, value] of Object.entries(vars)) {
       expect(name).toMatch(/^--[a-z0-9-]+$/);
       expect(value).not.toMatch(/url\(|;|[{}]/);
+      expect(value).not.toMatch(/var\(/);
     }
   });
 });

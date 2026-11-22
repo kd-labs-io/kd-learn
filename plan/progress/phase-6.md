@@ -7,8 +7,8 @@ Plan phần chính: [theme-va-dien-thoai.md](../theme-va-dien-thoai.md).
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Plan phần chính | Xong (2026-11-22). Chốt: dark mode và chọn theme dựng sẵn (tuỳ biến, import / export, marketplace để sau); khách lưu lựa chọn trên máy, tài khoản đồng bộ qua server; kiểm web trên điện thoại ở phase 6, bước cuối người dùng kiểm máy thật; vỏ Capacitor sang phase 7 |
-| Bước 0: spike dark mode Astryx (C1) | Chưa làm |
-| Bước 1: theme v2 trong `tokens` | Chưa làm |
+| Bước 0: spike dark mode Astryx (C1) | Xong (2026-11-22). `light-dark()` chạy ở ba trình duyệt, cả trong `color-mix()` và bóng; theme lúc chạy chuyển từ biến inline sang thẻ `<style>` (biến inline không tới portal); màu cú pháp tự theo. Kết quả ở [C1](../theme-va-dien-thoai.md) |
+| Bước 1: theme v2 trong `tokens` | Xong (2026-11-22). Schema v2 `colors {light, dark}`, `toAstryxVars` ra `light-dark()`, `checkContrast` hai chế độ, `figureVars(theme, mode)`, theme `kd`, `kd-contrast`, `ocean` (`packages/tokens/src/themes/`), bảng dark trong `DESIGN.md`. Màn hình vẫn chỉ light tới bước 3 |
 | Bước 2: `Appearance`, server v11, route | Chưa làm |
 | Bước 3: `ThemeRoot`, cookie, SSR / SPA, cài đặt | Chưa làm |
 | Bước 4: hình, demo, graph theo chế độ | Chưa làm |

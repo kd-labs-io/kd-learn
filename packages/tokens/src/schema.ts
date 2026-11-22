@@ -6,7 +6,8 @@ import { Schema } from 'effect';
  * for every theme: a theme may change values, not add or rename tokens.
  */
 
-export const THEME_SCHEMA_VERSION = 1;
+/** v2: a light and a dark color set (plan theme-va-dien-thoai.md A1). v1 was never stored, so it is not migrated. */
+export const THEME_SCHEMA_VERSION = 2;
 
 /** `#RGB` or `#RRGGBB` only. Rejects `url(...)`, `var(...)`, keywords and functions. */
 export const HexColor = Schema.String.pipe(
@@ -54,7 +55,10 @@ export const TypeScale = Schema.Struct({
   '3xl': TypeStep,
 });
 
-/** A shadow is structured so no free-form CSS gets in. Color is always the theme's `text`. */
+/**
+ * A shadow is structured so no free-form CSS gets in. Color: the light set's `text`; in dark mode
+ * black at twice the opacity (a light `text` would glow).
+ */
 const Shadow = Schema.Struct({
   offsetY: pixels(0, 64),
   blur: pixels(0, 128),
@@ -66,7 +70,7 @@ export const Theme = Schema.Struct({
   name: Schema.String.pipe(
     Schema.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,47}$/, { expected: 'a lowercase slug' })),
   ),
-  colors: ColorTokens,
+  colors: Schema.Struct({ light: ColorTokens, dark: ColorTokens }),
   fonts: Schema.Struct({ heading: HeadingFont, body: BodyFont, code: CodeFont }),
   typeScale: TypeScale,
   radius: Schema.Struct({ sm: pixels(0, 32), md: pixels(0, 32), lg: pixels(0, 48) }),
@@ -74,7 +78,12 @@ export const Theme = Schema.Struct({
 });
 
 export type Theme = typeof Theme.Type;
-export type ColorToken = keyof Theme['colors'];
+export type ColorTokens = typeof ColorTokens.Type;
+export type ColorToken = keyof ColorTokens;
+
+/** A resolved color mode: what `system` turns into on a given device. */
+export type ColorMode = 'light' | 'dark';
+export const colorModes: ReadonlyArray<ColorMode> = ['light', 'dark'];
 
 /** Decodes untrusted theme data (import, marketplace). Unknown keys are an error. */
 export const decodeTheme = Schema.decodeUnknownResult(Theme, { onExcessProperty: 'error' });

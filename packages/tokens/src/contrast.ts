@@ -1,4 +1,4 @@
-import type { ColorToken, Theme } from './schema.ts';
+import type { ColorMode, ColorToken, ColorTokens, Theme } from './schema.ts';
 
 /** WCAG 2.x relative luminance of a `#RGB` / `#RRGGBB` color. */
 const luminance = (hex: string) => {
@@ -17,7 +17,7 @@ export const contrastRatio = (a: string, b: string) => {
 };
 
 /** Text pairs that must reach WCAG AA (4.5:1), per DESIGN.md. */
-const textPairs: ReadonlyArray<readonly [ColorToken, ColorToken]> = [
+export const textPairs: ReadonlyArray<readonly [ColorToken, ColorToken]> = [
   ...(
     ['text', 'text-muted', 'accent-strong', 'success', 'warning', 'danger', 'info'] as const
   ).flatMap(
@@ -31,14 +31,23 @@ const textPairs: ReadonlyArray<readonly [ColorToken, ColorToken]> = [
 ];
 
 export interface ContrastIssue {
+  readonly mode: ColorMode;
   readonly foreground: ColorToken;
   readonly background: ColorToken;
   readonly ratio: number;
 }
 
-/** Returns every text pair below AA. An empty list means the theme is safe to apply. */
-export const checkContrast = (theme: Theme): ReadonlyArray<ContrastIssue> =>
+const checkSet = (mode: ColorMode, colors: ColorTokens, minimum: number) =>
   textPairs.flatMap(([foreground, background]) => {
-    const ratio = contrastRatio(theme.colors[foreground], theme.colors[background]);
-    return ratio < 4.5 ? [{ foreground, background, ratio }] : [];
+    const ratio = contrastRatio(colors[foreground], colors[background]);
+    return ratio < minimum ? [{ mode, foreground, background, ratio }] : [];
   });
+
+/**
+ * Returns every text pair below `minimum` (AA by default) in both color sets. An empty list means
+ * the theme is safe to apply.
+ */
+export const checkContrast = (theme: Theme, minimum = 4.5): ReadonlyArray<ContrastIssue> => [
+  ...checkSet('light', theme.colors.light, minimum),
+  ...checkSet('dark', theme.colors.dark, minimum),
+];

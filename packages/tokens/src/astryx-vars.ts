@@ -1,4 +1,4 @@
-import type { Theme } from './schema.ts';
+import type { ColorTokens, Theme } from './schema.ts';
 
 /**
  * The one mapping from kd-learn tokens (DESIGN.md) to Astryx CSS variables.
@@ -35,16 +35,23 @@ const hexToRgb = (hex: string): [number, number, number] => {
 /** Status tint: ~12% of the color over the page background (DESIGN.md). */
 const tint = (color: string, bg: string) => `color-mix(in srgb, ${color} 12%, ${bg})`;
 
-const shadow = (s: Theme['shadow']['sm'], text: string) => {
-  const [r, g, b] = hexToRgb(text);
-  return `0 ${s.offsetY}px ${s.blur}px rgba(${r}, ${g}, ${b}, ${s.opacity})`;
+const rgba = (hex: string, opacity: number) => {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
+
+/** One value per mode; equal values stay plain, so a mode-free token reads as before. */
+const pair = (light: string, dark: string) =>
+  light === dark ? light : `light-dark(${light}, ${dark})`;
+
+/** Light shadows take the light `text`; dark ones are black at twice the opacity. */
+const shadow = (s: Theme['shadow']['sm'], text: string) =>
+  `0 ${s.offsetY}px ${s.blur}px ${pair(rgba(text, s.opacity), rgba('#000000', Math.min(1, s.opacity * 2)))}`;
 
 const px = (n: number) => `${n / 16}rem`;
 
-export const toAstryxVars = (theme: Theme): CssVars => {
-  const c = theme.colors;
-  const t = theme.typeScale;
+/** The color variables of one color set. */
+const colorVars = (c: ColorTokens): CssVars => {
   const status = (name: 'success' | 'warning' | 'error' | 'info', color: string) => ({
     [`--color-${name}`]: color,
     [`--color-on-${name}`]: c['on-accent'],
@@ -86,8 +93,30 @@ export const toAstryxVars = (theme: Theme): CssVars => {
     ...status('error', c.danger),
     ...status('info', c.info),
 
-    // Focus: 2px ring, 2px offset
     '--focus-outline-color': c['focus-ring'],
+  };
+};
+
+/**
+ * Every color is `light-dark(<light>, <dark>)` (plan theme-va-dien-thoai.md A1): the page's
+ * `color-scheme` picks one, so `system` mode needs no script. Needs Safari 17.5 (risk 5).
+ */
+export const toAstryxVars = (theme: Theme): CssVars => {
+  const light = colorVars(theme.colors.light);
+  const dark = colorVars(theme.colors.dark);
+  const colors = Object.fromEntries(
+    Object.entries(light).map(([name, value]) => [
+      name,
+      pair(value, dark[name as keyof CssVars] ?? value),
+    ]),
+  );
+  const t = theme.typeScale;
+  const text = theme.colors.light.text;
+
+  return {
+    ...colors,
+
+    // Focus: 2px ring, 2px offset
     '--focus-outline-width': '2px',
     '--focus-outline-offset': '2px',
 
@@ -121,8 +150,8 @@ export const toAstryxVars = (theme: Theme): CssVars => {
     '--radius-inner': `${theme.radius.sm}px`,
     '--radius-element': `${theme.radius.md}px`,
     '--radius-container': `${theme.radius.lg}px`,
-    '--shadow-low': shadow(theme.shadow.sm, c.text),
-    '--shadow-med': shadow(theme.shadow.md, c.text),
-    '--shadow-high': shadow(theme.shadow.lg, c.text),
+    '--shadow-low': shadow(theme.shadow.sm, text),
+    '--shadow-med': shadow(theme.shadow.md, text),
+    '--shadow-high': shadow(theme.shadow.lg, text),
   };
 };
