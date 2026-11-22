@@ -10,13 +10,14 @@ import { Item } from '@astryxdesign/core/Item';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { List } from '@astryxdesign/core/List';
 import { Selector } from '@astryxdesign/core/Selector';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { MAX_PDF_BYTES, MAX_RESEARCH_QUESTION, type SearchProvider } from '@kd-learn/api';
 import type { SourceInfo } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
+import { WorkingText } from '@kd-learn/ui/components/WorkingText';
 import { useState } from 'react';
 import { ChunksDrawer } from './ChunksDrawer';
 import {
@@ -90,7 +91,7 @@ export function SourcesScreen({ library }: { readonly library: SourceLibrary }) 
             </Block>
             <Block>
               {view.status === 'loading' ? (
-                <Spinner label={m.learn_loading()} />
+                <LoadingSkeleton variant="list" label={m.loading()} />
               ) : view.status === 'error' ? (
                 <Banner status="error" title={view.message} />
               ) : (
@@ -239,7 +240,7 @@ function SourceList({
             endContent={
               <HStack gap={1}>
                 {source.state === 'pending' && !source.interrupted ? (
-                  <Spinner size="sm" label={stateText(source)} />
+                  <WorkingText label={stateText(source)} showLabel={false} />
                 ) : null}
                 {source.state === 'ready' ? (
                   <Button

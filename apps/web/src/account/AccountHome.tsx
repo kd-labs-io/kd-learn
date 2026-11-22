@@ -4,9 +4,9 @@ import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { VStack } from '@astryxdesign/core/VStack';
 import { getLocale, m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -113,7 +113,9 @@ export function AccountHome({ token }: { token: string }) {
               <VStack width={homeColumn}>
                 <Block gap={3}>
                   <Heading level={2}>{m.home_sessions_title()}</Heading>
-                  {sessions.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+                  {sessions.isPending ? (
+                    <LoadingSkeleton variant="list" label={m.loading()} />
+                  ) : null}
                   {sessions.isError ? (
                     <Banner
                       status="error"

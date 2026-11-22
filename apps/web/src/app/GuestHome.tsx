@@ -1,9 +1,9 @@
 import { Banner } from '@astryxdesign/core/Banner';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { VStack } from '@astryxdesign/core/VStack';
 import { defaultProfile, resolveProfile } from '@kd-learn/agent/client';
 import { Effect } from 'effect';
@@ -149,7 +149,7 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 <Block gap={3}>
                   <Heading level={2}>{m.home_sessions_title()}</Heading>
                   {sessions.status === 'loading' ? (
-                    <Spinner size="sm" label={m.learn_loading()} />
+                    <LoadingSkeleton variant="list" label={m.loading()} />
                   ) : null}
                   {sessions.status === 'error' ? (
                     <Banner

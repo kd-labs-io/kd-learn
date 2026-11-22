@@ -96,7 +96,7 @@ Rules every screen follows (phase 7, `plan/cai-thien-ux.md`). Check them with th
 - **The lesson has three columns.** Rail (places, plan) · lesson (title and progress on top, conversation, answer box) · tools (`SegmentedControl`: quick questions, sources) from 1180 px. Narrower, the tools open as drawers from buttons beside the lesson title.
 - **A box sits under what it answers.** A composer shares the column of its conversation (the lesson uses a nested `Layout` with `contentWidth="72ch"`).
 - **Roles are visible.** Learner messages are right-aligned bubbles (`ChatMessage sender="user"`); tutor text is full-width with an accent label.
-- **Every list has its states.** Loading (`Spinner`), empty (`EmptyState` with what to do next), error (`Banner` with a retry), and rows that say where each item stands (status, progress), not only a date.
+- **Every list has its states.** Loading (`LoadingSkeleton` in the shape of the content; `WorkingText` for a running task such as writing or grading; no `Spinner` with text), empty (`EmptyState` with what to do next), error (`Banner` with a retry), and rows that say where each item stands (status, progress), not only a date.
 - **Disabled says why.** Prefer an enabled button that explains on press (field `status`), or `disabledMessage`. Never a pale button with no reason.
 - **Drawers are opt-in.** A tool column on a wide screen may stay open (remember its tab per device); a `Drawer` opens only when asked for, never by itself.
 - **Phones.** No sideways scroll, no control cut at the right edge, main buttons at least 44 px, top bar one row. Keyboard shortcuts (Enter to send) only for a fine pointer.

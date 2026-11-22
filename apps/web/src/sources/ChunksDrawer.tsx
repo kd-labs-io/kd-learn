@@ -4,9 +4,9 @@ import { Banner } from '@astryxdesign/core/Banner';
 import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
 import { Item } from '@astryxdesign/core/Item';
 import { List } from '@astryxdesign/core/List';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import type { ChunkLocator, SourceChunk } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useEffect, useState } from 'react';
 
 export const locatorText = (locator: ChunkLocator): string =>
@@ -67,7 +67,7 @@ export function ChunksDrawer({
     >
       <DrawerHeader title={title ?? ''} subtitle={m.sources_chunks()} onOpenChange={onClose} />
       {state.status === 'loading' ? (
-        <Spinner label={m.learn_loading()} />
+        <LoadingSkeleton variant="list" label={m.loading()} />
       ) : state.status === 'error' ? (
         <Banner status="error" title={state.message} />
       ) : (

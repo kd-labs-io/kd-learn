@@ -12,12 +12,13 @@ import { Item } from '@astryxdesign/core/Item';
 import { Layout, LayoutContent, LayoutPanel } from '@astryxdesign/core/Layout';
 import { List } from '@astryxdesign/core/List';
 import { Selector } from '@astryxdesign/core/Selector';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import type { EdgeView, GraphView, PropositionView } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
+import { WorkingText } from '@kd-learn/ui/components/WorkingText';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { relationText } from './relation';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
@@ -65,7 +66,7 @@ export function GraphScreen({
       content={
         <LayoutContent padding={6}>
           {view.status === 'loading' ? (
-            <Spinner label={m.learn_loading()} />
+            <LoadingSkeleton label={m.loading()} />
           ) : (
             <Banner status="error" title={view.message} />
           )}
@@ -280,9 +281,8 @@ function PendingBanners({
   return (
     <>
       {running.length > 0 ? (
-        <HStack gap={2} vAlign="center" data-testid="graph-extracting">
-          <Spinner size="sm" label={m.graph_extracting({ count: running.length })} />
-          <Text type="supporting">{m.graph_extracting({ count: running.length })}</Text>
+        <HStack data-testid="graph-extracting">
+          <WorkingText label={m.graph_extracting({ count: running.length })} />
         </HStack>
       ) : null}
       {shown.map((p) => (

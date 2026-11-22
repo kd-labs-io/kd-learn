@@ -48,6 +48,7 @@
   "plan_title": "Kế hoạch",
   "plan_progress": "Xong {done} trên {total} bước",
   "plan_phase_probing": "Tìm hiểu bạn đã biết gì",
+  "loading": "Đang tải…",
   "plan_phase_planning": "Đang lập kế hoạch cho bạn",
   "plan_status_done": "Xong",
   "plan_status_skipped": "Đã bỏ qua",

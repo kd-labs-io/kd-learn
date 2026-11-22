@@ -8,6 +8,8 @@
     "./components/LessonMarkdown": "./components/LessonMarkdown.tsx",
     "./components/LessonText": "./components/LessonText.tsx",
     "./components/LessonFigure": "./components/LessonFigure.tsx",
+    "./components/LoadingSkeleton": "./components/LoadingSkeleton.tsx",
+    "./components/WorkingText": "./components/WorkingText.tsx",
     "./figure/frame-doc": "./components/figure/frame-doc.ts"
   },
   "scripts": {

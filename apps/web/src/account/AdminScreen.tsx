@@ -9,7 +9,6 @@ import { Item } from '@astryxdesign/core/Item';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { NumberInput } from '@astryxdesign/core/NumberInput';
 import { Selector } from '@astryxdesign/core/Selector';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
@@ -24,6 +23,7 @@ import type {
   UpdateAdminSearchRequest,
 } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { formatDate } from '../app/format';
@@ -59,7 +59,7 @@ export function AdminScreen({ token, selfId }: { token: string; selfId: string }
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="68ch" data-testid="admin">
             <Heading level={2}>{m.admin_title()}</Heading>
-            {config.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+            {config.isPending ? <LoadingSkeleton label={m.loading()} /> : null}
             {config.isError ? (
               <Banner
                 status="error"
@@ -322,7 +322,7 @@ function Users({ token, selfId }: { token: string; selfId: string }) {
   return (
     <Block gap={3}>
       <Heading level={3}>{m.admin_users()}</Heading>
-      {users.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+      {users.isPending ? <LoadingSkeleton variant="list" label={m.loading()} /> : null}
       {update.isError ? (
         <Banner status="error" title={m.error_generic({ message: errorText(update.error) })} />
       ) : null}
@@ -385,7 +385,7 @@ function Search({ token }: { token: string }) {
   return (
     <Block gap={3} data-testid="admin-search">
       <Heading level={3}>{m.admin_search()}</Heading>
-      {search.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+      {search.isPending ? <LoadingSkeleton variant="list" label={m.loading()} /> : null}
       {update.isError ? (
         <Banner status="error" title={m.error_generic({ message: errorText(update.error) })} />
       ) : null}
