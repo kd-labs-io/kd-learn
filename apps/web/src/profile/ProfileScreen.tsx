@@ -38,6 +38,8 @@ const PROMPT_KEYS: ReadonlyArray<PromptKey> = [
   'extractor',
   'auditor',
   'merge',
+  'researchQueries',
+  'researchSummary',
 ];
 
 const promptLabel = (key: PromptKey) => {
@@ -56,6 +58,10 @@ const promptLabel = (key: PromptKey) => {
       return m.profile_prompt_auditor();
     case 'merge':
       return m.profile_prompt_merge();
+    case 'researchQueries':
+      return m.profile_prompt_researchQueries();
+    case 'researchSummary':
+      return m.profile_prompt_researchSummary();
   }
 };
 

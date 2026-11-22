@@ -315,6 +315,8 @@ export const SourceFailureCode = {
   Timeout: 'Timeout',
   Interrupted: 'Interrupted',
   Failed: 'Failed',
+  /** Research: the search found nothing (A5). */
+  NoResults: 'NoResults',
 } as const;
 
 const pdfFailureMessages: Record<string, string> = {
