@@ -11,7 +11,7 @@
 - ACP trên bản build: mới kiểm Claude Code (`KD_BUILD_ACP=1`). opencode và Antigravity cần bridge stdio (`packages/ai/src/acp/stdio-bridge.ts`) mà bản build chưa đóng gói; cần đóng gói bridge (hoặc chỉ dùng agent hỗ trợ MCP qua HTTP) trước khi bật hai agent này trên server thật. ACP trong Docker để sau phase 2 (C3). Admin bật được agent cả trên bản build không kèm ACP; lượt khi đó trả `AcpUnavailable` (thông báo cố định, chi tiết chỉ ở log server). Màn admin báo khi `acpAvailable` là `false` (bước 8).
 - Marketplace theme: chạy riêng trên từng server hay dùng một registry chung, cách kiểm duyệt, và theme dùng chung giấy phép nào.
 - `practice.e2e.ts` khách lỗi trên WebKit (từ phase 4; CI chỉ chạy Chromium).
-- Lỗi hydrate React #418 (lệch text giữa SSR và client) trên mọi trang của bản build, cả `/login` (thấy ở bước 10 phase 5).
+- Lỗi hydrate React #418 (lệch text giữa SSR và client) trên mọi trang của bản build, cả `/login`. Có từ trước phase 5 (bản build ở `c72355f`, đóng phase 4, cũng lỗi); thấy ở bước 10 phase 5.
 - Adapter ảnh tương thích OpenAI (`/images/generations`) chưa gọi thật tới endpoint nào; tham số khớp danh sách của OpenRouter (phase 5).
 - Với yêu cầu mơ hồ ("something interactive"), Haiku đôi khi vẽ sơ đồ thay vì làm demo (bước 10 phase 5). Cân nhắc chỉnh mô tả tool nếu người dùng gặp nhiều.
 
