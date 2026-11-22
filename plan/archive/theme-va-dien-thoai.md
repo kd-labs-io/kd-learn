@@ -1,13 +1,13 @@
 # Plan phần chính phase 6: theme, dark mode, web trên điện thoại
 
 - **Ngày lập:** 2026-11-22
-- **Phạm vi:** phase 6 ([mục 4](04-phases.md)): dark mode, chọn theme có sẵn, kiểm bản web trên trình duyệt điện thoại (Safari iOS, Chrome Android; hoãn từ phase 0). Vỏ Capacitor và màn hình nhập URL server chuyển sang phase 7
+- **Phạm vi:** phase 6 ([mục 4](../04-phases.md)): dark mode, chọn theme có sẵn, kiểm bản web trên trình duyệt điện thoại (Safari iOS, Chrome Android; hoãn từ phase 0). Vỏ Capacitor và màn hình nhập URL server chuyển sang phase 7
 - **Xong khi:** đăng nhập và học 1 buổi trên trình duyệt điện thoại; đổi theme và dark mode không vỡ sơ đồ, demo, graph
-- **Nền đã có:** theme là dữ liệu thuần có schema (`packages/tokens/src/schema.ts`, v1, một bộ màu), `toAstryxVars` là ánh xạ duy nhất sang biến Astryx, theme tĩnh build từ `default-theme.json` (`kdTheme.ts`, chỉ light). `ThemeRoot` (`apps/web/src/theme/ThemeRoot.tsx`) đặt `mode="light"` cố định, theme chạy lúc chạy là biến inline trên phần tử trong wrapper `[data-astryx-theme]` ([rủi ro 12](05-rui-ro.md)); `__root.tsx` đặt `data-theme="light"` trên `<html>`. Hình lấy màu bằng `figureVars(theme)` (hex thuần, vào blob SVG, Mermaid và khung demo); graph đọc token lúc vẽ (`GraphFigure.tsx`). `checkContrast` kiểm AA cho cặp chữ / nền. Token của tài khoản nằm ở `localStorage` nên bản SSR không thấy; locale đi qua cookie. Không có màu viết cứng trong `ui` và `web` (grep 2026-11-22). Migration hiện tại: khách v5, server v10
+- **Nền đã có:** theme là dữ liệu thuần có schema (`packages/tokens/src/schema.ts`, v1, một bộ màu), `toAstryxVars` là ánh xạ duy nhất sang biến Astryx, theme tĩnh build từ `default-theme.json` (`kdTheme.ts`, chỉ light). `ThemeRoot` (`apps/web/src/theme/ThemeRoot.tsx`) đặt `mode="light"` cố định, theme chạy lúc chạy là biến inline trên phần tử trong wrapper `[data-astryx-theme]` ([rủi ro 12](../05-rui-ro.md)); `__root.tsx` đặt `data-theme="light"` trên `<html>`. Hình lấy màu bằng `figureVars(theme)` (hex thuần, vào blob SVG, Mermaid và khung demo); graph đọc token lúc vẽ (`GraphFigure.tsx`). `checkContrast` kiểm AA cho cặp chữ / nền. Token của tài khoản nằm ở `localStorage` nên bản SSR không thấy; locale đi qua cookie. Không có màu viết cứng trong `ui` và `web` (grep 2026-11-22). Migration hiện tại: khách v5, server v10
 
 Ba quyết định sản phẩm chốt ngày 2026-11-22:
 
-1. **Phạm vi theme:** dark mode (sáng / tối / theo hệ thống) và chọn trong vài theme dựng sẵn. Theme tuỳ biến, import / export, marketplace vẫn để sau ([mục 4](04-phases.md)).
+1. **Phạm vi theme:** dark mode (sáng / tối / theo hệ thống) và chọn trong vài theme dựng sẵn. Theme tuỳ biến, import / export, marketplace vẫn để sau ([mục 4](../04-phases.md)).
 2. **Lưu lựa chọn:** khách lưu trên máy; tài khoản lưu trên server và đi theo người dùng qua các máy.
 3. **Điện thoại:** phase 6 kiểm bản web trên trình duyệt điện thoại; phase 7 chỉ lo vỏ Capacitor. Lần kiểm trên điện thoại thật do người dùng tự làm ở bước cuối (máy này chưa có simulator iOS hay AVD Android); các bước trước kiểm bằng giả lập thiết bị của Playwright.
 
@@ -18,7 +18,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
 - **Schema theme v2:** `colors` thành `{light: ColorTokens, dark: ColorTokens}`; font, cỡ chữ, bo góc, bóng dùng chung cho hai chế độ. Mọi theme đều có đủ hai bộ, nên dark mode không có trường hợp "theme này chỉ có light".
 - **Bỏ v1, không chuyển đổi:** chưa có theme nào được lưu (theme lúc chạy chỉ ở bộ nhớ, chưa có import). `decodeTheme` từ chối v1 như mọi giá trị ngoài schema.
 - **Tên token không đổi** (`DESIGN.md`): theme chỉ đổi giá trị, không thêm hay đổi tên token.
-- **`toAstryxVars(theme)`** trả `light-dark(<light>, <dark>)` cho mọi màu (Astryx đổi tuple `[light, dark]` thành đúng dạng này, [rủi ro 5](05-rui-ro.md): cần Safari 17.5). Màu dẫn xuất cũng tách theo chế độ:
+- **`toAstryxVars(theme)`** trả `light-dark(<light>, <dark>)` cho mọi màu (Astryx đổi tuple `[light, dark]` thành đúng dạng này, [rủi ro 5](../05-rui-ro.md): cần Safari 17.5). Màu dẫn xuất cũng tách theo chế độ:
   - Nền nhạt của màu trạng thái: `light-dark(color-mix(<màu light> 12%, <bg light>), color-mix(<màu dark> 12%, <bg dark>))`.
   - Bóng: light lấy màu `text` như hiện nay; dark dùng đen với độ mờ gấp đôi (màu `text` của dark sáng, thành quầng sáng). Schema bóng không đổi.
 - **`checkContrast(theme)`** kiểm cả hai bộ màu; mỗi theme dựng sẵn có test: không có cặp nào dưới AA ở cả hai chế độ.
@@ -30,7 +30,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
   - `kd`: mặc định, light theo `DESIGN.md`, dark mới (nền ấm tối, cùng tông terracotta). Bảng dark ghi vào mục "Dark mode" của `DESIGN.md`.
   - `kd-contrast`: tương phản cao (mục tiêu AAA 7:1 cho chữ chính), cho người cần đọc rõ.
   - `ocean`: tông lạnh (xanh), để chứng minh đổi theme đổi cả accent mà không vỡ gì.
-- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ mỗi màu là `light-dark()`. Theme khác không còn là biến inline trên một phần tử (spike C1: biến inline không tới được popover, toast, vì portal nằm ngoài wrapper). Thay vào đó, `<head>` có sẵn CSS của mọi theme dựng sẵn (`builtInThemeCss`, trong layer `product`), mỗi theme gắn với `:root[data-kd-theme="<id>"]` và `[data-astryx-theme]` bên trong. Đổi theme chỉ là đổi thuộc tính `data-kd-theme` trên `<html>`. CSS này giống hệt ở SSR, SPA và client nên không lệch hydrate. Giá trị đã qua schema (hex, độ dài, font trong danh sách) nên dựng CSS từ chúng an toàn ([rủi ro 11](05-rui-ro.md)).
+- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ mỗi màu là `light-dark()`. Theme khác không còn là biến inline trên một phần tử (spike C1: biến inline không tới được popover, toast, vì portal nằm ngoài wrapper). Thay vào đó, `<head>` có sẵn CSS của mọi theme dựng sẵn (`builtInThemeCss`, trong layer `product`), mỗi theme gắn với `:root[data-kd-theme="<id>"]` và `[data-astryx-theme]` bên trong. Đổi theme chỉ là đổi thuộc tính `data-kd-theme` trên `<html>`. CSS này giống hệt ở SSR, SPA và client nên không lệch hydrate. Giá trị đã qua schema (hex, độ dài, font trong danh sách) nên dựng CSS từ chúng an toàn ([rủi ro 11](../05-rui-ro.md)).
 - Tên hiện cho người dùng nằm ở i18n (`packages/i18n/messages/`), không ở JSON của theme.
 
 ### A3. Chế độ và lựa chọn của người dùng
@@ -64,9 +64,9 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
 ### A6. Web trên điện thoại
 
 - **Kiểm tự động** (Playwright, giả lập thiết bị: WebKit với iPhone, Chromium với Pixel): mọi màn chính (chào, đăng nhập, cài đặt, học, side chat, luyện tập, graph, nguồn, admin) không cuộn ngang ở 375 px; vùng bấm tối thiểu 44 px cho nút chính; ô trả lời và `Drawer` side chat dùng được. Lỗi tìm thấy sửa trong phase này.
-- **Giới hạn đã biết của giả lập:** WebKit của Playwright không có OPFS (context tạm) và không có bàn phím ảo; phần này chỉ kiểm được trên máy thật ([rủi ro 5](05-rui-ro.md)).
+- **Giới hạn đã biết của giả lập:** WebKit của Playwright không có OPFS (context tạm) và không có bàn phím ảo; phần này chỉ kiểm được trên máy thật ([rủi ro 5](../05-rui-ro.md)).
 - **Kiểm trên máy thật do người dùng làm** (bước 7). Cần ngữ cảnh an toàn (HTTPS): qua LAN bằng `http://<ip>` thì không có OPFS, `crypto.subtle` (rủi ro 49). Bước 6 chuẩn bị bản build, một đường HTTPS (Cloudflare quick tunnel hoặc `tailscale serve`, cả hai đã có trên máy) và danh sách kiểm.
-- **Lỗi React #418** (lệch text giữa SSR và client, [mục 6](06-viec-mo.md)) nằm đúng đường hydrate mà A3 sửa: điều tra và sửa trong phase này.
+- **Lỗi React #418** (lệch text giữa SSR và client, [mục 6](../06-viec-mo.md)) nằm đúng đường hydrate mà A3 sửa: điều tra và sửa trong phase này.
 - **`practice.e2e.ts` khách lỗi trên WebKit** (từ phase 4): điều tra trong phase này vì Safari là đích; nếu nguyên nhân chỉ có ở WebKit của Playwright (không có OPFS), ghi lại và để mở.
 
 ## B. Các bước
@@ -99,7 +99,7 @@ Mỗi bước một PR (bước lớn có thể tách), `turbo typecheck lint te
 7. Lỗi React #418 thấy trên Chromium ở mọi lần tải `/login`, không thấy trên Firefox và WebKit (bước 5).
 
 1. Theme tĩnh build với tuple `[light, dark]`: component Astryx đổi màu đúng khi `mode` là `light`, `dark`, `system`? Popover, toast (portal ngoài wrapper) có theo không?
-2. Theme lúc chạy (biến inline `light-dark(...)` trên phần tử trong wrapper) có thắng biến của theme tĩnh ở cả hai chế độ không (như [rủi ro 12](05-rui-ro.md) ở light)?
+2. Theme lúc chạy (biến inline `light-dark(...)` trên phần tử trong wrapper) có thắng biến của theme tĩnh ở cả hai chế độ không (như [rủi ro 12](../05-rui-ro.md) ở light)?
 3. Bản SSR: đặt `data-theme` trên `<html>` từ cookie và để `Theme` của Astryx đồng bộ lại có gây lệch hydrate (#418) không? `system` thì thuộc tính bị gỡ, có loé không?
 4. Bản SPA: script trong `<head>` đặt `data-theme` trước lần vẽ đầu, `Theme` sau khi mount có ghi đè sai không?
 5. Khối code: theme cú pháp của Astryx có bản dark không, đổi theo chế độ thế nào?
