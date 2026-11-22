@@ -88,11 +88,11 @@ Mọi mã do model sinh (demo HTML, và Mermaid nếu spike C2 chọn render tro
 
 | Route | Chế độ | Việc |
 | --- | --- | --- |
-| `POST /api/turns` | khách, demo | Thêm `imageModel` tuỳ chọn (A6). Frame SSE mới `figure {figureId, mime, body}` (ảnh: base64) phát trước các frame `event` của cuối lượt; client ghi hình và lô event trong một transaction |
+| `POST /api/turns` | khách, demo | Thêm `imageModel` tuỳ chọn (A6). Frame SSE mới `figure {figureId, encoding: text \| base64, body}` phát trước các frame `event` của cuối lượt (mime nằm ở `FigureAdded`); client ghi hình và lô event trong một transaction |
 | Stream của tài khoản | tài khoản | `FigureAdded` đi như event khác; nội dung lấy bằng route dưới |
-| `GET /api/account/figures/:id` | tài khoản | Nội dung một hình, đúng `content-type`, kèm `content-security-policy: sandbox; default-src 'none'`, `x-content-type-options: nosniff`, `cache-control: private` |
-| `GET /api/figures/options` | mọi chế độ | CDN bật hay tắt, danh sách thư viện, ảnh dùng được ở chế độ hiện tại (không lộ key) |
-| `GET` / `PUT /api/admin/figures` | admin | Công tắc CDN, `demo.images`, giá N |
+| `GET /api/account/figures/:id` | tài khoản | Nội dung một hình: chữ là `text/plain`, ảnh là `application/octet-stream` (client dựng blob theo mime trong `FigureAdded`, không bao giờ để trình duyệt hiện nó như tài liệu), kèm `content-security-policy: sandbox; default-src 'none'`, `x-content-type-options: nosniff`, `cache-control: private, immutable` |
+| `GET /api/config` | mọi chế độ | Thêm `figureCdn` (đã làm ở bước 5) và cờ ảnh dùng được ở chế độ hiện tại (bước 9). Không có route `/api/figures/options` riêng |
+| `GET` / `PUT /api/admin/config` | admin | Thêm `figureCdn` (bước 5), `demoImages`, `demoImageCost` (bước 9). Không có route `/api/admin/figures` riêng |
 
 - **Ảnh của tài khoản:** auth chỉ có Bearer, nên `<img src="/api/...">` không xác thực được. Client tải bằng `fetch` kèm token rồi hiện qua blob URL (cả SVG, Mermaid và HTML cũng lấy theo cách này). TanStack Query giữ cache theo `figureId` (hình không đổi sau khi ghi).
 - Route tài khoản có test cross-user ([rủi ro 26](05-rui-ro.md)); route khách / demo có test key không lộ, cả key model chữ lẫn key model ảnh ([rủi ro 19](05-rui-ro.md)).
