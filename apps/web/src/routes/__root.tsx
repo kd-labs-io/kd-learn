@@ -15,6 +15,7 @@ import { I18nRoot } from '../i18n/I18nRoot';
 import { builtInThemeCss } from '@kd-learn/tokens';
 import { htmlThemeAttribute, prePaintScript, readAppearance } from '../theme/appearance';
 import { ThemeRoot } from '../theme/ThemeRoot';
+import { AppRail, RailSlotProvider } from '../app/AppRail';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -25,7 +26,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     // Dev only: Start renders its own HTML, so the StyleX Vite plugin cannot add
     // its dev stylesheet. Production builds put StyleX CSS in the main bundle.
-    links: import.meta.env.DEV ? [{ rel: 'stylesheet', href: '/virtual:stylex.css' }] : [],
+    links: [
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      ...(import.meta.env.DEV ? [{ rel: 'stylesheet', href: '/virtual:stylex.css' }] : []),
+    ],
   }),
   component: RootComponent,
   shellComponent: RootDocument,
@@ -33,12 +37,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   // Fills the viewport; each screen is a Layout inside it, so the lesson scrolls in its own region.
+  // No top bar: the left rail carries the logo, the places and the account menu (on a phone AppShell
+  // shows it as a top bar with a menu button). A screen adds its own part to the rail with RailSlot.
   const app = (
     <I18nRoot>
       <ThemeRoot>
-        <AppShell>
-          <Outlet />
-        </AppShell>
+        <RailSlotProvider>
+          <AppShell sideNav={<AppRail />}>
+            <Outlet />
+          </AppShell>
+        </RailSlotProvider>
       </ThemeRoot>
     </I18nRoot>
   );

@@ -2,7 +2,6 @@ import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
 import { Card } from '@astryxdesign/core/Card';
 import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
-import { Heading } from '@astryxdesign/core/Heading';
 import { Selector } from '@astryxdesign/core/Selector';
 import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
@@ -87,7 +86,6 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
   return (
     <VStack gap={3} data-testid="side-chat">
       <VStack gap={2}>
-        <Heading level={2}>{m.side_title()}</Heading>
         <Text type="supporting">{m.side_hint()}</Text>
         {others.length === 0 ? (
           <Text type="supporting" color="accent" data-testid="side-step">

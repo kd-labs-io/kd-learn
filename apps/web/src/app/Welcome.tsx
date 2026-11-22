@@ -11,7 +11,6 @@ import type { PublicConfig } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { chooseLocalMode } from '../account/auth';
-import { AppHeader } from './AppHeader';
 import { pageWidth } from './page';
 
 export function Welcome({ config }: { config: PublicConfig }) {
@@ -19,7 +18,6 @@ export function Welcome({ config }: { config: PublicConfig }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={5} maxWidth="68ch" data-testid="welcome">

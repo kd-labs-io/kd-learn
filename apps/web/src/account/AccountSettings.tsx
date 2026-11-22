@@ -27,7 +27,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useAccountSourceLibrary } from '../sources/library';
 import { SearchPreference } from '../sources/SearchPreference';
-import { AppHeader } from '../app/AppHeader';
 import { ProfileLink } from '../profile/ProfileLink';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { errorCode, errorText, keys, useAccountApi } from './api';
@@ -107,7 +106,6 @@ export function AccountSettingsScreen({ token }: { token: string }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="720px">

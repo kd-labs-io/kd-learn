@@ -26,7 +26,6 @@ import type {
 import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { formatDate } from '../app/format';
 import { agentLabel } from './AccountSettings';
 import { errorText, keys, useAccountApi } from './api';
@@ -56,7 +55,6 @@ export function AdminScreen({ token, selfId }: { token: string; selfId: string }
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="68ch" data-testid="admin">

@@ -19,7 +19,6 @@ import { VStack } from '@astryxdesign/core/VStack';
 import type { EdgeView, GraphView, PropositionView } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { AppHeader } from '../app/AppHeader';
 import { relationText } from './relation';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
 import type { SourceLibrary } from '../sources/library';
@@ -63,7 +62,6 @@ export function GraphScreen({
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           {view.status === 'loading' ? (
@@ -242,7 +240,6 @@ function ReadyGraph({
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       end={
         wide ? (
           <LayoutPanel width={420} hasDivider label={m.graph_detail_title()}>

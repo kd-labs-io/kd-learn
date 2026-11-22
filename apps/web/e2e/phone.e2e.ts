@@ -3,6 +3,7 @@
 // show the on-screen keyboard or OPFS on WebKit: those are checked on real phones (step 7).
 import { expect, test, type Page } from '@playwright/test';
 import { E2E_ADMIN, accountsPort } from './accounts-env';
+import { expectWho } from './rail';
 
 test.use({ locale: 'en-US', baseURL: `http://localhost:${accountsPort}` });
 
@@ -80,7 +81,7 @@ test('sign up and learn a session to its end on a phone, in dark mode', async ({
   await page.getByLabel('Password').fill('learner-password-1');
   await tappable(page, 'auth-submit');
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('who')).toHaveText(email);
+  await expectWho(page, email);
   await page.waitForLoadState('networkidle');
 
   const key = `key-${unique()}-0123456789`;
@@ -116,10 +117,12 @@ test('sign up and learn a session to its end on a phone, in dark mode', async ({
   await composer.fill('#assess');
   await page.getByTestId('composer-send').click();
   await expect(composer).toBeEditable();
-  // No plan column on a phone: the plan folds above the conversation.
-  await page.getByText('Plan', { exact: true }).first().click();
-  await expect(page.getByTestId('plan-panel').getByText('Basics').first()).toBeVisible();
-  await fitsWidth(page, 'lesson with the plan open');
+  // No rail on a phone: the plan is in the rail drawer behind the menu button.
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  const plan = page.getByTestId('plan-panel').filter({ visible: true });
+  await expect(plan.getByText('Basics').first()).toBeVisible();
+  await expect(async () => fitsWidth(page, 'lesson with the plan open')).toPass({ timeout: 3000 });
+  await page.keyboard.press('Escape');
 
   // The side chat opens over the lesson and closes again.
   await page.getByTestId('side-open').click();
@@ -145,7 +148,7 @@ test('the admin screen fits the phone width', async ({ page }) => {
   await page.getByLabel('Email').fill(E2E_ADMIN.email);
   await page.getByLabel('Password').fill(E2E_ADMIN.password);
   await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('who')).toHaveText(E2E_ADMIN.email);
+  await expectWho(page, E2E_ADMIN.email);
   await page.waitForLoadState('networkidle');
   await page.goto('/admin');
   await page.waitForLoadState('networkidle');

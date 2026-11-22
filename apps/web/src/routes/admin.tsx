@@ -4,7 +4,6 @@ import { m } from '@kd-learn/i18n';
 import { Navigate, createFileRoute } from '@tanstack/react-router';
 import { AdminScreen } from '../account/AdminScreen';
 import { useWho } from '../account/auth';
-import { AppHeader } from '../app/AppHeader';
 import { pageWidth } from '../app/page';
 
 export const Route = createFileRoute('/admin')({ component: Admin });
@@ -17,7 +16,6 @@ function Admin() {
     return (
       <Layout
         contentWidth={pageWidth}
-        header={<AppHeader />}
         content={
           <LayoutContent padding={6}>
             <Banner status="warning" title={m.admin_only()} />

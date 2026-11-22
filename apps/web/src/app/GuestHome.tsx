@@ -12,7 +12,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import type { LocalMode } from '../account/auth';
 import { useStoragePersistent } from '../learn/hooks';
-import { AppHeader } from './AppHeader';
 import { homeColumn, SessionRows, StartTopic } from './HomeParts';
 import { PracticeLink } from '../practice/PracticeLink';
 import { useGuestSourceLibrary, preferredProvider } from '../sources/library';
@@ -94,7 +93,6 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
   return (
     <Layout
       contentWidth={pageWidth}
-      header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
           <VStack gap={6}>
