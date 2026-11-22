@@ -1,6 +1,6 @@
 # Plan kd-learn
 
-- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 xong (2026-11-21, [archive/phase-2.md](archive/phase-2.md); plan phần chính ở [archive/tai-khoan.md](archive/tai-khoan.md)). Phase 3 xong (2026-11-22, [archive/phase-3.md](archive/phase-3.md); plan phần chính ở [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md)). Phase 4 (nguồn học + việc nền): đã có plan ([nguon-hoc.md](nguon-hoc.md)), chưa bắt đầu bước nào
+- **Trạng thái:** phase 0 xong (2026-11-17, [archive/phase-0.md](archive/phase-0.md)), phase 1 xong (2026-11-21, [archive/phase-1.md](archive/phase-1.md); spike port AI ở [archive/spike-port-ai.md](archive/spike-port-ai.md), plan phần chính ở [archive/loi-day-hoc.md](archive/loi-day-hoc.md)). Phase 2 xong (2026-11-21, [archive/phase-2.md](archive/phase-2.md); plan phần chính ở [archive/tai-khoan.md](archive/tai-khoan.md)). Phase 3 xong (2026-11-22, [archive/phase-3.md](archive/phase-3.md); plan phần chính ở [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md)). Phase 4 (nguồn học + việc nền): đang làm: đã có plan ([nguon-hoc.md](nguon-hoc.md)), chưa xong bước nào
 - **Nguồn:** `probe/IDEA.md` và phần hỏi đáp trong `probe/AGENT_FEEDBACK.md`
 - **Lịch sử thay đổi:** [changelog.md](changelog.md)
 
