@@ -95,7 +95,7 @@ Rules every screen follows (phase 7, `plan/cai-thien-ux.md`). Check them with th
 - **Navigation says where you are.** The current place is marked (`aria-current="page"`, filled button). Account actions (language, admin, sign out) live in the account menu, not beside the places.
 - **A box sits under what it answers.** A composer shares the column of its conversation (the lesson uses a nested `Layout` with `contentWidth="72ch"`).
 - **Roles are visible.** Learner messages are right-aligned bubbles (`ChatMessage sender="user"`); tutor text is full-width with an accent label.
-- **Every list has its states.** Loading (`Spinner`), empty (`EmptyState` with what to do next), error (`Banner` with a retry), and rows that say where each item stands (status, progress), not only a date.
+- **Every list has its states.** Loading (`LoadingSkeleton` in the shape of the content; `WorkingText` for a running task such as writing or grading; no `Spinner` with text), empty (`EmptyState` with what to do next), error (`Banner` with a retry), and rows that say where each item stands (status, progress), not only a date.
 - **Disabled says why.** Prefer an enabled button that explains on press (field `status`), or `disabledMessage`. Never a pale button with no reason.
 - **Panels are opt-in.** Secondary tools (side chat) are closed until asked for; a column on a wide screen, a `Drawer` on a phone. Remember a column choice per device; never open a drawer by itself.
 - **Phones.** No sideways scroll, no control cut at the right edge, main buttons at least 44 px, header at most two rows. Keyboard shortcuts (Enter to send) only for a fine pointer.

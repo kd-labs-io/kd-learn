@@ -137,3 +137,22 @@ test('admin', async ({ page }) => {
   await page.goto('/admin');
   await shoot(page, 'admin');
 });
+
+test('loading', async ({ page }) => {
+  const email = `shots-${unique()}@e2e.test`;
+  await page.goto('/register');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('learner-password-1');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('who')).toHaveText(email);
+  // Hold the lists' requests so the pictures show their loading state.
+  await page.route(/\/(sessions|sources)(\?|$)/, (route) =>
+    route.request().resourceType() === 'document' ? route.continue() : undefined,
+  );
+  for (const path of ['/', '/sources']) {
+    await page.goto(path);
+    await shoot(page, `loading${path === '/' ? '-home' : path.replace('/', '-')}`, async () => {
+      await expect(page.getByTestId('loading').first()).toBeVisible();
+    });
+  }
+});

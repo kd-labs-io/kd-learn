@@ -48,6 +48,7 @@
   "plan_title": "Plan",
   "plan_progress": "{done} of {total} steps done",
   "plan_phase_probing": "Getting to know what you already know",
+  "loading": "Loading…",
   "plan_phase_planning": "Writing your plan",
   "plan_status_done": "Done",
   "plan_status_skipped": "Skipped",

@@ -1,11 +1,11 @@
 import { Banner } from '@astryxdesign/core/Banner';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { Selector } from '@astryxdesign/core/Selector';
 import { Text } from '@astryxdesign/core/Text';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
@@ -123,7 +123,7 @@ export function GuestSettings() {
               />
             ) : null}
 
-            {stored.status === 'loading' ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+            {stored.status === 'loading' ? <LoadingSkeleton label={m.loading()} /> : null}
             {stored.status === 'error' ? (
               <Banner status="error" title={m.storage_error({ reason: stored.error.message })} />
             ) : null}

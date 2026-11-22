@@ -8,7 +8,6 @@ import { HStack } from '@astryxdesign/core/HStack';
 import { Item } from '@astryxdesign/core/Item';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { Selector } from '@astryxdesign/core/Selector';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
@@ -23,6 +22,7 @@ import type {
 } from '@kd-learn/api';
 import { roleFallback } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useAccountSourceLibrary } from '../sources/library';
@@ -112,7 +112,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
         <LayoutContent padding={6}>
           <VStack gap={6} maxWidth="720px">
             <Heading level={2}>{m.settings_title()}</Heading>
-            {settings.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+            {settings.isPending ? <LoadingSkeleton label={m.loading()} /> : null}
             {settings.isError ? (
               <Banner
                 status="error"

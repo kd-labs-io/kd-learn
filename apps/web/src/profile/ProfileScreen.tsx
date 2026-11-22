@@ -8,7 +8,6 @@ import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { NumberInput } from '@astryxdesign/core/NumberInput';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
@@ -25,6 +24,7 @@ import {
   type ResolvedProfile,
 } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useForm } from '@tanstack/react-form';
 import { Schema } from 'effect';
 import { useState } from 'react';
@@ -167,7 +167,7 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
         <LayoutContent padding={6}>
           <VStack gap={5} maxWidth="80ch">
             <Heading level={2}>{m.profile_title()}</Heading>
-            {view.status === 'loading' ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+            {view.status === 'loading' ? <LoadingSkeleton label={m.loading()} /> : null}
             {view.status === 'error' ? (
               <Banner status="error" title={m.account_load_failed({ reason: view.message })} />
             ) : null}

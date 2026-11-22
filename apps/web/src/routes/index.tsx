@@ -1,5 +1,5 @@
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { m } from '@kd-learn/i18n';
 import { createFileRoute } from '@tanstack/react-router';
 import { AccountHome } from '../account/AccountHome';
@@ -18,7 +18,7 @@ function Loading() {
       contentWidth={pageWidth}
       content={
         <LayoutContent padding={6}>
-          <Spinner label={m.learn_loading()} />
+          <LoadingSkeleton label={m.loading()} />
         </LayoutContent>
       }
     />

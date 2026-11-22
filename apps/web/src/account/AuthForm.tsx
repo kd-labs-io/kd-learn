@@ -5,12 +5,12 @@ import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { accountClient } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
@@ -91,9 +91,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
               <Heading level={2}>
                 {mode === 'login' ? m.auth_login_title() : m.auth_register_title()}
               </Heading>
-              {config.isPending || !hydrated ? (
-                <Spinner size="sm" label={m.learn_loading()} />
-              ) : null}
+              {config.isPending || !hydrated ? <LoadingSkeleton label={m.loading()} /> : null}
               {config.data !== undefined && !config.data.accounts ? (
                 <Banner status="info" title={m.auth_no_accounts()} data-testid="no-accounts" />
               ) : null}

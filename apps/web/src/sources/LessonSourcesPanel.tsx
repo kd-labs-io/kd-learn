@@ -3,11 +3,11 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList';
 import { Heading } from '@astryxdesign/core/Heading';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
 import type { Session } from '@kd-learn/core';
 import { m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
 import { useState } from 'react';
 import type { LessonSources } from './library';
 import { kindText } from './SourcesScreen';
@@ -45,7 +45,7 @@ export function LessonSourcesPanel({
       <Heading level={3}>{m.lesson_sources_title()}</Heading>
       <Text type="supporting">{m.lesson_sources_hint()}</Text>
       {error ? <Banner status="error" title={error} /> : null}
-      {view.status === 'loading' ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+      {view.status === 'loading' ? <LoadingSkeleton variant="list" label={m.loading()} /> : null}
       {view.status === 'error' ? <Banner status="error" title={view.message} /> : null}
       {view.status === 'ready' && rows.length === 0 ? (
         <Text type="supporting">{m.sources_empty_hint()}</Text>

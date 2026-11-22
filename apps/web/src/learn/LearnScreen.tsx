@@ -1,4 +1,6 @@
 import { Banner } from '@astryxdesign/core/Banner';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
+import { WorkingText } from '@kd-learn/ui/components/WorkingText';
 import { Button } from '@astryxdesign/core/Button';
 import { Card } from '@astryxdesign/core/Card';
 import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
@@ -14,7 +16,6 @@ import {
   LayoutHeader,
   LayoutPanel,
 } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
@@ -124,7 +125,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
       <Layout
         content={
           <LayoutContent padding={6}>
-            <Spinner label={m.learn_loading()} />
+            <LoadingSkeleton label={m.learn_loading()} />
           </LayoutContent>
         }
       />
@@ -408,7 +409,7 @@ function Conversation({
               {m.conv_tutor()}
             </Text>
             {live.text === '' ? (
-              <Spinner size="sm" label={m.conv_writing()} />
+              <WorkingText label={m.conv_writing()} />
             ) : (
               <LessonFigure
                 figures={figures}

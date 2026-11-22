@@ -8,12 +8,13 @@ import { Card } from '@astryxdesign/core/Card';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
-import { Spinner } from '@astryxdesign/core/Spinner';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
 import type { ExerciseView, PracticeView } from '@kd-learn/api';
 import { masteryBoxes, type ExerciseAnswer } from '@kd-learn/core';
 import { getLocaleTag, m } from '@kd-learn/i18n';
+import { LoadingSkeleton } from '@kd-learn/ui/components/LoadingSkeleton';
+import { WorkingText } from '@kd-learn/ui/components/WorkingText';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
@@ -123,7 +124,7 @@ function Exercise({
         {exercise.grade !== undefined ? <Grade exercise={exercise} /> : null}
         {answered && exercise.grade === undefined ? (
           busy ? (
-            <Spinner size="sm" label={m.practice_grading()} />
+            <WorkingText label={m.practice_grading()} />
           ) : (
             <Banner
               status="info"
@@ -229,7 +230,7 @@ export function PracticeScreen({ source }: { readonly source: PracticeSource }) 
 
   let body;
   if (view.status === 'loading') {
-    body = <Spinner label={m.learn_loading()} />;
+    body = <LoadingSkeleton label={m.loading()} />;
   } else if (view.status === 'error') {
     body = <Banner status="error" title={m.practice_failed({ reason: view.message })} />;
   } else if (view.practice !== undefined) {
