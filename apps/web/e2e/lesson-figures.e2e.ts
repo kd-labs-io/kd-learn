@@ -2,7 +2,7 @@
 // the fake model (e2e/fake-openai.ts): the real agent tools, server, storage and screen. `#diagram`,
 // `#mermaid`, `#demo` and `#hostile` in a learner message make the fake Teacher call a figure tool.
 import { expect, test, type Page } from '@playwright/test';
-import { accountsPort } from './accounts-env';
+import { accountsPort, fakeModelPort } from './accounts-env';
 
 test.use({ locale: 'en-US', baseURL: `http://localhost:${accountsPort}` });
 
@@ -101,6 +101,51 @@ test.describe('guest', () => {
     await expect(tutor(page).getByTestId('figure-image')).toBeVisible();
 
     await hostileDemoStaysInside(page, outside);
+  });
+
+  test('the image model draws with its own key, and the image survives a reload', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByTestId('choose-guest').click();
+    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('provider').click();
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
+    await page.getByTestId('endpoint').click();
+    await page.getByRole('option', { name: 'Fake model' }).click();
+    await page.getByLabel('Model').fill('fake-model');
+    await page.getByLabel('API key').fill(`guest-text-${unique()}-0123456789`);
+    await page.getByTestId('save-settings').click();
+    await expect(page.getByTestId('settings-message')).toContainText('Saved');
+
+    const imageKey = `guest-image-${unique()}-0123456789`;
+    await page.getByTestId('image-provider').click();
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
+    await page.getByTestId('image-endpoint').click();
+    // Only endpoints that make images are offered.
+    await expect(page.getByRole('option', { name: 'Fake model' })).toHaveCount(0);
+    await page.getByRole('option', { name: 'Fake images' }).click();
+    await page.getByTestId('image-model').fill('fake-image');
+    await page.getByTestId('image-api-key').fill(imageKey);
+    await page.getByTestId('image-save').click();
+    await expect(page.getByTestId('image-settings-message')).toContainText('Saved');
+    // Saving the text model again keeps the image model.
+    await page.getByTestId('save-settings').click();
+    await page.reload();
+    await expect(page.getByTestId('image-delete-key')).toBeVisible();
+    await page.getByTestId('nav-home').click();
+
+    await startTeaching(page, 'Colors');
+    await answer(page, '#image');
+    const image = tutor(page).last().getByRole('img', { name: 'A red square' });
+    await expect(image).toBeVisible({ timeout: 20_000 });
+    await expect
+      .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))
+      .toBe(16);
+    const calls = await fetch(`http://localhost:${fakeModelPort}/calls/${imageKey}`);
+    expect(((await calls.json()) as { calls: number }).calls).toBe(1);
+    await page.reload();
+    await expect(tutor(page).getByRole('img', { name: 'A red square' })).toBeVisible();
   });
 });
 

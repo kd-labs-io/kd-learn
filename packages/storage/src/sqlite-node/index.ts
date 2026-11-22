@@ -383,6 +383,7 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
     getSettings: Effect.succeed(undefined),
     saveSettings: () => guestOnly,
     deleteApiKey: guestOnly,
+    deleteImageApiKey: guestOnly,
 
     getProfile: run(() => getProfile.get(userId) as { payload: string } | undefined).pipe(
       Effect.flatMap((row) =>

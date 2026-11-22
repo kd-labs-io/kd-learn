@@ -64,6 +64,21 @@ export const ModelChoice = Schema.Union([
 ]);
 export type ModelChoice = typeof ModelChoice.Type;
 
+/**
+ * The guest's image model (phase 5 A6): Gemini, or an endpoint marked `images`. Its own key, kept
+ * out of logs like the text key (risk 19). Never in demo mode.
+ */
+export const ImageModelChoice = Schema.Union([
+  Schema.Struct({ provider: Schema.Literal('gemini'), model: ModelName, apiKey: Secret }),
+  Schema.Struct({
+    provider: Schema.Literal('openai-compatible'),
+    endpointId: EndpointId,
+    model: ModelName,
+    apiKey: Secret,
+  }),
+]);
+export type ImageModelChoice = typeof ImageModelChoice.Type;
+
 /** The main thread, or a side chat thread (plan A5). */
 export const TurnSelector = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('main') }),
@@ -88,6 +103,8 @@ export const TurnRequest = Schema.Struct({
    * turn. Main turns only; at most `MAX_SOURCE_SLICE_BYTES`.
    */
   sourceSlice: Schema.optionalKey(SourceSlice),
+  /** Guest main turns only (phase 5 A6): offers `generate_image`. */
+  imageModel: Schema.optionalKey(ImageModelChoice),
 });
 export type TurnRequest = typeof TurnRequest.Type;
 
@@ -511,6 +528,8 @@ export const PublicConfig = Schema.Struct({
   demoMode: Schema.Boolean,
   /** Demos of the Teacher may load the pinned CDN libraries (phase 5 A5). */
   figureCdn: Schema.Boolean,
+  /** Demo mode may make images now: the admin switch is on and a demo image model is set (A9). */
+  demoImages: Schema.Boolean,
 });
 export type PublicConfig = typeof PublicConfig.Type;
 
@@ -533,6 +552,12 @@ export const AdminConfig = Schema.Struct({
   guestMode: Schema.Boolean,
   demoMode: Schema.Boolean,
   figureCdn: Schema.Boolean,
+  /** Demo turns may make images (phase 5 A9). Off by default. */
+  demoImages: Schema.Boolean,
+  /** Demo budget calls one image costs. */
+  demoImageCost: Schema.Int,
+  /** The demo image model from the environment; absent when none is set (then no demo images). */
+  demoImageModel: Schema.optionalKey(Schema.String),
   demoBudget: DemoBudget,
   /** The demo model from the environment, without its key; absent when none is set. */
   demoModel: Schema.optionalKey(Schema.String),
@@ -556,6 +581,10 @@ export const UpdateAdminConfigRequest = Schema.Struct({
   guestMode: Schema.optionalKey(Schema.Boolean),
   demoMode: Schema.optionalKey(Schema.Boolean),
   figureCdn: Schema.optionalKey(Schema.Boolean),
+  demoImages: Schema.optionalKey(Schema.Boolean),
+  demoImageCost: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(1000)),
+  ),
   demoBudgetLimit: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1_000_000_000)),
   ),

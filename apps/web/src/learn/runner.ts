@@ -35,7 +35,7 @@ import {
 } from '@kd-learn/core';
 import { StorageBusy, type StorageService } from '@kd-learn/storage/port';
 import { isLockHeld, sideLockName, turnLockName, withLock, type WithLock } from './locks';
-import { modelChoiceOf } from './model';
+import { imageChoiceOf, modelChoiceOf } from './model';
 
 export { shouldAutoStart };
 
@@ -331,12 +331,18 @@ export class SessionRunner {
     this.setMain({ live: { turnId, text: '' }, failure: undefined });
     const parts = new Map<string, string>();
     const sourceSlice = await this.sourceSlice(storage, withStarted, input);
+    // The demo uses the server's image model; a guest sends their own, when complete.
+    const imageModel =
+      model.provider === 'demo'
+        ? undefined
+        : imageChoiceOf(await Effect.runPromise(storage.getSettings));
     const collected = await this.collect(
       {
         model,
         turn: { kind: 'main' },
         log: withStarted,
         ...(sourceSlice.length === 0 ? {} : { sourceSlice }),
+        ...(imageModel === undefined ? {} : { imageModel }),
       },
       (frame) => {
         if (frame._tag !== 'delta') return;

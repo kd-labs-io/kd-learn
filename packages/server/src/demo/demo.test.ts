@@ -303,3 +303,145 @@ describe('metered AI', () => {
     expect(capped.seen[0]).toMatchObject({ maxSteps: 1 });
   });
 });
+
+describe('demo images (phase 5 A9)', () => {
+  const IMAGE_KEY_ENV = {
+    ...demoEnv(100),
+    KD_LEARN_DEMO_PROVIDER: 'gemini',
+    KD_LEARN_DEMO_MODEL: 'gemini-3-flash',
+    KD_LEARN_DEMO_IMAGE_MODEL: 'gemini-3.1-flash-lite-image',
+  };
+  const teaching = [
+    {
+      _tag: 'SessionCreated',
+      id: 'f1',
+      at: 1,
+      sessionId: 's1',
+      topic: 'T',
+      profile: defaultProfile,
+    },
+    { _tag: 'TurnStarted', id: 'f2', at: 1, turnId: 't0', input: '' },
+    {
+      _tag: 'AssessmentRecorded',
+      id: 'f3',
+      at: 1,
+      turnId: 't0',
+      level: 'beginner',
+      summary: 's',
+      strengths: [],
+      gaps: [],
+    },
+    { _tag: 'TurnCompleted', id: 'f4', at: 1, turnId: 't0', reason: 'stop' },
+    { _tag: 'TurnStarted', id: 'f5', at: 1, turnId: 't1', input: '' },
+    {
+      _tag: 'PlanCreated',
+      id: 'f6',
+      at: 1,
+      turnId: 't1',
+      plan: { nodes: [{ id: 'a', title: 'A', goal: 'Learn A', dependsOn: [] }] },
+    },
+    { _tag: 'TurnCompleted', id: 'f7', at: 1, turnId: 't1', reason: 'stop' },
+    { _tag: 'TurnStarted', id: 'f8', at: 2, turnId: 't2', input: 'show me' },
+  ];
+  /** Calls `generate_image` when offered and reports the tool's answer or error as text. */
+  const draw: Parameters<typeof scriptedAi>[0][number] = (request) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const spec = request.tools?.find((tool) => tool.name === 'generate_image');
+        const output =
+          spec === undefined
+            ? 'no tool'
+            : yield* spec
+                .run({ title: 'A cell', prompt: 'A plant cell' } as never)
+                .pipe(Effect.catch((error) => Effect.succeed(`error: ${error.message}`)));
+        return Stream.fromIterable<TurnEvent<never>>([
+          { _tag: 'TextDelta', messageId: 'm1', delta: String(output) },
+          { _tag: 'Usage', inputTokens: 1, outputTokens: 1 },
+          { _tag: 'Finish', reason: 'stop' },
+        ]);
+      }),
+    );
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 7]);
+
+  it('is off by default; on, each image reserves N calls first; short, the provider is not called', async () => {
+    const asked: Array<{ model: string; apiKey: string }> = [];
+    const fake = scriptedAi([draw, draw, draw]);
+    const { handlers, logs } = make(IMAGE_KEY_ENV, {
+      ai: fake.layer,
+      images: {
+        generate: (request) =>
+          Effect.sync(() => {
+            asked.push({ model: request.model.model, apiKey: request.model.apiKey });
+            return {
+              mime: 'image/jpeg' as const,
+              bytes: JPEG,
+              usage: { inputTokens: 3, outputTokens: 9 },
+            };
+          }),
+      },
+    });
+    const admin = (
+      (await (await call(handlers.login, 'POST', '/api/auth/login', undefined, ADMIN)).json()) as {
+        token: string;
+      }
+    ).token;
+    const turn = async (extra: Record<string, unknown> = {}) => {
+      const response = await call(handlers.turns, 'POST', '/api/turns', undefined, {
+        model: { provider: 'demo' },
+        turn: { kind: 'main' },
+        log: teaching,
+        ...extra,
+      });
+      return { status: response.status, text: await response.text() };
+    };
+    const config = async () =>
+      (await (await call(handlers.admin, 'GET', '/api/admin/config', admin)).json()) as {
+        demoImages: boolean;
+        demoImageCost: number;
+        demoImageModel?: string;
+        demoBudget: { used: number };
+      };
+    const publicImages = async () =>
+      (
+        (await (await call(handlers.config, 'GET', '/api/config')).json()) as {
+          demoImages: boolean;
+        }
+      ).demoImages;
+
+    expect(await config()).toMatchObject({
+      demoImages: false,
+      demoImageCost: 10,
+      demoImageModel: 'gemini:gemini-3.1-flash-lite-image',
+    });
+    expect(await publicImages()).toBe(false);
+    expect((await turn()).text).toContain('no tool');
+    expect((await config()).demoBudget.used).toBe(1);
+
+    await call(handlers.admin, 'PUT', '/api/admin/config', admin, {
+      demoImages: true,
+      demoImageCost: 30,
+    });
+    expect(await publicImages()).toBe(true);
+    const drawn = await turn();
+    expect(drawn.text).toContain('"_tag":"figure"');
+    expect(asked).toEqual([{ model: 'gemini-3.1-flash-lite-image', apiKey: DEMO_KEY }]);
+    // One text call, then the image's 30.
+    expect((await config()).demoBudget.used).toBe(1 + 1 + 30);
+
+    // 32 used, 68 left at limit 100; at limit 50 only 18 are left: less than one image.
+    await call(handlers.admin, 'PUT', '/api/admin/config', admin, { demoBudgetLimit: 50 });
+    const short = await turn();
+    expect(short.text).toContain('no budget left for images');
+    expect(asked).toHaveLength(1);
+    expect((await config()).demoBudget.used).toBe(33);
+
+    // The client never picks the demo's image model or key.
+    const forged = await turn({
+      imageModel: { provider: 'gemini', model: 'x', apiKey: 'AIza-forged-0123456789' },
+    });
+    expect(forged.status).toBe(400);
+    for (const entry of [JSON.stringify(logs), drawn.text, short.text]) {
+      expect(entry).not.toContain(DEMO_KEY);
+    }
+  });
+});

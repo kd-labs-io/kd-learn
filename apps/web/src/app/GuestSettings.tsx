@@ -4,11 +4,13 @@ import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { Selector } from '@astryxdesign/core/Selector';
+import { Text } from '@astryxdesign/core/Text';
 import { Spinner } from '@astryxdesign/core/Spinner';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
-import type { GuestProvider, GuestSettings } from '@kd-learn/storage/port';
+import type { EndpointInfo } from '@kd-learn/api';
+import type { GuestImageSettings, GuestProvider, GuestSettings } from '@kd-learn/storage/port';
 import { useEffect, useState } from 'react';
 import { AppHeader } from './AppHeader';
 import { useGuestSourceLibrary } from '../sources/library';
@@ -72,6 +74,8 @@ export function GuestSettings() {
       model: name,
       apiKey: key,
       ...(provider === 'openai-compatible' ? { endpointId } : {}),
+      // The image model is saved on its own; keep it.
+      ...(stored.status === 'ready' && stored.data?.image ? { image: stored.data.image } : {}),
     };
     try {
       await runStorage((storage) => storage.saveSettings(next));
@@ -194,11 +198,197 @@ export function GuestSettings() {
               )}
             </HStack>
 
+            <ImageSettings
+              stored={stored.status === 'ready' ? stored.data : undefined}
+              endpoints={offered}
+            />
+
             <SearchPreference providers={library.providers} />
             <ProfileLink />
           </VStack>
         </LayoutContent>
       }
     />
+  );
+}
+
+type ImageProvider = GuestImageSettings['provider'];
+
+/**
+ * The image model (phase 5 A6): Gemini or an endpoint that makes images, with a key of its own.
+ * Saved apart from the text model; without it the Teacher makes no images.
+ */
+function ImageSettings({
+  stored,
+  endpoints,
+}: {
+  stored: GuestSettings | undefined;
+  endpoints: ReadonlyArray<EndpointInfo>;
+}) {
+  const saved = stored?.image;
+  const [provider, setProvider] = useState<ImageProvider | ''>(saved?.provider ?? '');
+  const [endpointId, setEndpointId] = useState(saved?.endpointId ?? '');
+  const [model, setModel] = useState(saved?.model ?? '');
+  const [apiKey, setApiKey] = useState('');
+  const [message, setMessage] = useState<{ status: 'success' | 'error'; text: string } | undefined>(
+    undefined,
+  );
+  const [filled, setFilled] = useState(saved !== undefined);
+  useEffect(() => {
+    if (filled || saved === undefined) return;
+    setFilled(true);
+    setProvider(saved.provider);
+    setEndpointId(saved.endpointId ?? '');
+    setModel(saved.model);
+  }, [filled, saved]);
+
+  const imageEndpoints = endpoints.filter((endpoint) => endpoint.images === true);
+  const providerOptions = [
+    { value: 'gemini', label: m.provider_gemini() },
+    ...(imageEndpoints.length > 0 || provider === 'openai-compatible'
+      ? [{ value: 'openai-compatible', label: m.provider_openai_compatible() }]
+      : []),
+  ];
+
+  const write = async (next: GuestSettings, text: string) => {
+    try {
+      await runStorage((storage) => storage.saveSettings(next));
+      setApiKey('');
+      setMessage({ status: 'success', text });
+    } catch (cause) {
+      setMessage({
+        status: 'error',
+        text: m.storage_error({ reason: cause instanceof Error ? cause.message : String(cause) }),
+      });
+    }
+  };
+
+  const save = async () => {
+    if (stored === undefined)
+      return setMessage({ status: 'error', text: m.image_settings_text_first() });
+    const key = apiKey.trim() || saved?.apiKey;
+    const name = model.trim();
+    if (
+      provider === '' ||
+      !key ||
+      name === '' ||
+      (provider === 'openai-compatible' && endpointId === '')
+    ) {
+      return setMessage({ status: 'error', text: m.settings_missing() });
+    }
+    await write(
+      {
+        ...stored,
+        image: {
+          provider,
+          model: name,
+          apiKey: key,
+          ...(provider === 'openai-compatible' ? { endpointId } : {}),
+        },
+      },
+      m.settings_saved(),
+    );
+  };
+
+  const remove = async () => {
+    if (stored === undefined) return;
+    const { image: _image, ...rest } = stored;
+    setProvider('');
+    setModel('');
+    setEndpointId('');
+    await write(rest, m.image_settings_removed());
+  };
+
+  const deleteKey = async () => {
+    try {
+      await runStorage((storage) => storage.deleteImageApiKey);
+      setApiKey('');
+      setMessage({ status: 'success', text: m.settings_key_deleted() });
+    } catch (cause) {
+      setMessage({
+        status: 'error',
+        text: m.storage_error({ reason: cause instanceof Error ? cause.message : String(cause) }),
+      });
+    }
+  };
+
+  return (
+    <VStack gap={3} data-testid="image-settings">
+      <Heading level={3}>{m.image_settings_title()}</Heading>
+      <Text type="supporting">{m.image_settings_hint()}</Text>
+      <Selector
+        label={m.settings_provider()}
+        placeholder={m.image_settings_none()}
+        options={providerOptions}
+        value={provider}
+        onChange={(value) => setProvider(value as ImageProvider)}
+        data-testid="image-provider"
+      />
+      {provider === 'openai-compatible' ? (
+        <Selector
+          label={m.settings_endpoint()}
+          placeholder={m.settings_endpoint_placeholder()}
+          options={imageEndpoints.map((endpoint) => ({
+            value: endpoint.id,
+            label: endpoint.label,
+          }))}
+          value={endpointId}
+          onChange={setEndpointId}
+          data-testid="image-endpoint"
+        />
+      ) : null}
+      {provider === '' ? null : (
+        <>
+          <TextInput
+            label={m.settings_model()}
+            description={m.settings_model_description()}
+            value={model}
+            onChange={setModel}
+            autoComplete="off"
+            hasSpellCheck={false}
+            data-testid="image-model"
+          />
+          <TextInput
+            label={m.image_settings_key()}
+            description={
+              saved?.apiKey === undefined
+                ? m.settings_key_description()
+                : m.settings_key_saved_hint()
+            }
+            type="password"
+            value={apiKey}
+            onChange={setApiKey}
+            autoComplete="off"
+            data-testid="image-api-key"
+          />
+        </>
+      )}
+      {message === undefined ? null : (
+        <Banner status={message.status} title={message.text} data-testid="image-settings-message" />
+      )}
+      <HStack gap={2} wrap="wrap">
+        <Button
+          label={m.image_settings_save()}
+          onClick={() => void save()}
+          isDisabled={provider === ''}
+          data-testid="image-save"
+        />
+        {saved?.apiKey === undefined ? null : (
+          <Button
+            label={m.settings_delete_key()}
+            variant="destructive"
+            onClick={() => void deleteKey()}
+            data-testid="image-delete-key"
+          />
+        )}
+        {saved === undefined ? null : (
+          <Button
+            label={m.image_settings_remove()}
+            onClick={() => void remove()}
+            data-testid="image-remove"
+          />
+        )}
+      </HStack>
+    </VStack>
   );
 }

@@ -409,5 +409,18 @@
   "role_illustrator": "Hình ảnh",
   "roles_illustrator_hint": "Vẽ hình cho bài học khi Teacher cần. Không đặt: không có hình. Cần Gemini hoặc một endpoint tạo được ảnh; mỗi hình tốn vài cent trên key đó.",
   "roles_illustrator_none": "Thêm một kết nối Gemini, hoặc một kết nối tới endpoint tạo được ảnh, để dùng vai này.",
-  "error_RoleNotSupported": "Kết nối này không tạo được ảnh. Hãy chọn Gemini hoặc một endpoint tạo được ảnh."
+  "error_RoleNotSupported": "Kết nối này không tạo được ảnh. Hãy chọn Gemini hoặc một endpoint tạo được ảnh.",
+  "image_settings_title": "Model ảnh",
+  "image_settings_hint": "Không bắt buộc. Khi đặt, Teacher có thể vẽ hình cho bài học. Cần Gemini hoặc một endpoint tạo được ảnh; mỗi hình tốn vài cent trên key này.",
+  "image_settings_none": "Không dùng ảnh",
+  "image_settings_key": "API key cho ảnh",
+  "image_settings_save": "Lưu model ảnh",
+  "image_settings_remove": "Tắt ảnh",
+  "image_settings_removed": "Đã tắt ảnh.",
+  "image_settings_text_first": "Hãy lưu model chữ trước.",
+  "admin_demo_images": "Ảnh ở chế độ demo",
+  "admin_demo_images_hint": "Mặc định tắt. Bật: Teacher có thể vẽ ảnh bằng {model} trên key của server, mỗi ảnh tốn số lần gọi bên dưới.",
+  "admin_demo_images_no_model": "Đặt KD_LEARN_DEMO_IMAGE_MODEL (Gemini, hoặc endpoint có ảnh) để cho phép ảnh ở chế độ demo.",
+  "admin_demo_image_cost": "Số lần gọi mỗi ảnh demo",
+  "admin_demo_image_cost_hint": "Mỗi ảnh lấy chừng này lần gọi từ ngân sách demo, giữ chỗ trước khi gọi nhà cung cấp."
 }

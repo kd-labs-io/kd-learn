@@ -51,6 +51,8 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
           guestMode: next.guestMode,
           demoMode: next.demoMode,
           figureCdn: next.figureCdn,
+          demoImages: next.demoImages,
+          demoImageCost: next.demoImageCost,
           demoBudgetLimit: next.demoBudget.limit,
           demoBudgetPeriod: next.demoBudget.period,
           acpAgents: next.acpAgents.join(','),

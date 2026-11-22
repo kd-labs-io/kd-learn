@@ -29,7 +29,12 @@ import type { PdfExtractor } from '../sources/pdf.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
 import { makeLazyAcp, routedAi } from '../acp/router.ts';
-import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
+import {
+  demoGate,
+  resolveDemoImageModel,
+  resolveDemoModel,
+  type DemoGate,
+} from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
 import { makeResearchJobs, type ResearchJobs } from '../sources/research-job.ts';
@@ -110,6 +115,8 @@ export const initAccounts = async (
   }
   const budget = makeDemoBudget(database, config.demo);
   const demoModel = () => resolveDemoModel(config.demo.model, options.endpoints());
+  const demoImageModel = () =>
+    resolveDemoImageModel(config.demo.model, config.demo.imageModel, options.endpoints());
   const admin = makeAdmin(
     database,
     auth,
@@ -121,9 +128,18 @@ export const initAccounts = async (
       acpModels: config.acpModels,
       acpMaxConcurrent: config.acpMaxConcurrent,
     },
-    { budget, model: demoModel },
+    { budget, model: demoModel, imageModel: demoImageModel },
   );
-  const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
+  const demo = () => {
+    const on = admin.switches();
+    const imageModel = on.demoImages ? demoImageModel() : undefined;
+    return demoGate(
+      on.demoMode,
+      demoModel(),
+      budget,
+      imageModel === undefined ? undefined : { model: imageModel, cost: admin.demoImageCost() },
+    );
+  };
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
   const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
   const search = makeSearchConfig({

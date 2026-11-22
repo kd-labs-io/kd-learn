@@ -11,8 +11,8 @@ import { meteredAi, type Meter } from './demo/metered.ts';
 import type { DemoGate } from './demo/service.ts';
 import { Cause, Effect, Layer, Result, Schema, Stream } from 'effect';
 import { defaultProfile, runSideChat, runTurn } from '@kd-learn/agent';
-import type { AgentOutput, InvalidTurn } from '@kd-learn/agent';
-import { AiPort, type ImagePort } from '@kd-learn/ai/port';
+import type { AgentOutput, ImageGenerator, InvalidTurn } from '@kd-learn/agent';
+import { AiPort, ProviderError, type ImageModelRef, type ImagePort } from '@kd-learn/ai/port';
 import type { ModelRef } from '@kd-learn/ai/port';
 import { layer as tanstackLayer } from '@kd-learn/ai/tanstack';
 import { makeImageService } from '@kd-learn/ai/image';
@@ -24,12 +24,19 @@ import {
   TurnRequest,
   encodeFrame,
 } from '@kd-learn/api';
-import type { Failure, Frame, ModelChoice, SearchProvider } from '@kd-learn/api';
+import type { Failure, Frame, ImageModelChoice, ModelChoice, SearchProvider } from '@kd-learn/api';
 import { envOnlySearch, type SearchAdapters, type SearchConfigService } from './search/config.ts';
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
-import { asRecord, describeIssue, makeFigureLeakFilter, redact, scrubFrame } from './safety.ts';
+import {
+  asRecord,
+  describeIssue,
+  makeFigureLeakFilter,
+  redact,
+  scrubFrame,
+  type Secrets,
+} from './safety.ts';
 import type { PdfExtractor } from './sources/pdf.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { loadAccountConfig, switchFrom } from './auth/config.ts';
@@ -160,6 +167,23 @@ export const whenAborted = (signal: AbortSignal): Effect.Effect<void> =>
     return Effect.sync(() => signal.removeEventListener('abort', onAbort));
   });
 
+/** The guest's image model; undefined for an endpoint that is unknown or makes no images. */
+export const toImageModelRef = (
+  choice: ImageModelChoice,
+  config: ServerConfig,
+): ImageModelRef | undefined => {
+  if (choice.provider === 'gemini') return choice;
+  const endpoint = config.endpoints.find((e) => e.id === choice.endpointId && e.images);
+  return endpoint === undefined
+    ? undefined
+    : {
+        provider: 'openai-compatible',
+        model: choice.model,
+        apiKey: choice.apiKey,
+        baseURL: endpoint.baseURL,
+      };
+};
+
 export const toModelRef = (
   choice: Exclude<ModelChoice, { provider: 'demo' }>,
   config: ServerConfig,
@@ -210,7 +234,7 @@ const failedFrames = (error: Failure): ReadonlyArray<Frame> => [
 /** Never fails: a failure becomes `error` + `done` frames, so the client always gets a closed record. */
 const framesOf = (
   outputs: Stream.Stream<AgentOutput, InvalidTurn, AiPort>,
-  key: string,
+  key: Secrets,
   onFailure: (code: string, message: string) => void,
 ): Stream.Stream<Frame, never, AiPort> =>
   outputs.pipe(
@@ -274,20 +298,29 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   }
 
   // A free base URL is never accepted (risk 6). Say so plainly before the generic decode error.
-  const modelField = asRecord(asRecord(json)?.model);
-  if (modelField && Object.keys(modelField).some((k) => k.toLowerCase() === 'baseurl')) {
-    return reject(
-      400,
-      ErrorCode.InvalidRequest,
-      'model.baseURL is not accepted. Choose an endpointId from GET /api/endpoints.',
-    );
+  for (const field of ['model', 'imageModel'] as const) {
+    const value = asRecord(asRecord(json)?.[field]);
+    if (value && Object.keys(value).some((k) => k.toLowerCase() === 'baseurl')) {
+      return reject(
+        400,
+        ErrorCode.InvalidRequest,
+        `${field}.baseURL is not accepted. Choose an endpointId from GET /api/endpoints.`,
+      );
+    }
   }
 
   const decoded = Schema.decodeUnknownResult(TurnRequest)(json, { onExcessProperty: 'error' });
   if (Result.isFailure(decoded)) {
     return reject(400, ErrorCode.InvalidRequest, describeIssue(decoded.failure));
   }
-  const { model: choice, turn, sourceSlice } = decoded.success;
+  const { model: choice, turn, sourceSlice, imageModel: imageChoice } = decoded.success;
+  if (imageChoice !== undefined && (choice.provider === 'demo' || turn.kind !== 'main')) {
+    return reject(
+      400,
+      ErrorCode.InvalidRequest,
+      "imageModel is for guest main turns only. The demo uses the server's image model.",
+    );
+  }
   let eventLog = decoded.success.log;
   if (
     sourceSlice !== undefined &&
@@ -307,6 +340,9 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
   let model: ModelRef;
   let ai = deps.ai ?? tanstackLayer();
   let settle: (() => void) | undefined;
+  const images = deps.images ?? makeImageService();
+  let image: ImageGenerator | undefined;
+  let imageKey: string | undefined;
   if (choice.provider === 'demo') {
     if (body.bytes > DEMO_MAX_REQUEST_BYTES) {
       return reject(
@@ -345,6 +381,36 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
     const { reservation } = reserved;
     const meter: Meter = { calls: 0 };
     model = gate.model;
+    const demoImages = gate.images;
+    if (demoImages !== undefined) {
+      const budget = gate.budget;
+      imageKey = demoImages.model.apiKey;
+      image = {
+        model: demoImages.model.model,
+        // Each image reserves its N calls before the provider is called (risk 46). Short: the
+        // provider is not called and the reservation goes back.
+        generate: (prompt, aspect) =>
+          Effect.suspend(() => {
+            const held = budget.reserve(demoImages.cost);
+            if (held._tag !== 'Ok' || held.reservation.calls < demoImages.cost) {
+              if (held._tag === 'Ok') budget.settle(held.reservation, 0);
+              return Effect.fail(
+                new ProviderError({
+                  message: 'The demo has no budget left for images.',
+                  code: ErrorCode.DemoQuotaExceeded,
+                }),
+              );
+            }
+            return images
+              .generate({ model: demoImages.model, prompt, aspect })
+              .pipe(
+                Effect.ensuring(
+                  Effect.sync(() => budget.settle(held.reservation, demoImages.cost)),
+                ),
+              );
+          }),
+      };
+    }
     ai = meteredAi(
       ai,
       { calls: reservation.calls, maxOutputTokens: DEMO_MAX_OUTPUT_TOKENS },
@@ -375,9 +441,24 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
       );
     }
     model = resolved;
+    if (imageChoice !== undefined) {
+      const imageModel = toImageModelRef(imageChoice, config);
+      if (imageModel === undefined) {
+        return reject(
+          400,
+          ErrorCode.UnknownEndpoint,
+          'This endpoint id does not make images on this server.',
+        );
+      }
+      imageKey = imageModel.apiKey;
+      image = {
+        model: imageModel.model,
+        generate: (prompt, aspect) => images.generate({ model: imageModel, prompt, aspect }),
+      };
+    }
   }
-  // The key to scrub from every frame: the guest's own, or the server's demo key.
-  const key = model.provider === 'acp' ? '' : model.apiKey;
+  // The keys to scrub from every frame: the guest's own, or the server's demo keys; text and image.
+  const key = [model.provider === 'acp' ? undefined : model.apiKey, imageKey];
 
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const outputs =
@@ -387,7 +468,10 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
           model,
           newId,
           ...(sourceSlice === undefined ? {} : { sourceSlice }),
-          figures: { cdn: await (deps.figureCdn?.() ?? Promise.resolve(true)).catch(() => false) },
+          figures: {
+            cdn: await (deps.figureCdn?.() ?? Promise.resolve(true)).catch(() => false),
+            ...(image === undefined ? {} : { image }),
+          },
         })
       : runSideChat({ log: eventLog, threadId: turn.threadId, model, newId });
 
@@ -635,7 +719,14 @@ export const createHandlers = (
     search = async () => envSearch;
     publicConfig = async (request) =>
       Response.json(
-        { accounts: false, registration: 'closed', guestMode, demoMode: false, figureCdn: true },
+        {
+          accounts: false,
+          registration: 'closed',
+          guestMode,
+          demoMode: false,
+          figureCdn: true,
+          demoImages: false,
+        },
         {
           headers: {
             ...SECURITY_HEADERS,

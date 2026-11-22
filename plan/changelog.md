@@ -83,3 +83,4 @@
 - **Cập nhật:** 2026-11-22: xong spike C3 (Haiku thật vẽ SVG và demo đúng bước, chạy dưới CSP chỉ hash trên ba trình duyệt); A7 khớp với cách đã làm (cờ trong `/api/config` và `/api/admin/config`, frame `figure` có `encoding`) (hinh-va-demo.md, progress phase 5)
 - **Cập nhật:** 2026-11-22: bước 9a, cổng ảnh, adapter HTTP Gemini và tương thích OpenAI, tool `generate_image` (progress phase 5)
 - **Cập nhật:** 2026-11-22: bước 9b, vai `illustrator` cho tài khoản, cờ `images` của endpoint, sửa vai `researcher` không lưu được (progress phase 5)
+- **Cập nhật:** 2026-11-22: bước 9c, model ảnh của khách, ảnh demo theo ngân sách (giá N mỗi ảnh), biến `KD_LEARN_DEMO_IMAGE_MODEL` (hinh-va-demo.md A9, progress phase 5)

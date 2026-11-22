@@ -168,6 +168,30 @@ function Demo({ config, change }: { config: AdminConfig; change: Change }) {
         onChange={(value) => void change({ demoBudgetPeriod: value as DemoBudgetPeriod })}
         data-testid="admin-demo-period"
       />
+      <Switch
+        label={m.admin_demo_images()}
+        description={
+          config.demoImageModel === undefined
+            ? m.admin_demo_images_no_model()
+            : m.admin_demo_images_hint({ model: config.demoImageModel })
+        }
+        value={config.demoImages}
+        changeAction={(demoImages) => change({ demoImages })}
+        data-testid="admin-demo-images"
+      />
+      <NumberInput
+        label={m.admin_demo_image_cost()}
+        description={m.admin_demo_image_cost_hint()}
+        value={config.demoImageCost}
+        min={1}
+        max={1000}
+        onChange={(cost) => {
+          if (Number.isInteger(cost) && cost >= 1 && cost <= 1000) {
+            void change({ demoImageCost: cost });
+          }
+        }}
+        data-testid="admin-demo-image-cost"
+      />
     </VStack>
   );
 }

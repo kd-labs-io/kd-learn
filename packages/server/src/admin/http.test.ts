@@ -88,6 +88,8 @@ describe('admin switches', () => {
       guestMode: true,
       demoMode: false,
       figureCdn: true,
+      demoImages: false,
+      demoImageCost: 10,
       demoBudget: { limit: 0, period: 'day', used: 0 },
       acpAgents: [],
       acpModels: {},
@@ -110,6 +112,7 @@ describe('admin switches', () => {
       guestMode: false,
       demoMode: false,
       figureCdn: true,
+      demoImages: false,
     });
     await call(t.handlers.admin, 'PUT', '/api/admin/config', t.admin, { guestMode: true });
     expect((await guestTurn(t.handlers)).status).toBe(200);
@@ -150,6 +153,7 @@ describe('admin switches', () => {
       guestMode: false,
       demoMode: false,
       figureCdn: true,
+      demoImages: false,
     });
   });
 });
