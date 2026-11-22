@@ -2,6 +2,7 @@ import { Schema } from 'effect';
 import kdJson from './themes/kd.json' with { type: 'json' };
 import kdContrastJson from './themes/kd-contrast.json' with { type: 'json' };
 import oceanJson from './themes/ocean.json' with { type: 'json' };
+import { themeCss } from './astryx-vars.ts';
 import { Theme } from './schema.ts';
 
 export * from './schema.ts';
@@ -22,6 +23,9 @@ export const builtInThemes: ReadonlyArray<Theme> = [
 ];
 
 export const builtInThemeIds = builtInThemes.map((theme) => theme.name);
+
+/** CSS of every built-in theme but the static default, for `<head>` (see `themeCss`). */
+export const builtInThemeCss = themeCss(builtInThemes.filter((theme) => theme !== defaultTheme));
 
 /** A built-in theme by id; an unknown id (a theme removed in a later build) falls back to `kd`. */
 export const themeById = (id: string): Theme =>

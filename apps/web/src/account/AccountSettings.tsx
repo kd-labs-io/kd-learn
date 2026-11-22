@@ -29,6 +29,7 @@ import { useAccountSourceLibrary } from '../sources/library';
 import { SearchPreference } from '../sources/SearchPreference';
 import { AppHeader } from '../app/AppHeader';
 import { ProfileLink } from '../profile/ProfileLink';
+import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { errorCode, errorText, keys, useAccountApi } from './api';
 
 type Provider = ConnectionInfo['provider'];
@@ -125,6 +126,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
                 <Roles token={token} settings={settings.data} endpoints={endpoints.data ?? []} />
                 <SearchPreference providers={library.providers} />
                 <ProfileLink />
+                <AppearanceSettings isSynced />
               </>
             )}
           </VStack>

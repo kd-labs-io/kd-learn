@@ -155,3 +155,20 @@ export const toAstryxVars = (theme: Theme): CssVars => {
     '--shadow-high': shadow(theme.shadow.lg, text),
   };
 };
+
+/**
+ * CSS for the built-in themes other than the static one (plan theme-va-dien-thoai.md A2), keyed on
+ * `data-kd-theme` on `<html>`. In the `product` layer, after Astryx's theme, and on every element
+ * that declares the static theme's variables (`<html>` and the Theme wrapper), so portals follow
+ * too (spike C1). Values come from decoded themes only (hex colors, lengths, listed fonts).
+ */
+export const themeCss = (themes: ReadonlyArray<Theme>): string =>
+  `@layer product {\n${themes
+    .map((theme) => {
+      const root = `:root[data-kd-theme="${theme.name}"]`;
+      const body = Object.entries(toAstryxVars(theme))
+        .map(([name, value]) => `${name}: ${value};`)
+        .join(' ');
+      return `${root}, ${root} [data-astryx-theme] { ${body} }`;
+    })
+    .join('\n')}\n}`;

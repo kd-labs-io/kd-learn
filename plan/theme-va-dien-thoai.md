@@ -30,7 +30,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
   - `kd`: mặc định, light theo `DESIGN.md`, dark mới (nền ấm tối, cùng tông terracotta). Bảng dark ghi vào mục "Dark mode" của `DESIGN.md`.
   - `kd-contrast`: tương phản cao (mục tiêu AAA 7:1 cho chữ chính), cho người cần đọc rõ.
   - `ocean`: tông lạnh (xanh), để chứng minh đổi theme đổi cả accent mà không vỡ gì.
-- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ mỗi màu là `light-dark()`. Theme khác áp lúc chạy bằng một thẻ `<style>` trong layer `product`, chọn `[data-astryx-theme]` (cả `<html>` lẫn wrapper), không còn là biến inline trên một phần tử: spike C1 thấy biến inline không tới được popover, toast (portal nằm ngoài wrapper). Giá trị đã qua schema (hex, độ dài) nên dựng CSS từ chúng an toàn ([rủi ro 11](05-rui-ro.md)). Thẻ này render giống nhau ở SSR và client (từ cookie, A3).
+- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ mỗi màu là `light-dark()`. Theme khác không còn là biến inline trên một phần tử (spike C1: biến inline không tới được popover, toast, vì portal nằm ngoài wrapper). Thay vào đó, `<head>` có sẵn CSS của mọi theme dựng sẵn (`builtInThemeCss`, trong layer `product`), mỗi theme gắn với `:root[data-kd-theme="<id>"]` và `[data-astryx-theme]` bên trong. Đổi theme chỉ là đổi thuộc tính `data-kd-theme` trên `<html>`. CSS này giống hệt ở SSR, SPA và client nên không lệch hydrate. Giá trị đã qua schema (hex, độ dài, font trong danh sách) nên dựng CSS từ chúng an toàn ([rủi ro 11](05-rui-ro.md)).
 - Tên hiện cho người dùng nằm ở i18n (`packages/i18n/messages/`), không ở JSON của theme.
 
 ### A3. Chế độ và lựa chọn của người dùng
@@ -39,12 +39,12 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
 - **`mode: 'system'`** để CSS tự theo hệ điều hành (`light-dark()` với `color-scheme: light dark`, Astryx bỏ `data-theme` trên `<html>`), không cần JS để tô đúng màu.
 - **JS vẫn cần biết chế độ đã quyết** cho hình: hook `useResolvedMode()` đọc `matchMedia('(prefers-color-scheme: dark)')` và nghe đổi. Đổi chế độ (hay hệ điều hành đổi) thì dựng lại blob SVG, render lại Mermaid, gửi `theme` vào khung demo đang chạy, vẽ lại graph.
 - **Không loé sai màu lúc tải trang:**
-  - Cookie `kd_appearance` (`<mode>.<theme>`, ví dụ `system.kd`; `SameSite=Lax`, một năm, không `HttpOnly` vì client ghi). Đây chỉ là sở thích hiển thị, không phải dữ liệu nhạy cảm.
-  - Bản SSR đọc cookie trong request (cùng chỗ Paraglide đọc locale): đặt `data-theme` trên `<html>` khi chế độ không phải `system`, và biến của theme không phải `kd` lên wrapper ngay trong HTML.
-  - Bản SPA (shell prerender, màn hình chỉ render sau khi mount): một script nhỏ trong `<head>` đọc cookie và đặt `data-theme` trước lần vẽ đầu. App chưa có CSP cho script (chỉ `frame-src`), nên script nội tuyến chạy được.
+  - Cookie `kd_appearance` (`<mode>.<theme>`, ví dụ `system.kd`; `SameSite=Lax`, một năm, không `HttpOnly` vì client ghi). Đây chỉ là sở thích hiển thị, không phải dữ liệu nhạy cảm. Chỉ có cookie, không có bản sao ở `localStorage` (một nguồn duy nhất cho SSR, script và client). Cookie hỏng hay theme lạ thì về mặc định.
+  - Bản SSR đọc cookie trong request (`getCookie` của Start qua `createIsomorphicFn`): đặt `data-theme` (khi chế độ không phải `system`) và `data-kd-theme` trên `<html>` ngay trong HTML.
+  - Bản SPA (shell prerender với giá trị mặc định, màn hình chỉ render sau khi mount): một script nhỏ trong `<head>` đọc cookie và đặt `data-theme`, `data-kd-theme` trước lần vẽ đầu (đã kiểm ở ba trình duyệt khi chặn hết JS của app: màu nền đúng theme tối đã chọn). App chưa có CSP cho script (chỉ `frame-src`), nên script nội tuyến chạy được.
 - **Đồng bộ tài khoản:**
-  - Server: bảng `user_appearance (user_id, mode, theme, updated_at)`, migration server v11. `GET` và `PUT /api/account/appearance` trả `{appearance: Appearance | null}` (`null` khi tài khoản chưa lưu gì); `/api/account/settings` không đổi. Khách không đổi migration (lưu ở cookie và `localStorage`).
-  - Đổi trong UI: ghi cookie và `localStorage` ngay, rồi gửi lên server nếu đang đăng nhập.
+  - Server: bảng `user_appearance (user_id, mode, theme, updated_at)`, migration server v11. `GET` và `PUT /api/account/appearance` trả `{appearance: Appearance | null}` (`null` khi tài khoản chưa lưu gì); `/api/account/settings` không đổi. Khách không đổi migration (lưu ở cookie).
+  - Đổi trong UI: ghi cookie ngay, rồi gửi lên server nếu đang đăng nhập (lỗi thì bỏ qua, máy giữ lựa chọn của mình).
   - Mở app khi đã đăng nhập: giá trị của server thắng nếu có (ghi đè cookie, không loé lần sau); server chưa có thì đẩy giá trị của máy lên. Đăng xuất giữ giá trị của máy.
   - Test hai người dùng: mỗi người đọc và ghi đúng `appearance` của mình.
 

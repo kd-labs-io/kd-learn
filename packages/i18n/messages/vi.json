@@ -422,5 +422,19 @@
   "admin_demo_images_hint": "Mặc định tắt. Bật: Teacher có thể vẽ ảnh bằng {model} trên key của server, mỗi ảnh tốn số lần gọi bên dưới.",
   "admin_demo_images_no_model": "Đặt KD_LEARN_DEMO_IMAGE_MODEL (Gemini, hoặc endpoint có ảnh) để cho phép ảnh ở chế độ demo.",
   "admin_demo_image_cost": "Số lần gọi mỗi ảnh demo",
-  "admin_demo_image_cost_hint": "Mỗi ảnh lấy chừng này lần gọi từ ngân sách demo, giữ chỗ trước khi gọi nhà cung cấp."
+  "admin_demo_image_cost_hint": "Mỗi ảnh lấy chừng này lần gọi từ ngân sách demo, giữ chỗ trước khi gọi nhà cung cấp.",
+  "appearance_title": "Giao diện",
+  "appearance_mode": "Chế độ màu",
+  "appearance_mode_system": "Theo hệ thống",
+  "appearance_mode_light": "Sáng",
+  "appearance_mode_dark": "Tối",
+  "appearance_theme": "Theme",
+  "appearance_theme_kd": "kd-learn",
+  "appearance_theme_kd_hint": "Kem ấm và đất nung, mặc định.",
+  "appearance_theme_kd_contrast": "Tương phản cao",
+  "appearance_theme_kd_contrast_hint": "Chữ và viền đậm hơn, dễ đọc hơn.",
+  "appearance_theme_ocean": "Đại dương",
+  "appearance_theme_ocean_hint": "Tông xanh lạnh.",
+  "appearance_synced": "Lưu vào tài khoản, đi theo bạn sang máy khác.",
+  "appearance_device": "Lưu trên máy này."
 }

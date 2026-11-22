@@ -12,6 +12,8 @@ import type { ReactNode } from 'react';
 import { getLocale } from '@kd-learn/i18n';
 import '../styles/app.css';
 import { I18nRoot } from '../i18n/I18nRoot';
+import { builtInThemeCss } from '@kd-learn/tokens';
+import { htmlThemeAttribute, prePaintScript, readAppearance } from '../theme/appearance';
 import { ThemeRoot } from '../theme/ThemeRoot';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -49,10 +51,19 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: ReactNode }) {
-  // Light only until dark mode lands: set it on <html> so SSR has no mode flash.
-  // The SPA shell is prerendered in the base locale, so `lang` may change on hydration.
+  // Mode and theme come from the `kd_appearance` cookie (plan theme-va-dien-thoai.md A3), so the
+  // server render has no flash. The SPA shell is prerendered with the default appearance and the
+  // base locale, so `data-theme`, `data-kd-theme` and `lang` may change on hydration; the pre-paint
+  // script sets the first two before anything shows.
+  const appearance = readAppearance();
   return (
-    <html lang={getLocale()} data-theme="light" data-astryx-theme="kd" suppressHydrationWarning>
+    <html
+      lang={getLocale()}
+      data-theme={htmlThemeAttribute(appearance)}
+      data-kd-theme={appearance.theme}
+      data-astryx-theme="kd"
+      suppressHydrationWarning
+    >
       <head>
         {/*
           Fix the cascade layer order before any stylesheet loads (in dev the StyleX
@@ -67,6 +78,10 @@ function RootDocument({ children }: { children: ReactNode }) {
         <meta httpEquiv="Content-Security-Policy" content="frame-src 'self' about:" />
         <style href="kd-layer-order" precedence="kd-layer-order">
           {'@layer reset, astryx-base, astryx-theme, product;'}
+        </style>
+        <script dangerouslySetInnerHTML={{ __html: prePaintScript }} />
+        <style href="kd-themes" precedence="kd-themes">
+          {builtInThemeCss}
         </style>
         <HeadContent />
       </head>

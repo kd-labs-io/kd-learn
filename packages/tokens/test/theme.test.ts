@@ -2,6 +2,7 @@ import { Result } from 'effect';
 import { describe, expect, it } from 'vitest';
 import defaultThemeJson from '../src/themes/kd.json' with { type: 'json' };
 import {
+  builtInThemeCss,
   builtInThemes,
   checkContrast,
   contrastRatio,
@@ -126,5 +127,14 @@ describe('toAstryxVars', () => {
       expect(value).not.toMatch(/url\(|;|[{}]/);
       expect(value).not.toMatch(/var\(/);
     }
+  });
+});
+
+describe('builtInThemeCss', () => {
+  it('declares each non-default theme on <html> and on Astryx wrappers, nothing else', () => {
+    expect(builtInThemeCss).toContain(':root[data-kd-theme="ocean"] [data-astryx-theme] {');
+    expect(builtInThemeCss).toContain(':root[data-kd-theme="kd-contrast"],');
+    expect(builtInThemeCss).not.toContain('data-kd-theme="kd"]');
+    expect(builtInThemeCss).not.toMatch(/url\(|@import|<\/style/i);
   });
 });
