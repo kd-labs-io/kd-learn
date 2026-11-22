@@ -21,6 +21,7 @@ import type {
   DemoBudgetPeriod,
   RegistrationMode,
   UpdateAdminConfigRequest,
+  UpdateAdminSearchRequest,
 } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -77,6 +78,7 @@ export function AdminScreen({ token, selfId }: { token: string; selfId: string }
                 <Acp config={config.data} change={change} />
               </>
             )}
+            <Search token={token} />
             <Invites />
             <Users token={token} selfId={selfId} />
           </VStack>
@@ -325,6 +327,102 @@ function Users({ token, selfId }: { token: string; selfId: string }) {
           />
         ))}
       </VStack>
+    </VStack>
+  );
+}
+/** Search sources for research (phase 4 A6): SearXNG, Exa and its key, and guest/demo access. */
+function Search({ token }: { token: string }) {
+  const { call } = useAccountApi();
+  const queryClient = useQueryClient();
+  const [key, setKey] = useState('');
+  const search = useQuery({
+    queryKey: keys.adminSearch(token),
+    queryFn: () => call((api) => api.adminSearch()),
+  });
+  const update = useMutation({
+    mutationFn: (change: UpdateAdminSearchRequest) => call((api) => api.updateAdminSearch(change)),
+    onSuccess: (next) => queryClient.setQueryData(keys.adminSearch(token), next),
+  });
+  const change = (patch: UpdateAdminSearchRequest) =>
+    update.mutateAsync(patch).then(() => undefined);
+  const data = search.data;
+  return (
+    <VStack gap={3} data-testid="admin-search">
+      <Heading level={3}>{m.admin_search()}</Heading>
+      {search.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+      {update.isError ? (
+        <Banner status="error" title={m.error_generic({ message: errorText(update.error) })} />
+      ) : null}
+      {data === undefined ? null : (
+        <>
+          <Switch
+            label={m.search_searxng()}
+            description={data.searxng.configured ? m.admin_searxng_hint() : m.admin_searxng_unset()}
+            value={data.searxng.enabled}
+            isDisabled={!data.searxng.configured}
+            changeAction={(searxngEnabled) => change({ searxngEnabled })}
+            data-testid="admin-searxng"
+          />
+          <Switch
+            label={m.search_exa()}
+            description={
+              data.exa.hasKey
+                ? m.admin_exa_key_set({ last4: data.exa.keyLast4 ?? '' })
+                : m.admin_exa_no_key()
+            }
+            value={data.exa.enabled}
+            isDisabled={!data.exa.hasKey}
+            changeAction={(exaEnabled) => change({ exaEnabled })}
+            data-testid="admin-exa"
+          />
+          <HStack gap={2} vAlign="end" wrap="wrap">
+            <TextInput
+              label={m.admin_exa_key()}
+              type="password"
+              value={key}
+              onChange={setKey}
+              data-testid="admin-exa-key"
+            />
+            <Button
+              label={m.admin_exa_key_save()}
+              isDisabled={key.trim().length < 8}
+              isLoading={update.isPending}
+              onClick={() => void change({ exaKey: key.trim() }).then(() => setKey(''))}
+              data-testid="admin-exa-key-save"
+            />
+            {data.exa.hasKey ? (
+              <Button
+                label={m.admin_exa_key_remove()}
+                variant="ghost"
+                onClick={() => void change({ exaKey: null })}
+                data-testid="admin-exa-key-remove"
+              />
+            ) : null}
+          </HStack>
+          <Selector
+            label={m.admin_search_guest()}
+            options={[
+              { value: 'searxng', label: m.search_searxng() },
+              { value: 'off', label: m.admin_search_off() },
+            ]}
+            value={data.guest}
+            onChange={(value) => void change({ guest: value as 'searxng' | 'off' })}
+            data-testid="admin-search-guest"
+          />
+          <Selector
+            label={m.admin_search_demo()}
+            description={m.admin_search_demo_hint()}
+            options={[
+              { value: 'searxng', label: m.search_searxng() },
+              { value: 'exa', label: m.search_exa() },
+              { value: 'off', label: m.admin_search_off() },
+            ]}
+            value={data.demo}
+            onChange={(value) => void change({ demo: value as 'searxng' | 'exa' | 'off' })}
+            data-testid="admin-search-demo"
+          />
+        </>
+      )}
     </VStack>
   );
 }

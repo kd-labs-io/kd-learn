@@ -1,6 +1,6 @@
 // Pure helpers that turn a projected session into what the learning screen shows.
 import { m } from '@kd-learn/i18n';
-import { findInterruptedTurn, type PlanNode, type Session } from '@kd-learn/core';
+import { findInterruptedTurn, type Citation, type PlanNode, type Session } from '@kd-learn/core';
 import { ClientFailure, type UiFailure } from './runner';
 
 export interface ChatItem {
@@ -9,6 +9,8 @@ export interface ChatItem {
   readonly content: string;
   /** The learner's input of a turn that has no answer yet (failed or interrupted). */
   readonly pending?: boolean;
+  /** Chunks a tutor message cites (phase 4 A3). */
+  readonly citations?: ReadonlyArray<Citation>;
 }
 
 /** The main conversation: completed turns, then the input of an unanswered last turn. */
@@ -17,7 +19,14 @@ export function conversationOf(session: Session): ReadonlyArray<ChatItem> {
   session.history.forEach((message, index) => {
     // Agent-started turns (first Prober turn, planning) have empty input: nothing to show.
     if (message.role === 'user' && message.content === '') return;
-    items.push({ key: `h${index}`, role: message.role, content: message.content });
+    items.push({
+      key: `h${index}`,
+      role: message.role,
+      content: message.content,
+      ...(message.citations === undefined || message.citations.length === 0
+        ? {}
+        : { citations: message.citations }),
+    });
   });
   const last = session.turns.at(-1);
   if (last !== undefined && last.status !== 'completed' && last.input !== '') {

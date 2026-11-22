@@ -16,6 +16,8 @@ import type { LocalMode } from '../account/auth';
 import { useStoragePersistent } from '../learn/hooks';
 import { AppHeader } from './AppHeader';
 import { PracticeLink } from '../practice/PracticeLink';
+import { useGuestSourceLibrary, preferredProvider } from '../sources/library';
+import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { runStorage, useGuestSettings, useSessionList } from '../storage';
 
 export const formatDate = (epochMs: number) =>
@@ -30,6 +32,8 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
   const settings = useGuestSettings();
   const persistent = useStoragePersistent();
   const [topic, setTopic] = useState('');
+  const library = useGuestSourceLibrary(mode);
+  const [picked, setPicked] = useState<PickedSources>(noSources);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -45,6 +49,11 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
     setError(undefined);
     try {
       const sessionId = crypto.randomUUID();
+      const ready = library.view.status === 'ready' ? library.view.sources : [];
+      const attach = ready.filter(
+        (s) => s.state === 'ready' && picked.sourceIds.includes(s.sourceId),
+      );
+      const at = Date.now();
       // The log starts with the profile in use, in the learner's language (plan A1, A6; phase 3
       // A2). Demo mode always runs the server's profile, so it snapshots the default.
       await runStorage((storage) =>
@@ -62,10 +71,23 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                   language: getLocale(),
                 },
               },
+              // The picked sources, in the creating batch (A2).
+              ...attach.map((s) => ({
+                _tag: 'SourceAttached' as const,
+                id: crypto.randomUUID(),
+                at,
+                sourceId: s.sourceId,
+                title: s.title,
+                kind: s.kind,
+              })),
             ]),
           ),
         ),
       );
+      const provider = preferredProvider(library.providers);
+      if (picked.research && provider !== undefined) {
+        await library.research(name, provider, sessionId);
+      }
       await navigate({ to: '/s/$sessionId', params: { sessionId } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -129,6 +151,7 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 onEnter={() => void start()}
                 data-testid="topic-input"
               />
+              <SourcePicker library={library} value={picked} onChange={setPicked} />
               <Button
                 label={m.home_start()}
                 variant="primary"

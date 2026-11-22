@@ -17,7 +17,7 @@
 | Bước 7: dạy dựa trên nguồn | Xong (2026-11-22). Lát trong prompt (khối `<source>` không thoát được), `citations`, `sourceRefs`, `documents` của mệnh đề, `sourceSlice` / `documentSlice` của khách, gắn / gỡ nguồn của tài khoản |
 | Bước 8: research | Xong (2026-11-22): pipeline `runResearch`, vai `researcher`; `POST /api/research` (khách / demo, SSE, giới hạn theo địa chỉ, ngân sách demo), job `research` của tài khoản (sống qua khởi động lại, tự gắn vào buổi), client khách và tài khoản |
 | Bước 9: model và nguồn tìm kiếm giả cho e2e | Xong (2026-11-22): SearXNG giả (`e2e/fake-searxng.ts`), model giả trả truy vấn và bản tóm tắt research; test mẫu `research.e2e.ts` (khách, API) |
-| Bước 10: giao diện | Chưa bắt đầu |
+| Bước 10: giao diện | Xong (2026-11-22): màn `/sources` (thêm PDF, ghi chú, research; xem đoạn, xoá, chạy lại), chọn nguồn và research khi tạo buổi, panel nguồn và nút trích dẫn trong buổi học, tài liệu của mệnh đề trên graph, cấu hình tìm kiếm trong admin, chọn nguồn tìm trong cài đặt (lưu trên máy). `sources.e2e.ts` chạy cả ba trình duyệt, khách và tài khoản. Khởi động lại giữa ingest / research có test ở server (`research-job.test.ts`, test job ingest), chưa có e2e. Test `practice.e2e.ts` khách lỗi trên webkit có sẵn từ trước (CI chỉ chạy chromium) |
 | Bước 11: kiểm tiêu chí phase | Chưa bắt đầu |
 
 ## Điều cần biết khi bắt đầu (từ phase 3)

@@ -15,6 +15,8 @@ import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { PracticeLink } from '../practice/PracticeLink';
 import { formatDate } from '../app/GuestHome';
+import { preferredProvider, useAccountSourceLibrary } from '../sources/library';
+import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { errorText, keys, useAccountApi } from './api';
 
 export function AccountHome({ token }: { token: string }) {
@@ -22,6 +24,8 @@ export function AccountHome({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const { call } = useAccountApi();
   const [topic, setTopic] = useState('');
+  const library = useAccountSourceLibrary(token);
+  const [picked, setPicked] = useState<PickedSources>(noSources);
 
   const sessions = useQuery({
     queryKey: keys.sessions(token),
@@ -32,8 +36,22 @@ export function AccountHome({ token }: { token: string }) {
     queryFn: () => call((api) => api.settings()),
   });
   const create = useMutation({
-    mutationFn: (name: string) =>
-      call((api) => api.createSession({ topic: name, language: getLocale() })),
+    mutationFn: async (name: string) => {
+      const created = await call((api) =>
+        api.createSession({
+          topic: name,
+          language: getLocale(),
+          ...(picked.sourceIds.length === 0 ? {} : { sourceIds: [...picked.sourceIds] }),
+        }),
+      );
+      const provider = preferredProvider(library.providers);
+      // The research runs on the server and attaches itself when ready; a refusal (no search
+      // source any more) does not stop the lesson.
+      if (picked.research && provider !== undefined) {
+        await library.research(name, provider, created.sessionId).catch(() => undefined);
+      }
+      return created;
+    },
     onSuccess: async ({ sessionId }) => {
       await queryClient.invalidateQueries({ queryKey: keys.sessions(token) });
       await navigate({ to: '/a/$sessionId', params: { sessionId } });
@@ -89,6 +107,7 @@ export function AccountHome({ token }: { token: string }) {
                 onEnter={start}
                 data-testid="topic-input"
               />
+              <SourcePicker library={library} value={picked} onChange={setPicked} />
               <Button
                 label={m.home_start()}
                 variant="primary"

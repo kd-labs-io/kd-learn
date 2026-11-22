@@ -12,6 +12,7 @@
 // - the first turn (no assistant message yet): a question;
 // - `#assess` in the learner's message, with `submit_assessment` offered: an assessment;
 // - `#done`, with `complete_step` offered: completes step `basics` (the last one: the session ends);
+// - `#cite`, with source excerpts in the system prompt: an answer citing [S1];
 // - `hold`: streams a first chunk and waits until `POST /release/<apiKey>` (the key of the test's
 //   own connection, so parallel tests do not release each other's turns);
 // - otherwise it repeats the message.
@@ -260,6 +261,12 @@ const server = createServer((request, response) => {
       });
     } else if (last.includes('#done') && tools.has('complete_step')) {
       return toolCall(response, 'complete_step', { stepId: 'basics' });
+    } else if (
+      last.includes('#cite') &&
+      messages.some((m) => m.role !== 'user' && textOf(m.content).includes('label="S1"'))
+    ) {
+      // Grounded teaching (phase 4): cite the first excerpt of the slice.
+      chunk(response, { role: 'assistant', content: 'From your own source [S1].' }, null);
     } else if (last.includes('hold')) {
       chunk(response, { role: 'assistant', content: 'Thinking it over' }, null);
       await hold(key, response);

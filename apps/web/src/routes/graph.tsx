@@ -4,6 +4,7 @@ import { useWho } from '../account/auth';
 import { guestOnly, localModeOf } from '../app/modes';
 import { GraphScreen } from '../graph/GraphScreen';
 import { useAccountKnowledgeSource, useGuestKnowledgeSource } from '../graph/source';
+import { useAccountSourceLibrary, useGuestSourceLibrary } from '../sources/library';
 
 export const Route = createFileRoute('/graph')({ component: Graph });
 
@@ -16,13 +17,18 @@ function Graph() {
   if (config.isPending) return null;
   // Guest and demo both keep their knowledge log on this device; no mode chosen yet: home.
   const mode = localModeOf(current, config.data ?? guestOnly);
-  return mode === undefined ? <Navigate to="/" /> : <GuestGraph />;
+  return mode === undefined ? <Navigate to="/" /> : <GuestGraph mode={mode} />;
 }
 
 function AccountGraph({ token }: { token: string }) {
-  return <GraphScreen source={useAccountKnowledgeSource(token)} />;
+  return (
+    <GraphScreen
+      source={useAccountKnowledgeSource(token)}
+      library={useAccountSourceLibrary(token)}
+    />
+  );
 }
 
-function GuestGraph() {
-  return <GraphScreen source={useGuestKnowledgeSource()} />;
+function GuestGraph({ mode }: { mode: 'guest' | 'demo' }) {
+  return <GraphScreen source={useGuestKnowledgeSource()} library={useGuestSourceLibrary(mode)} />;
 }

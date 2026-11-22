@@ -11,6 +11,8 @@ import { m } from '@kd-learn/i18n';
 import type { GuestProvider, GuestSettings } from '@kd-learn/storage/port';
 import { useEffect, useState } from 'react';
 import { AppHeader } from './AppHeader';
+import { useGuestSourceLibrary } from '../sources/library';
+import { SearchPreference } from '../sources/SearchPreference';
 import { ProfileLink } from '../profile/ProfileLink';
 import { useEndpoints, useStoragePersistent } from '../learn/hooks';
 import { runStorage, useGuestSettings } from '../storage';
@@ -19,6 +21,7 @@ const DEFAULT_MODEL: Partial<Record<GuestProvider, string>> = { anthropic: 'clau
 
 /** Guest settings: provider, model and key, kept on this device only. */
 export function GuestSettings() {
+  const library = useGuestSourceLibrary('guest');
   const stored = useGuestSettings();
   const endpoints = useEndpoints();
   const persistent = useStoragePersistent();
@@ -191,6 +194,7 @@ export function GuestSettings() {
               )}
             </HStack>
 
+            <SearchPreference providers={library.providers} />
             <ProfileLink />
           </VStack>
         </LayoutContent>

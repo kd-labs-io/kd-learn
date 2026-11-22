@@ -2,6 +2,7 @@
 // the account store over the server's snapshot and stream (plan step 8: one screen for both).
 import type { EventLog, ProjectionError, Session } from '@kd-learn/core';
 import type { Result } from 'effect';
+import type { LessonSources } from '../sources/library';
 import type { RunnerState } from './runner';
 
 export type LessonView =
@@ -42,4 +43,6 @@ export interface LessonSource {
   readonly elsewhere: boolean;
   /** False when nothing is kept after closing (guest in-memory fallback). */
   readonly persistent: boolean | undefined;
+  /** Sources to attach and the chunks citations open (phase 4). */
+  readonly sources?: LessonSources;
 }

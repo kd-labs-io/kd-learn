@@ -3,6 +3,8 @@
 import { findInterruptedTurn } from '@kd-learn/core';
 import { useNavigate } from '@tanstack/react-router';
 import { Result } from 'effect';
+import { localModeNow } from '../account/auth';
+import { useGuestLessonSources } from '../sources/library';
 import { useSession } from '../storage';
 import { useRunner, useStoragePersistent, useTurnRunningElsewhere } from './hooks';
 import { LearnScreen } from './LearnScreen';
@@ -13,6 +15,7 @@ export function GuestLesson({ sessionId }: { sessionId: string }) {
   const stored = useSession(sessionId);
   const { runner, state } = useRunner(sessionId);
   const persistent = useStoragePersistent();
+  const sources = useGuestLessonSources(sessionId, localModeNow());
 
   const view: LessonView =
     stored.status === 'ready'
@@ -29,7 +32,7 @@ export function GuestLesson({ sessionId }: { sessionId: string }) {
 
   return (
     <LearnScreen
-      source={{ view, state, actions: runner, elsewhere, persistent }}
+      source={{ view, state, actions: runner, elsewhere, persistent, sources }}
       onHome={() => void navigate({ to: '/' })}
       onSettings={() => void navigate({ to: '/settings' })}
     />
