@@ -6,7 +6,9 @@
   "type": "module",
   "exports": {
     "./components/LessonMarkdown": "./components/LessonMarkdown.tsx",
-    "./components/LessonText": "./components/LessonText.tsx"
+    "./components/LessonText": "./components/LessonText.tsx",
+    "./components/LessonFigure": "./components/LessonFigure.tsx",
+    "./figure/frame-doc": "./components/figure/frame-doc.ts"
   },
   "scripts": {
     "typecheck": "tsc && astryx integration check --strict",
@@ -31,7 +33,11 @@
     "react": "catalog:"
   },
   "dependencies": {
+    "@kd-learn/core": "workspace:*",
     "@kd-learn/i18n": "workspace:*",
-    "katex": "0.19.1"
+    "@kd-learn/tokens": "workspace:*",
+    "effect": "catalog:",
+    "katex": "0.19.1",
+    "mermaid": "12.3.0"
   }
 }

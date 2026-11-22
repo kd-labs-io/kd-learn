@@ -59,6 +59,12 @@ function RootDocument({ children }: { children: ReactNode }) {
           sheet may come first). React hoists stylesheets by precedence group, in the
           order groups are first seen, so this group must render before <HeadContent>.
         */}
+        {/*
+          Demo frames (srcdoc, plan hinh-va-demo.md A2) may not navigate themselves anywhere: this
+          policy is inherited by srcdoc frames and blocks it in every browser (spike C1, risk 43).
+          Only frame-src, so nothing else of the app changes.
+        */}
+        <meta httpEquiv="Content-Security-Policy" content="frame-src 'self' about:" />
         <style href="kd-layer-order" precedence="kd-layer-order">
           {'@layer reset, astryx-base, astryx-theme, product;'}
         </style>

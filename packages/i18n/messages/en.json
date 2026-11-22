@@ -382,5 +382,21 @@
   "admin_search_demo": "Demo research uses",
   "admin_search_demo_hint": "Each search counts in the demo budget.",
   "admin_search_off": "Nothing (off)",
-  "settings_search": "Search source for research"
+  "settings_search": "Search source for research",
+  "figure_preparing": "Preparing a figure…",
+  "figure_missing": "This figure is not available.",
+  "figure_load_failed": "The figure could not be loaded.",
+  "figure_zoom": "Enlarge",
+  "figure_show_code": "Show code",
+  "figure_hide_code": "Hide code",
+  "figure_close": "Close",
+  "figure_invalid_svg": "This diagram could not be drawn: {reason}",
+  "figure_invalid_mermaid": "This Mermaid diagram could not be drawn: {reason}",
+  "figure_demo_label": "AI-generated code, run in isolation",
+  "figure_demo_run": "Run",
+  "figure_demo_stop": "Stop",
+  "figure_demo_rerun": "Run again",
+  "figure_demo_error": "The demo reported an error: {message}",
+  "figure_demo_unavailable": "Demos can run only over HTTPS or on localhost.",
+  "figure_demo_libraries": "Libraries: {list}"
 }
