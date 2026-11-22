@@ -43,7 +43,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
   - Bản SSR đọc cookie trong request (cùng chỗ Paraglide đọc locale): đặt `data-theme` trên `<html>` khi chế độ không phải `system`, và biến của theme không phải `kd` lên wrapper ngay trong HTML.
   - Bản SPA (shell prerender, màn hình chỉ render sau khi mount): một script nhỏ trong `<head>` đọc cookie và đặt `data-theme` trước lần vẽ đầu. App chưa có CSP cho script (chỉ `frame-src`), nên script nội tuyến chạy được.
 - **Đồng bộ tài khoản:**
-  - Server: cột `appearance` (JSON, có thể null) trong bảng người dùng, migration server v11. `GET /api/account/settings` trả thêm `appearance`; `PUT /api/account/appearance` ghi. Khách không đổi migration (lưu ở cookie và `localStorage`).
+  - Server: bảng `user_appearance (user_id, mode, theme, updated_at)`, migration server v11. `GET` và `PUT /api/account/appearance` trả `{appearance: Appearance | null}` (`null` khi tài khoản chưa lưu gì); `/api/account/settings` không đổi. Khách không đổi migration (lưu ở cookie và `localStorage`).
   - Đổi trong UI: ghi cookie và `localStorage` ngay, rồi gửi lên server nếu đang đăng nhập.
   - Mở app khi đã đăng nhập: giá trị của server thắng nếu có (ghi đè cookie, không loé lần sau); server chưa có thì đẩy giá trị của máy lên. Đăng xuất giữ giá trị của máy.
   - Test hai người dùng: mỗi người đọc và ghi đúng `appearance` của mình.
@@ -75,7 +75,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
 | --- | --- | --- | --- |
 | 0 | Spike dark mode Astryx (C1) | spike | Trả lời đủ C1; chốt cách áp theme lúc chạy ở hai chế độ, cách tránh loé ở SSR và SPA, theme cú pháp cho khối code |
 | 1 | Theme v2 trong `tokens`: hai bộ màu, `toAstryxVars` với `light-dark()`, nền nhạt và bóng theo chế độ, `checkContrast` hai chế độ, `figureVars(theme, mode)`, ba theme dựng sẵn, bảng dark trong `DESIGN.md` (A1, A2) | tokens | Test: ba theme decode được, không cặp nào dưới AA ở cả hai chế độ (`kd-contrast` đạt 7:1 cho chữ chính), v1 bị từ chối, biến dark khác light |
-| 2 | `Appearance` trong `api`, cột `appearance` (server v11), `GET` / `PUT` của tài khoản (A3) | api, storage, server | Test route: đọc / ghi đúng, giá trị sai bị từ chối, hai người dùng không thấy của nhau; migration chạy trên DB v10 có sẵn dữ liệu |
+| 2 | `Appearance` trong `api`, bảng `user_appearance` (server v11), `GET` / `PUT` của tài khoản (A3) | api, storage, server | Test route: đọc / ghi đúng, giá trị sai bị từ chối, hai người dùng không thấy của nhau; migration chạy trên DB v10 có sẵn dữ liệu |
 | 3 | `ThemeRoot` theo chế độ và theme, cookie, SSR, script trước lần vẽ đầu của SPA, `useResolvedMode`, đồng bộ tài khoản, mục "Giao diện" trong cài đặt, i18n (A3, A5) | web, i18n | Playwright: chọn tối / theme khác áp ngay và còn sau tải lại ở cả bản SSR và SPA, không loé (màu nền của lần vẽ đầu đúng); `system` theo `prefers-color-scheme` giả lập; tài khoản: chọn ở context A, context B (đăng nhập cùng tài khoản) thấy cùng lựa chọn |
 | 4 | Hình, demo, graph theo chế độ đã quyết (A4) | ui, web | Test trình duyệt hiện có (`figures.e2e.ts`: SVG, Mermaid có nét vẽ thật, demo chạy) chạy lại ở dark và ở từng theme; đổi chế độ giữa buổi thì màu hình đổi; graph vẽ lại |
 | 5 | Web trên điện thoại: kiểm giả lập và sửa, lỗi React #418, `practice.e2e.ts` trên WebKit (A6) | web, ui | Playwright với iPhone (WebKit) và Pixel (Chromium): không cuộn ngang ở mọi màn chính, học một buổi với model giả; không còn #418 trên bản build (hoặc ghi rõ nguyên nhân còn lại); kết luận về `practice.e2e.ts` WebKit |

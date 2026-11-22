@@ -3,6 +3,8 @@
 import { Effect, Result, Schema } from 'effect';
 import {
   AccountSettings,
+  Appearance,
+  AppearanceResponse,
   ConnectionInfo,
   CreateConnectionRequest,
   ErrorCode,
@@ -102,6 +104,22 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
         );
       }
       return json(ctx, Schema.encodeSync(AccountSettings)(ctx.accounts.settings.get(user.id)));
+    }),
+  );
+
+  /** `GET` and `PUT` of the appearance (phase 6 A3). */
+  const appearance = route('account.appearance', ['GET', 'PUT'], (ctx) =>
+    signedIn(ctx, async (user) => {
+      const service = ctx.accounts.settings;
+      if (ctx.request.method === 'PUT') {
+        const input = await decode(ctx, Appearance);
+        if (input instanceof Response) return input;
+        service.setAppearance(user.id, input);
+      }
+      return json(
+        ctx,
+        Schema.encodeSync(AppearanceResponse)({ appearance: service.appearance(user.id) }),
+      );
     }),
   );
 
@@ -221,6 +239,7 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     if (one?.[1] !== undefined) return deleteConnection(one[1])(request, context);
     if (path === 'roles') return setRoles(request, context);
     if (path === 'profile') return profile(request, context);
+    if (path === 'appearance') return appearance(request, context);
     if (path === 'knowledge/extractions') return extractions(request, context);
     if (path === 'knowledge') return knowledge(request, context);
     // Any non-empty string is a proposition id (core `PropositionId`): the client encodes it.

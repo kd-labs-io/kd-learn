@@ -128,4 +128,13 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
   [...sourcesTables],
   // v10: figure bodies (phase 5 A1); `owner` is the user id.
   [...figuresTable],
+  // v11: appearance of each account (phase 6 A3): color mode and built-in theme id.
+  [
+    `CREATE TABLE user_appearance (
+       user_id TEXT PRIMARY KEY REFERENCES users (id),
+       mode TEXT NOT NULL CHECK (mode IN ('system', 'light', 'dark')),
+       theme TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     ) WITHOUT ROWID`,
+  ],
 ];

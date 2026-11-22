@@ -7,6 +7,7 @@ import { ModelRole, roleFallback } from '@kd-learn/api';
 import type {
   AcpAgent,
   AcpModels,
+  Appearance,
   ConnectionInfo,
   CreateConnectionRequest,
   RoleModel,
@@ -69,6 +70,9 @@ export interface SettingsService {
    * its connection cannot make images (any more). Only for running a turn; never log it.
    */
   readonly resolveImageModel: (userId: string) => ImageModelRef | undefined;
+  /** The saved appearance (phase 6 A3), or null while the user has saved none. */
+  readonly appearance: (userId: string) => Appearance | null;
+  readonly setAppearance: (userId: string, appearance: Appearance) => void;
 }
 
 interface ConnectionRow {
@@ -136,6 +140,12 @@ export const makeSettings = (
     putRole: db.prepare(
       'INSERT INTO role_models (user_id, role, connection_id, model) VALUES (?, ?, ?, ?)',
     ),
+    appearance: db.prepare('SELECT mode, theme FROM user_appearance WHERE user_id = ?'),
+    putAppearance: db.prepare(
+      `INSERT INTO user_appearance (user_id, mode, theme, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET mode = excluded.mode, theme = excluded.theme,
+           updated_at = excluded.updated_at`,
+    ),
   };
 
   const modelAllowed = (agent: AcpAgent, model: string) =>
@@ -156,6 +166,16 @@ export const makeSettings = (
   };
 
   const settings: SettingsService = {
+    appearance: (userId) => {
+      const row = q.appearance.get(userId) as
+        { mode: Appearance['mode']; theme: string } | undefined;
+      return row === undefined ? null : { mode: row.mode, theme: row.theme };
+    },
+
+    setAppearance: (userId, appearance) => {
+      q.putAppearance.run(userId, appearance.mode, appearance.theme, now());
+    },
+
     get: (userId) => ({
       connections: (q.connections.all(userId) as unknown as ConnectionRow[]).map(toInfo),
       roles: rolesOf(userId),
