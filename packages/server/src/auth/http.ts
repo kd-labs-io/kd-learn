@@ -32,6 +32,7 @@ import { makeLazyAcp, routedAi } from '../acp/router.ts';
 import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
+import { makeResearchJobs, type ResearchJobs } from '../sources/research-job.ts';
 import {
   makeSearchConfig,
   type SearchAdapters,
@@ -64,6 +65,8 @@ export interface Accounts {
   readonly admin: AdminService;
   /** The server's search sources (phase 4 A6). */
   readonly search: SearchConfigService;
+  /** Web research jobs (phase 4 A5). */
+  readonly research: ResearchJobs;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
   /** Whether this build can load the ACP adapter. */
@@ -137,10 +140,32 @@ export const initAccounts = async (
   });
   const jobs = makeJobRunner({ database, log: options.log });
   const extractions = makeExtractionJobs({ storage, settings, ai, log: options.log, jobs });
+  // The session runner is made below; research attaches through it once a job finishes.
+  const late: { sessions?: SessionRunner } = {};
+  const research = makeResearchJobs({
+    storage,
+    settings,
+    ai,
+    jobs,
+    search,
+    log: options.log,
+    attach: (userId, sessionId, sourceId) => {
+      const outcome = late.sessions?.setSources(userId, sessionId, {
+        attach: [sourceId],
+        detach: [],
+      });
+      return outcome?._tag === 'TurnInProgress' || outcome === undefined
+        ? 'busy'
+        : outcome._tag === 'Ok'
+          ? 'attached'
+          : 'gone';
+    },
+  });
   const sources = makeSourceService({
     storage,
     jobs,
     log: options.log,
+    research,
     ...(options.extractPdf === undefined ? {} : { extract: options.extractPdf }),
   });
   // Background jobs survive a restart (phase 4 A1): take over the rows of the last process, then
@@ -155,6 +180,7 @@ export const initAccounts = async (
     onSessionCompleted: extractions.sessionCompleted,
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
+  late.sessions = sessions;
   const practice = makePracticeService({
     storage,
     settings,
@@ -175,6 +201,7 @@ export const initAccounts = async (
     sources,
     admin,
     search,
+    research,
     demo,
     acpAvailable,
   };

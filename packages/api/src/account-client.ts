@@ -78,6 +78,7 @@ import {
   SourceList,
   SourceResponse,
 } from './sources.ts';
+import { ACCOUNT_RESEARCH_PATH, CreateResearchRequest } from './research.ts';
 import type { ExerciseAnswer, SavedProfile } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
@@ -417,6 +418,14 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         path: ADMIN_SEARCH_PATH,
         body: bodyOf(UpdateAdminSearchRequest, change),
         response: codec(AdminSearchConfig),
+      }),
+    /** Starts a web research (phase 4 A5): 202 with the `pending` source. */
+    createResearch: (input: CreateResearchRequest) =>
+      go({
+        method: 'POST',
+        path: ACCOUNT_RESEARCH_PATH,
+        body: bodyOf(CreateResearchRequest, input),
+        response: codec(SourceResponse),
       }),
     /** Search sources this account may use for research (phase 4 A6). */
     searchOptions: () =>

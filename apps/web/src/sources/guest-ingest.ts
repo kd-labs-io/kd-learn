@@ -5,8 +5,12 @@
 // The tab reading a PDF holds the Web Lock `kd-learn:ingest:<sourceId>`, which lives exactly as
 // long as the tab. A `pending` source nobody holds the lock of was cut (tab closed, reload): the
 // list shows it as interrupted, and `retry` reads the kept file again.
+//
+// A web research (A5) works the same way: the source is stored `pending` with its question in
+// `origin`, the tab calls `/api/research` under the same lock, and writes `ready` or `failed`.
 import { Effect } from 'effect';
-import { MAX_PDF_BYTES } from '@kd-learn/api';
+import { MAX_PDF_BYTES, parseWebOrigin, webOrigin } from '@kd-learn/api';
+import type { ResearchOutcome, WebOrigin } from '@kd-learn/api';
 import { SourceFailureCode, type SourceInfo } from '@kd-learn/core';
 import type { StorageService } from '@kd-learn/storage/port';
 import { isLockHeld, withLock, type WithLock } from '../learn/locks';
@@ -23,6 +27,8 @@ export interface GuestSourcesDeps {
   readonly isHeld?: (name: string) => Promise<boolean>;
   readonly newId?: () => string;
   readonly now?: () => number;
+  /** Runs a research on the server (`researchWeb` with the guest's model); absent: no research. */
+  readonly research?: (origin: WebOrigin) => Promise<ResearchOutcome>;
 }
 
 /** A source as the list shows it: `interrupted` is a `pending` source no tab is reading. */
@@ -70,6 +76,44 @@ export const makeGuestSources = (deps: GuestSourcesDeps) => {
         (result.ok
           ? s.completeSource(sourceId, result.chunks)
           : s.failSource(sourceId, result.failure)
+        ).pipe(Effect.catchTag('SourceConflict', () => Effect.void)),
+      );
+    });
+    return outcome.acquired;
+  };
+
+  /** Runs the research of a pending web source under its lock. False when another tab runs it. */
+  const researchPending = async (sourceId: string): Promise<boolean> => {
+    const research = deps.research;
+    const outcome = await lock(ingestLockName(sourceId), async () => {
+      const info = await run((s) => s.getSource(sourceId));
+      if (info?.state !== 'pending') return;
+      const origin = parseWebOrigin(info.origin);
+      const result: ResearchOutcome =
+        origin === undefined || research === undefined
+          ? {
+              _tag: 'Failed',
+              error: {
+                code: SourceFailureCode.Invalid,
+                message: 'The question is lost.',
+                retryable: false,
+              },
+            }
+          : await research(origin).catch((): ResearchOutcome => ({
+              _tag: 'Failed',
+              error: {
+                code: SourceFailureCode.Failed,
+                message: 'The research could not reach the server.',
+                retryable: true,
+              },
+            }));
+      await run((s) =>
+        (result._tag === 'Researched'
+          ? s.completeSource(sourceId, result.chunks)
+          : s.failSource(sourceId, {
+              code: result.error.code,
+              message: result.error.message.slice(0, 500),
+            })
         ).pipe(Effect.catchTag('SourceConflict', () => Effect.void)),
       );
     });
@@ -139,13 +183,37 @@ export const makeGuestSources = (deps: GuestSourcesDeps) => {
       return { _tag: 'Added', source: (await run((s) => s.getSource(sourceId)))! };
     },
 
-    /** Reads an interrupted or failed PDF again from its kept file. */
+    /**
+     * Stores a `pending` web source and runs its research. Resolves when it is `ready` or
+     * `failed`; the source is in the list from the start.
+     */
+    addResearch: async (origin: WebOrigin): Promise<AddResult> => {
+      const sourceId = newId();
+      await run((s) =>
+        s.createSource({
+          state: 'pending',
+          info: {
+            sourceId,
+            kind: 'web',
+            title: [...origin.question.replace(/\s+/g, ' ').trim()].slice(0, 300).join(''),
+            origin: webOrigin(origin),
+            createdAt: now(),
+          },
+        }),
+      );
+      await researchPending(sourceId);
+      return { _tag: 'Added', source: (await run((s) => s.getSource(sourceId)))! };
+    },
+
+    /** Runs an interrupted or failed PDF or research again (the kept file, or the question). */
     retry: async (sourceId: string): Promise<'started' | 'busy' | 'notFound'> => {
       const info = await run((s) => s.getSource(sourceId));
-      if (info === undefined || info.kind !== 'pdf') return 'notFound';
+      if (info === undefined || info.kind === 'note' || info.state === 'ready') return 'notFound';
       if (await isHeld(ingestLockName(sourceId))) return 'busy';
       if (info.state === 'failed') await run((s) => s.retrySource(sourceId));
-      return (await readPending(sourceId)) ? 'started' : 'busy';
+      const started =
+        info.kind === 'pdf' ? await readPending(sourceId) : await researchPending(sourceId);
+      return started ? 'started' : 'busy';
     },
 
     remove: (sourceId: string) => run((s) => s.deleteSource(sourceId)),

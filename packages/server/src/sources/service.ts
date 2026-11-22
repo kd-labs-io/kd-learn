@@ -16,6 +16,7 @@ import { Schema } from 'effect';
 import type { Logger } from '../handler.ts';
 import type { JobKind, JobRunner } from '../jobs/runner.ts';
 import { extractPdf, type PdfExtractor } from './pdf.ts';
+import type { ResearchJobs } from './research-job.ts';
 
 export type SourceResult<A> =
   | { readonly _tag: 'Ok'; readonly value: A }
@@ -51,6 +52,8 @@ export interface SourceServiceDeps {
   readonly log: Logger;
   /** Tests replace the worker. */
   readonly extract?: PdfExtractor;
+  /** Runs a failed `web` source again. */
+  readonly research?: ResearchJobs;
   readonly newId?: () => string;
   readonly now?: () => number;
 }
@@ -197,8 +200,13 @@ export const makeSourceService = (deps: SourceServiceDeps): SourceService => {
       const user = storage.forUser(userId);
       const info = sync(user.getSource(sourceId));
       if (info === undefined) return { _tag: 'NotFound' };
+      if (info.kind === 'web' && deps.research !== undefined) {
+        return info.state === 'ready'
+          ? { _tag: 'Conflict', message: 'This research is done.' }
+          : deps.research.retry(userId, info);
+      }
       if (info.kind !== 'pdf') {
-        return { _tag: 'Conflict', message: 'Only a PDF can be read again.' };
+        return { _tag: 'Conflict', message: 'Only a PDF or a research can run again.' };
       }
       if (jobs.state(userId, ingest.kind, sourceId) !== undefined) {
         return { _tag: 'Conflict', message: 'This PDF is being read.' };

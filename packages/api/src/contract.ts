@@ -154,6 +154,8 @@ export const ErrorCode = {
   AcpBusy: 'AcpBusy',
   /** The session is already being extracted, or waits in the queue (phase 3 A3). */
   ExtractionInProgress: 'ExtractionInProgress',
+  /** The search source is not offered in this mode, or the admin turned it off (phase 4 A6). */
+  SearchUnavailable: 'SearchUnavailable',
   Misconfigured: 'ServerMisconfigured',
   Internal: 'InternalError',
 } as const;

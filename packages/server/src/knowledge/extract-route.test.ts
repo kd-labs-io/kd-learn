@@ -204,3 +204,61 @@ describe('POST /api/knowledge/extract', () => {
     await second.text();
   });
 });
+
+describe('extraction with documents (phase 4 A3)', () => {
+  const chunk = (text: string, ordinal: number) => ({
+    sourceId: 'pdf1',
+    ordinal,
+    title: 'Notes',
+    text,
+    locator: { page: 1 },
+  });
+  const body = (documentSlice: unknown, model: unknown) => ({
+    model,
+    extractionId: 'x1',
+    log,
+    slice,
+    documentSlice,
+  });
+  const guestModel = { provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: KEY };
+
+  it('sends the documents to the extractor, and refuses a slice over the limit', async () => {
+    const fake = scriptedAi(answers());
+    const { handlers } = make({}, { ai: fake.layer });
+    const ok = await post(handlers.extract, body([chunk('Arrays must be sorted.', 0)], guestModel));
+    expect(ok.status).toBe(200);
+    const text = await ok.text();
+    expect(fake.requests[0]!.messages[0]!.content).toContain('[D1] Notes, page 1:');
+    expect(text).not.toContain(KEY);
+
+    const big = Array.from({ length: 20 }, (_, i) => chunk('x'.repeat(3900), i));
+    expect((await post(handlers.extract, body(big, guestModel))).status).toBe(413);
+  });
+
+  it('counts the documents in the 256 KiB demo cap', async () => {
+    const fake = scriptedAi([]);
+    const { handlers } = make(demoEnv(10), { ai: fake.layer });
+    // Under the document limit (64 KiB) but, with a long log, over the demo request cap.
+    const longLog = [
+      ...log,
+      ...Array.from({ length: 60 }, (_, i) => ({
+        _tag: 'MessageAppended',
+        id: `x${i}`,
+        at: 5,
+        turnId: 't1',
+        messageId: `m${i}`,
+        agent: 'teacher',
+        content: 'y'.repeat(3500),
+      })),
+    ];
+    const response = await post(handlers.extract, {
+      ...body(
+        Array.from({ length: 15 }, (_, i) => chunk('x'.repeat(3900), i)),
+        { provider: 'demo' },
+      ),
+      log: longLog,
+    });
+    expect(response.status).toBe(413);
+    expect(fake.requests).toHaveLength(0);
+  });
+});
