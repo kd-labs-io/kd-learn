@@ -1,7 +1,7 @@
 import { defaultProfile } from '@kd-learn/agent/client';
 import { MAX_PROMPT_LENGTH } from '@kd-learn/core';
 import { describe, expect, it } from 'vitest';
-import { validateProfile } from './ProfileScreen';
+import { validateProfile } from './form';
 
 const form = {
   id: crypto.randomUUID(),
