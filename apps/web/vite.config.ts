@@ -50,7 +50,15 @@ export default defineConfig({
         ? { spa: { enabled: true, prerender: { outputPath: '/index.html', crawlLinks: false } } }
         : {},
     ),
-    ...(spa ? [] : [nitro(acp ? { traceDeps: ['@agentclientprotocol/claude-agent-acp*'] } : {})]),
+    // pdfjs-dist is loaded by path in a worker thread (server PDF extraction, phase 4 A4), so the
+    // bundler cannot see it: trace it next to the server output.
+    ...(spa
+      ? []
+      : [
+          nitro({
+            traceDeps: ['pdfjs-dist*', ...(acp ? ['@agentclientprotocol/claude-agent-acp*'] : [])],
+          }),
+        ]),
     // StyleX for kd-learn components; splits Astryx and product CSS into layers.
     ...astryx(),
     // React's plugin must come after Start's.

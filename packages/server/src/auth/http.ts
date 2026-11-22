@@ -24,6 +24,8 @@ import { makeSessionRunner, type SessionRunner } from '../sessions/runner.ts';
 import { makeJobRunner, type JobRunner } from '../jobs/runner.ts';
 import { makeExtractionJobs, type ExtractionJobs } from '../knowledge/jobs.ts';
 import { makePracticeService, type PracticeService } from '../practice/account.ts';
+import { makeSourceService, type SourceService } from '../sources/service.ts';
+import type { PdfExtractor } from '../sources/pdf.ts';
 import { makeAdmin, type AdminService } from '../admin/service.ts';
 import { makeDemoBudget } from '../demo/budget.ts';
 import { makeLazyAcp, routedAi } from '../acp/router.ts';
@@ -52,6 +54,8 @@ export interface Accounts {
   readonly extractions: ExtractionJobs;
   /** Practice on the knowledge log (phase 3 A7). */
   readonly practice: PracticeService;
+  /** Learning sources and their `ingest` jobs (phase 4 A2, A4). */
+  readonly sources: SourceService;
   readonly admin: AdminService;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
@@ -72,6 +76,8 @@ export const initAccounts = async (
     readonly acp?: Layer.Layer<AiPort>;
     readonly turnTimeoutMs?: number;
     readonly database?: ServerDatabase;
+    /** PDF extraction; tests pass a fake. Default: pdfjs in a worker thread. */
+    readonly extractPdf?: PdfExtractor;
     readonly auth?: AuthOptions;
     readonly log: Logger;
   },
@@ -114,6 +120,12 @@ export const initAccounts = async (
   });
   const jobs = makeJobRunner({ database, log: options.log });
   const extractions = makeExtractionJobs({ storage, settings, ai, log: options.log, jobs });
+  const sources = makeSourceService({
+    storage,
+    jobs,
+    log: options.log,
+    ...(options.extractPdf === undefined ? {} : { extract: options.extractPdf }),
+  });
   // Background jobs survive a restart (phase 4 A1): take over the rows of the last process, then
   // close the extraction attempts left open without a job.
   jobs.resume();
@@ -143,6 +155,7 @@ export const initAccounts = async (
     jobs,
     extractions,
     practice,
+    sources,
     admin,
     demo,
     acpAvailable,

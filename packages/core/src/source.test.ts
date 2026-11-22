@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { DomainEvent, EventLog } from './event.ts';
 import { projectSession } from './session.ts';
 import {
+  pdfHasText,
+  pdfPagesText,
   chunkNote,
   chunkPages,
   chunkWeb,
@@ -176,5 +178,34 @@ describe('sources in the session log', () => {
     expect(Result.isFailure(projectSession(twice as DomainEvent[]))).toBe(true);
     const detach = [created, { _tag: 'SourceDetached', id: 'e2', at: 2, sourceId: 'x' }];
     expect(Result.isFailure(projectSession(detach as DomainEvent[]))).toBe(true);
+  });
+});
+
+describe('pdfPagesText', () => {
+  const line = (str: string, y: number, height = 12) => ({ str, hasEOL: true, y, height });
+  const page = (n: number, body: ReadonlyArray<ReturnType<typeof line>>) => ({
+    page: n,
+    items: [line('Book title', 760, 9), ...body, line(`Page ${n}`, 30, 9)],
+  });
+
+  it('drops running heads and footers, keeps repeated body lines, splits paragraphs on gaps', () => {
+    const body = [
+      line('Intro', 720),
+      line('First line', 700),
+      line('Example:', 686),
+      line('After a gap', 640),
+      line('More', 626),
+      line('End', 612),
+    ];
+    const pages = pdfPagesText([1, 2, 3, 4].map((n) => page(n, body)));
+    expect(pages[0]!.text).toBe('First line\nExample:\n\nAfter a gap\nMore');
+    expect(pages[3]!.text).not.toContain('Page 4');
+  });
+
+  it('keeps everything under three pages, and gives NFC', () => {
+    const pages = pdfPagesText([page(1, [line('Tiếng', 700)]), page(2, [])]);
+    expect(pages[0]!.text).toBe('Book title\n\nTiếng\n\nPage 1');
+    expect(pdfHasText(pages)).toBe(true);
+    expect(pdfHasText([{ text: ' ' }, { text: 'abc' }])).toBe(false);
   });
 });

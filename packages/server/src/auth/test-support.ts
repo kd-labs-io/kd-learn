@@ -5,6 +5,7 @@ import type { AiPort } from '@kd-learn/ai/port';
 import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { createHandlers } from '../index.ts';
 import type { LogEntry } from '../index.ts';
+import type { PdfExtractor } from '../sources/pdf.ts';
 
 export const ADMIN = { email: 'root@kd.test', password: 'admin-password-1' };
 export const USER = { email: 'learner@kd.test', password: 'learner-password-1' };
@@ -17,6 +18,7 @@ export interface MakeOptions {
   readonly dbPath?: string;
   /** A database the test keeps a handle on (to seed it). */
   readonly database?: ServerDatabase;
+  readonly extractPdf?: PdfExtractor;
 }
 
 export const make = (env: Record<string, string> = {}, options: MakeOptions = {}) => {
@@ -37,6 +39,7 @@ export const make = (env: Record<string, string> = {}, options: MakeOptions = {}
         Effect.runSync(openServerDatabase({ path: options.dbPath ?? ':memory:' })),
       ...(options.ai ? { ai: options.ai } : {}),
       ...(options.acp ? { acp: options.acp } : {}),
+      ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
       ...(options.turnTimeoutMs ? { turnTimeoutMs: options.turnTimeoutMs } : {}),
     },
   );

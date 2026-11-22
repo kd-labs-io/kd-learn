@@ -10,6 +10,7 @@ import {
   maxChunkChars,
   defaultChunkChars,
   type SourceChunk,
+  type SourceFailure,
 } from './source-schema.ts';
 import { lexicalSimilarity, tokenize, utf8Length } from './slice.ts';
 import { currentStep, type Session } from './session.ts';
@@ -223,4 +224,136 @@ export const selectSourceSlice = (
   // Reading order inside the prompt: by source, then by position.
   const order = new Map(chunks.map((chunk, index) => [chunk, index]));
   return picked.sort((a, b) => order.get(a)! - order.get(b)!);
+};
+
+// ---------------------------------------------------------------------------------------------
+// PDF text (plan nguon-hoc.md A4, spike C1)
+
+/** One text item of a PDF page, as pdfjs gives it: `y` is the baseline, `height` the font size. */
+export interface PdfTextItem {
+  readonly str: string;
+  readonly hasEOL: boolean;
+  readonly y: number;
+  readonly height: number;
+}
+
+/** A page "has text" when it averages at least this many non-space characters (spike C1). */
+export const minPdfCharsPerPage = 10;
+
+const lineKey = (line: string) => line.trim().replace(/\d+/g, '#').toLowerCase();
+
+/**
+ * Page text of a PDF: lines from `hasEOL`, a paragraph break where the gap to the next line is
+ * more than 1.5 line heights, and running heads and footers dropped: a short line among the first
+ * or last two of a page that repeats there on at least half the pages (digits ignored). NFC.
+ */
+export const pdfPagesText = (
+  pages: ReadonlyArray<{ readonly page: number; readonly items: ReadonlyArray<PdfTextItem> }>,
+): Array<{ page: number; text: string }> => {
+  const linesOf = pages.map(({ page, items }) => {
+    const lines: Array<{ text: string; y: number; height: number }> = [];
+    let text = '';
+    let y = Number.NaN;
+    let height = 0;
+    const end = () => {
+      if (text.trim().length > 0) lines.push({ text: text.trim(), y, height });
+      text = '';
+      y = Number.NaN;
+      height = 0;
+    };
+    for (const item of items) {
+      if (Number.isNaN(y)) y = item.y;
+      height = Math.max(height, item.height);
+      text += item.str;
+      if (item.hasEOL) end();
+    }
+    end();
+    return { page, lines };
+  });
+  const edge = (index: number, count: number) => index < 2 || index >= count - 2;
+  const counts = new Map<string, number>();
+  if (pages.length >= 3) {
+    for (const { lines } of linesOf) {
+      const keys = lines
+        .filter((line, index) => line.text.length <= 80 && edge(index, lines.length))
+        .map((line) => lineKey(line.text));
+      for (const key of new Set(keys)) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  const repeated = (line: string) =>
+    line.length <= 80 && (counts.get(lineKey(line)) ?? 0) >= Math.max(3, pages.length / 2);
+  return linesOf.map(({ page, lines }) => {
+    const kept = lines.filter((line, index) => !(edge(index, lines.length) && repeated(line.text)));
+    let text = '';
+    kept.forEach((line, index) => {
+      const previous = kept[index - 1];
+      if (previous !== undefined) {
+        const gap = Math.abs(previous.y - line.y);
+        const size = Math.max(previous.height, line.height, 1);
+        text += gap > 1.5 * size * 1.2 ? '\n\n' : '\n';
+      }
+      text += line.text;
+    });
+    return { page, text: text.normalize('NFC') };
+  });
+};
+
+/** True when the PDF has a text layer worth reading (not a scan). */
+export const pdfHasText = (pages: ReadonlyArray<{ readonly text: string }>) =>
+  pages.length > 0 &&
+  pages.reduce((sum, p) => sum + p.text.replace(/\s/g, '').length, 0) / pages.length >=
+    minPdfCharsPerPage;
+
+/** Codes of a failed source (A4, A5). The UI has a message for each. */
+export const SourceFailureCode = {
+  NoText: 'NoText',
+  Encrypted: 'Encrypted',
+  Invalid: 'Invalid',
+  TooLarge: 'TooLarge',
+  Timeout: 'Timeout',
+  Interrupted: 'Interrupted',
+  Failed: 'Failed',
+} as const;
+
+const pdfFailureMessages: Record<string, string> = {
+  NoText: 'This PDF has no text layer (a scan?). Text recognition is not supported.',
+  Encrypted: 'This PDF is protected by a password.',
+  Invalid: 'This file is not a readable PDF.',
+  TooLarge: 'This PDF is too large (pages or text).',
+  Timeout: 'Reading this PDF took too long.',
+  TooMuchMemory: 'Reading this PDF needed too much memory.',
+  Crashed: 'Reading this PDF failed.',
+};
+
+/**
+ * The chunks of an extracted PDF, or why it fails: same function for the browser and the server,
+ * so both modes give the same chunks (A4).
+ */
+export const pdfSourceChunks = (
+  result:
+    | {
+        readonly ok: true;
+        readonly pages: ReadonlyArray<{
+          readonly page: number;
+          readonly items: ReadonlyArray<PdfTextItem>;
+        }>;
+      }
+    | { readonly ok: false; readonly code: string },
+):
+  | { readonly ok: true; readonly chunks: SourceChunk[] }
+  | { readonly ok: false; readonly failure: SourceFailure } => {
+  const fail = (code: string) => ({
+    ok: false as const,
+    failure: {
+      code: code === 'TooMuchMemory' ? 'TooLarge' : code === 'Crashed' ? 'Invalid' : code,
+      message: pdfFailureMessages[code] ?? 'Reading this PDF failed.',
+    },
+  });
+  if (!result.ok) return fail(result.code);
+  const pages = pdfPagesText(result.pages);
+  if (!pdfHasText(pages)) return fail('NoText');
+  const chunks = chunkPages(pages);
+  if (chunks.length === 0) return fail('NoText');
+  if (chunksBytes(chunks) > maxSourceTextBytes) return fail('TooLarge');
+  return { ok: true, chunks };
 };

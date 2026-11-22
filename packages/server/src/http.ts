@@ -32,14 +32,14 @@ export const failureResponse = (
   });
 };
 
-/** The body as text, or why it was refused. Stops reading as soon as the limit is passed. */
-export const readLimited = async (
+/** The body as bytes, or why it was refused. Stops reading as soon as the limit is passed. */
+export const readLimitedBytes = async (
   request: Request,
   max: number,
-): Promise<{ readonly text: string; readonly bytes: number } | 'too-large' | 'unreadable'> => {
+): Promise<Uint8Array | 'too-large' | 'unreadable'> => {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > max) return 'too-large';
-  if (request.body === null) return { text: '', bytes: 0 };
+  if (request.body === null) return new Uint8Array(0);
   const reader = request.body.getReader();
   const chunks: Array<Uint8Array> = [];
   let total = 0;
@@ -63,8 +63,18 @@ export const readLimited = async (
     all.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  return all;
+};
+
+/** The body as text, or why it was refused. Stops reading as soon as the limit is passed. */
+export const readLimited = async (
+  request: Request,
+  max: number,
+): Promise<{ readonly text: string; readonly bytes: number } | 'too-large' | 'unreadable'> => {
+  const all = await readLimitedBytes(request, max);
+  if (typeof all === 'string') return all;
   try {
-    return { text: new TextDecoder('utf-8', { fatal: true }).decode(all), bytes: total };
+    return { text: new TextDecoder('utf-8', { fatal: true }).decode(all), bytes: all.byteLength };
   } catch {
     return 'unreadable';
   }

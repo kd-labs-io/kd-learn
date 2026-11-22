@@ -52,6 +52,17 @@ echo 'admin signed in'
 compose exec -T web node -e "fetch(process.env.KD_SEARXNG_URL+'/search?q=test&format=json').then(r=>{if(r.status!==200)process.exit(1);console.log('searxng json ok')})" \
   || fail 'searxng is not reachable from the web service'
 
+# An uploaded PDF is read by the ingest job in a worker thread (pdfjs traced into the image).
+curl -fsS -o /dev/null -X POST "$base/api/account/sources" -H "authorization: Bearer $(token)" \
+  -F 'file=@packages/server/test/fixtures/pdf/vi-5pages.pdf;type=application/pdf'
+for _ in $(seq 1 30); do
+  state=$(curl -fsS "$base/api/account/sources" -H "authorization: Bearer $(token)" | json '.sources[0].state')
+  [ "$state" = pending ] || break
+  sleep 1
+done
+[ "$state" = ready ] || fail "the PDF was not read (state: $state)"
+echo 'PDF read in the image'
+
 curl -fsS -o /dev/null -X POST "$base/api/account/sessions" -H "authorization: Bearer $(token)" \
   -H 'content-type: application/json' --data '{"topic":"Smoke test","language":"en"}'
 restart

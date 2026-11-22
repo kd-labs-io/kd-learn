@@ -18,7 +18,8 @@
     "@kd-learn/api": "workspace:*",
     "@kd-learn/core": "workspace:*",
     "@kd-learn/storage": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "pdfjs-dist": "6.5.438"
   },
   "devDependencies": {
     "@kd-learn/config": "workspace:*",

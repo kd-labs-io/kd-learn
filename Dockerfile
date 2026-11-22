@@ -13,6 +13,10 @@ RUN pnpm fetch
 COPY . .
 RUN pnpm install --offline --frozen-lockfile
 RUN pnpm exec turbo build --filter=@kd-learn/web
+# The server reads PDFs with pdfjs-dist's legacy build only (phase 4 A4): drop the rest (~20 MB).
+RUN cd apps/web/.output/server/node_modules/pdfjs-dist \
+    && rm -rf build web image_decoders types \
+    && find . -name '*.map' -delete
 
 FROM ${NODE_IMAGE}
 ENV NODE_ENV=production \
