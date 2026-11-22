@@ -21,6 +21,7 @@ import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
 import { asRecord, describeIssue, redact, scrubFrame } from './safety.ts';
+import type { PdfExtractor } from './sources/pdf.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { loadAccountConfig, switchFrom } from './auth/config.ts';
 import { makeAdminHandlers } from './admin/http.ts';
@@ -397,6 +398,8 @@ export interface Handlers extends AccountHandlers {
 export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
   /** Replaces the database file (tests). */
   readonly database?: ServerDatabase;
+  /** PDF extraction of account sources; tests pass a fake. */
+  readonly extractPdf?: PdfExtractor;
   readonly auth?: AuthOptions;
   /** Upper bound on one account turn. Default 3 minutes. */
   readonly turnTimeoutMs?: number;
@@ -483,6 +486,7 @@ export const createHandlers = (
         ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
         ...(options.acp ? { acp: options.acp } : {}),
         ...(options.database ? { database: options.database } : {}),
+        ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
         ...(options.auth ? { auth: options.auth } : {}),
       }).catch((error: unknown) => {
         log({

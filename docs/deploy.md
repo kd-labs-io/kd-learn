@@ -64,6 +64,8 @@ SearXNG. To run without SearXNG, remove the `searxng` service and set `KD_SEARXN
 
 The learning screen streams with server-sent events. The proxy must not buffer responses. The server sends `X-Accel-Buffering: no`; an account stream also sends a ping every 15 seconds. A guest turn streams without pings until it ends, so keep the proxy's read timeout at 5 minutes or more.
 
+Accounts upload PDFs of up to 20 MiB. nginx refuses bodies over 1 MiB by default: set `client_max_body_size 21m;`. Caddy has no limit by default.
+
 Caddy (gets certificates by itself):
 
 ```caddyfile
@@ -88,6 +90,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
         proxy_read_timeout 300s;
+        client_max_body_size 21m;
     }
 }
 ```

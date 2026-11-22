@@ -11,3 +11,4 @@ export * from './session.ts';
 export * from './slice.ts';
 export * from './source.ts';
 export * from './source-schema.ts';
+export * from './pdf-read.ts';

@@ -65,6 +65,13 @@ import {
   StartPracticeRequest,
 } from './practice.ts';
 import { GraphView, KNOWLEDGE_PATH } from './knowledge.ts';
+import {
+  ACCOUNT_SOURCES_PATH,
+  CreateNoteSourceRequest,
+  SourceDetail,
+  SourceList,
+  SourceResponse,
+} from './sources.ts';
 import type { ExerciseAnswer, SavedProfile } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
 
@@ -138,6 +145,8 @@ interface Call<A> {
   readonly path: string;
   /** Encoded with `schema` before sending. */
   readonly body?: { readonly schema: Schema.Codec<unknown, unknown>; readonly value: unknown };
+  /** Sent as multipart instead of `body` (file uploads). */
+  readonly form?: FormData;
   /** Decodes the answer. Absent: the answer has no body (204). */
   readonly response?: Schema.Codec<A, unknown>;
 }
@@ -155,6 +164,7 @@ const request = <A>(options: AccountClientOptions, call: Call<A>): Effect.Effect
           method: call.method,
           headers: headersOf(options, body !== undefined),
           ...(body === undefined ? {} : { body }),
+          ...(call.form === undefined ? {} : { body: call.form }),
           signal,
         }),
       catch: networkError,
@@ -183,6 +193,8 @@ const practicePath = (practiceId: string) =>
   `${ACCOUNT_PRACTICE_PATH}/${encodeURIComponent(practiceId)}`;
 const exercisePath = (exerciseId: string) =>
   `${ACCOUNT_PRACTICE_PATH}/exercises/${encodeURIComponent(exerciseId)}`;
+
+const sourcePath = (sourceId: string) => `${ACCOUNT_SOURCES_PATH}/${encodeURIComponent(sourceId)}`;
 
 const sessionPath = (sessionId: string) => `${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`;
 
@@ -258,6 +270,39 @@ export const accountClient = (options: AccountClientOptions = {}) => {
       }),
     /** The graph without anything about exercises (phase 3 A9). */
     knowledge: () => go({ method: 'GET', path: KNOWLEDGE_PATH, response: codec(GraphView) }),
+
+    // Learning sources (phase 4 A2, A4).
+    sources: () =>
+      go({ method: 'GET', path: ACCOUNT_SOURCES_PATH, response: codec(SourceList) }).pipe(
+        Effect.map((answer) => answer.sources),
+      ),
+    source: (sourceId: string) =>
+      go({ method: 'GET', path: sourcePath(sourceId), response: codec(SourceDetail) }),
+    createNoteSource: (input: CreateNoteSourceRequest) =>
+      go({
+        method: 'POST',
+        path: ACCOUNT_SOURCES_PATH,
+        body: bodyOf(CreateNoteSourceRequest, input),
+        response: codec(SourceResponse),
+      }).pipe(Effect.map((answer) => answer.source)),
+    /** Uploads a PDF; the server reads it in a background job (`pending` until then). */
+    uploadPdfSource: (file: Blob, fileName: string) => {
+      const form = new FormData();
+      form.set('file', file, fileName);
+      return go({
+        method: 'POST',
+        path: ACCOUNT_SOURCES_PATH,
+        form,
+        response: codec(SourceResponse),
+      }).pipe(Effect.map((answer) => answer.source));
+    },
+    retrySource: (sourceId: string) =>
+      go({
+        method: 'POST',
+        path: `${sourcePath(sourceId)}/retry`,
+        response: codec(SourceResponse),
+      }).pipe(Effect.map((answer) => answer.source)),
+    deleteSource: (sourceId: string) => go({ method: 'DELETE', path: sourcePath(sourceId) }),
     /** The learner drops a wrong proposition; answers with the graph after it. */
     retireProposition: (propositionId: string) =>
       go({

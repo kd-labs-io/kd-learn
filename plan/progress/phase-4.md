@@ -13,7 +13,7 @@
 | Bước 3: job bền | Xong (2026-11-22). Bảng `jobs` (migration server v8), runner trong `packages/server/src/jobs/runner.ts`, job extraction chạy qua runner; chạy lại sau khởi động lại tối đa 3 lần. Xem ghi chú bước 3 bên dưới |
 | Bước 4: nguồn trong core và storage | Xong (2026-11-22). Schema và hàm cắt đoạn, chọn lát trong `core`; bảng nguồn ở cả ba driver (khách v4, server v9). Xem ghi chú bước 4 bên dưới |
 | Bước 5: `packages/search` | Đang làm. Xong phần package (port, SearXNG kèm bộ tải trang, Exa), lint, service SearXNG trong compose (2026-11-22); còn cấu hình admin và key Exa mã hoá |
-| Bước 6: ingest PDF và ghi chú | Chưa bắt đầu |
+| Bước 6: ingest PDF và ghi chú | Đang làm. Xong phần tài khoản (route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker) (2026-11-22); còn khách / demo (Worker trình duyệt, ghi chú ở client, "bị ngắt") |
 | Bước 7: dạy dựa trên nguồn | Chưa bắt đầu |
 | Bước 8: research | Chưa bắt đầu |
 | Bước 9: model và nguồn tìm kiếm giả cho e2e | Chưa bắt đầu |
@@ -70,3 +70,12 @@
 - **Exa** (`./exa`): `POST /search`, `type: 'auto'`, `contents.highlights`; 401/403 `Unauthorized`, 402 `PaymentRequired`, 429 `RateLimited` (đọc `Retry-After`), 400 `Invalid`.
 - **Compose:** service `searxng` (`searxng/searxng:2026.11.20-cd6d28091`, không mở cổng, `settings.yml` mount chỉ đọc ở `deploy/searxng/`, `SEARXNG_SECRET`, `SEARXNG_CONTACT_URL` để bật Wikipedia / Wikidata); `web` có `KD_SEARXNG_URL=http://searxng:8080`. `scripts/compose-smoke.sh` kiểm `web` gọi được SearXNG JSON; chạy local xanh.
 - **Test:** 32 test (địa chỉ công khai / riêng kể cả IPv4 trong IPv6, chuyển hướng tới `::1` và `localhost`, vòng chuyển hướng, kích thước, loại, thời gian, scheme, adapter với `fetch` giả, key không lộ).
+## Bước 6: ingest (2026-11-22, phần tài khoản)
+
+- **Một hàm tách chữ cho hai chế độ:** `readPdfPages(getDocument, data, maxPages, assets?)` trong `core` (`pdf-read.ts`) chỉ gọi pdfjs và trả item thô (`str`, `hasEOL`, `y`, `height`) mỗi trang. Thân hàm tự đủ (không import, không hàm phụ đặt tên) vì server gửi **mã nguồn** của nó vào worker (`readPdfPagesSource()`): worker `eval` không có code workspace. Phần còn lại chạy ở luồng chính và dùng chung với trình duyệt: `pdfSourceChunks` (gồm `pdfPagesText`, `pdfHasText`, `chunkPages`, trần 4 MiB, đổi mã lỗi).
+- **Đầu trang / chân trang:** chỉ xét 2 dòng đầu và 2 dòng cuối mỗi trang (lặp ở ít nhất một nửa số trang, bỏ chữ số); xét cả trang thì bỏ nhầm câu thân bài lặp lại (fixture có đoạn lặp).
+- **Bản build Nitro:** pdfjs được nạp theo đường dẫn trong worker nên bundler không thấy: `traceDeps: ['pdfjs-dist*']` chép nó vào `.output/server/node_modules` (thử bằng `.output` tách riêng khỏi repo). Dockerfile xoá `build`, `web`, `image_decoders`, `types` và file `.map` của pdfjs (giữ `legacy`, `cmaps`, `standard_fonts`). Worker tắt `console.log` lúc import (pdfjs cảnh báo thiếu `@napi-rs/canvas`, chỉ cần để vẽ). Server truyền `cMapUrl` / `standardFontDataUrl` (đường dẫn thường, không phải `file:` URL).
+- **Job `ingest`:** `global: 1`, khoá = `sourceId`; nguồn đã xoá hay không còn `pending` thì bỏ qua; `SourceConflict` của `completeSource` coi như xong; lỗi kho thì `failed` mã `Failed`; bị ngắt (dừng process) thì giữ dòng để chạy lại; quá 3 lần thì `Interrupted`. Ngắt effect thì `terminate()` worker.
+- **Route:** `GET` / `POST /api/account/sources` (JSON = ghi chú đã cắt, `ready` ngay; multipart = PDF, `pending` 202), `GET` / `DELETE /sources/:id`, `POST /sources/:id/retry` (chỉ PDF, giữ file). Đọc thân theo luồng có trần (`readLimitedBytes`, 20 MiB + 64 KiB) rồi mới parse multipart; kiểm `%PDF-`. Nguồn của người khác: 404 (xoá: 204 không làm gì).
+- **Proxy:** nginx mặc định chặn thân quá 1 MiB: `docs/deploy.md` thêm `client_max_body_size 21m`.
+- **Test:** worker thật trên fixture (tiếng Việt 5 trang có đầu trang, NFD, mã hoá, không phải PDF, quá số trang, bom Flate 400 MB bị dừng theo RSS, timeout, ngắt); route (PDF thành `ready` với số trang, scan thành `NoText`, thân vô hạn bị cắt 413, ghi chú, cross-user, khởi động lại giữa ingest trên cùng file DB rồi xong, chạy lại PDF lỗi). `compose-smoke.sh` tải PDF lên image và chờ `ready`. Fixture ở `packages/server/test/fixtures/pdf/`.

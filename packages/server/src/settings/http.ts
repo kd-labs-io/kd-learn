@@ -24,6 +24,7 @@ import type { Ctx, makeRouteKit } from '../routes.ts';
 import type { CurrentUser } from '../auth/service.ts';
 import { makeSessionsHandler, modelUnavailable } from '../sessions/http.ts';
 import { makePracticeAccountHandler } from '../practice/http.ts';
+import { makeSourcesHandler } from '../sources/http.ts';
 
 type Kit = ReturnType<typeof makeRouteKit>;
 
@@ -199,6 +200,7 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
 
   const sessions = makeSessionsHandler(kit, log);
   const practice = makePracticeAccountHandler(kit, log);
+  const sourced = makeSourcesHandler(kit, log);
 
   const fallback = route('account', ['GET', 'POST', 'PUT', 'DELETE'], notFound);
 
@@ -220,6 +222,8 @@ export const makeSettingsHandler = (kit: Kit, log: Logger): Handler => {
     }
     const session = sessions(path);
     if (session !== undefined) return session(request, context);
+    const source = sourced(path);
+    if (source !== undefined) return source(request, context);
     const practiced = practice(path);
     if (practiced !== undefined) return practiced(request, context);
     return fallback(request, context);

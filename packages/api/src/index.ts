@@ -2,6 +2,7 @@
 export * from './contract.ts';
 export * from './practice.ts';
 export * from './knowledge.ts';
+export * from './sources.ts';
 export { encodeAccountFrame, encodeFrame, makeSseParser } from './sse.ts';
 export type { SseMessage } from './sse.ts';
 export { ClientError, extractSession, listEndpoints, streamTurn } from './client.ts';
