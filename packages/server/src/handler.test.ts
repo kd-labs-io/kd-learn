@@ -624,6 +624,63 @@ describe('POST /api/turns: figures (phase 5)', () => {
     expect(added).toMatchObject([{ kind: 'html', libraries: ['d3'] }]);
   });
 
+  it('guest imageModel: draws with the guest image key, sends bytes as base64, keeps the key out', async () => {
+    const IMAGE_KEY = 'AIza-guest-image-SECRET-0123456789';
+    const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2]);
+    const asked: Array<unknown> = [];
+    const d = deps(callTool('generate_image', { title: 'Cell', prompt: 'A cell' }), {
+      config: config({
+        endpoints: [
+          { id: 'acme', label: 'Acme', baseURL: 'https://llm.acme.test/v1', images: false },
+          { id: 'pics', label: 'Pics', baseURL: 'https://pics.test/v1', images: true },
+        ],
+      }),
+      images: {
+        generate: (request) =>
+          Effect.sync(() => {
+            asked.push(request.model);
+            return {
+              mime: 'image/png' as const,
+              bytes: PNG,
+              usage: { inputTokens: 1, outputTokens: 2 },
+            };
+          }),
+      },
+    });
+    const body = (imageModel: unknown, over: Partial<TurnRequest> = {}) =>
+      post({ ...mainRequest({ log: teachingLog(), ...over }), imageModel });
+    const frames = await readFrames(
+      await handleTurns(body({ provider: 'gemini', model: 'img', apiKey: IMAGE_KEY }), d),
+    );
+    expect(asked).toEqual([{ provider: 'gemini', model: 'img', apiKey: IMAGE_KEY }]);
+    const figure = frames.find((f) => f._tag === 'figure');
+    expect(figure).toMatchObject({ encoding: 'base64', body: Buffer.from(PNG).toString('base64') });
+    expect(JSON.stringify(frames)).not.toContain(IMAGE_KEY);
+    expect(JSON.stringify(d.logs)).not.toContain(IMAGE_KEY);
+
+    // An endpoint without images, a free base URL, or a side turn: refused before any call.
+    const imageModel = {
+      provider: 'openai-compatible',
+      endpointId: 'acme',
+      model: 'm',
+      apiKey: IMAGE_KEY,
+    };
+    const textOnly = await handleTurns(body(imageModel), d);
+    expect(textOnly.status).toBe(400);
+    expect((await errorOf(textOnly)).code).toBe('UnknownEndpoint');
+    const free = await handleTurns(body({ ...imageModel, baseURL: 'http://169.254.169.254' }), d);
+    expect(free.status).toBe(400);
+    const side = await handleTurns(body(imageModel, { turn: { kind: 'side', threadId: 'x' } }), d);
+    expect(side.status).toBe(400);
+    expect(asked).toHaveLength(1);
+    const ok = await handleTurns(body({ ...imageModel, endpointId: 'pics' }), d);
+    await ok.text();
+    expect(asked.at(-1)).toMatchObject({
+      provider: 'openai-compatible',
+      baseURL: 'https://pics.test/v1',
+    });
+  });
+
   it('refuses demo libraries when the admin turned the CDN off', async () => {
     const d = deps(callTool('show_demo', { title: 'Demo', html: '<p>x</p>', libraries: ['d3'] }), {
       figureCdn: async () => false,

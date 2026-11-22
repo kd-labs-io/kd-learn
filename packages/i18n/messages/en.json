@@ -409,5 +409,18 @@
   "role_illustrator": "Images",
   "roles_illustrator_hint": "Draws pictures for the lesson when the Teacher asks for one. Not set: no pictures. Needs Gemini or an endpoint that makes images; each picture costs a few cents on that key.",
   "roles_illustrator_none": "Add a Gemini connection, or one to an endpoint that makes images, to use this role.",
-  "error_RoleNotSupported": "This connection cannot make images. Choose Gemini or an endpoint that makes images."
+  "error_RoleNotSupported": "This connection cannot make images. Choose Gemini or an endpoint that makes images.",
+  "image_settings_title": "Image model",
+  "image_settings_hint": "Optional. When set, the Teacher may draw a picture for the lesson. Needs Gemini or an endpoint that makes images; each picture costs a few cents on this key.",
+  "image_settings_none": "No images",
+  "image_settings_key": "Image API key",
+  "image_settings_save": "Save image model",
+  "image_settings_remove": "Turn images off",
+  "image_settings_removed": "Images are off.",
+  "image_settings_text_first": "Save the text model first.",
+  "admin_demo_images": "Images in demo mode",
+  "admin_demo_images_hint": "Off by default. On: the Teacher may draw images with {model} on the server's key, each costing the calls below.",
+  "admin_demo_images_no_model": "Set KD_LEARN_DEMO_IMAGE_MODEL (Gemini, or an endpoint with images) to allow images in demo mode.",
+  "admin_demo_image_cost": "Calls per demo image",
+  "admin_demo_image_cost_hint": "Each image takes this many calls from the demo budget, reserved before the provider is called."
 }

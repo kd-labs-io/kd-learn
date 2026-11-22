@@ -111,7 +111,7 @@ Mọi mã do model sinh (demo HTML, và Mermaid nếu spike C2 chọn render tro
 ### A9. Demo
 
 - Sơ đồ và demo HTML là một phần chữ của lượt Teacher, không thêm lời gọi model, tính ngân sách như hiện nay.
-- Ảnh theo A6 (mặc định tắt). Server dùng hồ sơ của mình cho demo ([rủi ro 29](05-rui-ro.md)), kể cả các trần ảnh.
+- Ảnh theo A6 (mặc định tắt). Server dùng hồ sơ của mình cho demo ([rủi ro 29](05-rui-ro.md)), kể cả các trần ảnh. Model ảnh của demo là `KD_LEARN_DEMO_IMAGE_MODEL`, chạy trên provider và key của demo (Gemini, hoặc endpoint có `images: true`); không đặt thì demo không có ảnh dù công tắc bật. Request demo có `imageModel` bị từ chối.
 - Giới hạn 256 KiB mỗi request không đổi: nội dung hình không nằm trong log gửi lên.
 
 ## B. Các bước

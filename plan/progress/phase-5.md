@@ -16,7 +16,7 @@
 | Bước 6: khung sandbox và hiện hình trong `ui` | Xong (2026-11-22). `LessonFigure` trong `@kd-learn/ui`: SVG / Mermaid qua `<img src=blob:>`, demo trong khung `srcdoc` với CSP chỉ hash, chạy khi bấm; `figureVars` trong `tokens`; CSP `frame-src 'self' about:` ở trang gốc; test trình duyệt qua trên Chromium, Firefox, WebKit. Xem ghi chú bước 6 |
 | Bước 7: model giả cho e2e | Xong (2026-11-22). `#diagram`, `#mermaid`, `#demo`, `#hostile` trong `fake-openai.ts`; API ảnh giả để bước 9. Xem ghi chú bước 7–8 |
 | Bước 8: giao diện, demo thù địch | Xong (2026-11-22), trừ phần ảnh (vai `illustrator`, ảnh ở demo, giá N: bước 9). Màn học dùng `LessonFigure` ở cả hai chế độ; hồ sơ bật / tắt từng loại hình; admin bật / tắt CDN; demo thù địch không thoát khỏi khung (e2e). Xem ghi chú bước 7–8 |
-| Bước 9: sinh ảnh | Chưa làm |
+| Bước 9: sinh ảnh | Xong (2026-11-22), ba PR 9a, 9b, 9c. Xem ghi chú bước 9a-9c |
 | Bước 10: kiểm tiêu chí bằng model thật | Chưa làm |
 
 ## Điều cần biết khi bắt đầu (từ phase 4)
@@ -110,4 +110,11 @@
 - Runner: mỗi lượt chính dựng `FigureOptions.image` từ illustrator của người dùng và `ImagePort` (mặc định adapter HTTP). Key ảnh là bí mật của lượt: `redact`, `scrubDeep`, `scrubFrame`, bộ lọc rò rỉ nay nhận nhiều key.
 - UI: vai "Hình ảnh" trong cài đặt, chỉ liệt kê kết nối tạo được ảnh, có gợi ý chi phí; nút "dùng lựa chọn của Prober cho mọi vai" không chép sang illustrator. Ảnh trong bài có nút phóng to (A8).
 - Test: settings (từ chối, không fallback, operator tắt `images`), lượt dạy tạo ảnh qua HTTP (byte, `UsageRecorded` của model ảnh, key ảnh không có trong log và event), e2e tài khoản với endpoint ảnh giả (PNG 16x16), tải lại vẫn còn.
+
+## Bước 9c: ảnh cho khách và demo (2026-11-22)
+
+- Khách: `GuestSettings.image {provider, model, endpointId?, apiKey?}` lưu trong bảng `settings` (khoá `image*`, không cần migration), `deleteImageApiKey` riêng. Màn cài đặt có phần "Model ảnh" (chỉ liệt kê endpoint có ảnh, nút xoá key, nút tắt ảnh); lưu lại model chữ không làm mất model ảnh. Lượt chính gửi `imageModel` khi đủ thông tin.
+- `/api/turns`: `imageModel` chỉ nhận cho lượt chính của khách; `baseURL` trong `imageModel` bị từ chối như ở `model`; endpoint không có `images` thì `400 UnknownEndpoint`; demo kèm `imageModel` thì `400`. Cả hai key bị lọc khỏi frame và log.
+- Demo: `KD_LEARN_DEMO_IMAGE_MODEL` (provider và key của demo). Công tắc `demoImages` (mặc định tắt) và `demoImageCost` (mặc định 10) trong `/api/admin/config`, `demoImages` trong `/api/config` chỉ đúng khi demo chạy được, công tắc bật và có model ảnh. Mỗi ảnh giữ chỗ đủ N lần gọi trước khi gọi nhà cung cấp; thiếu thì trả lại chỗ, không gọi, Teacher viết tiếp; đã gọi thì tính đủ N.
+- Test: handler (key ảnh của khách, endpoint không ảnh, `baseURL`, lượt phụ), demo (tắt mặc định, trừ đúng N, thiếu ngân sách không gọi, không nhận `imageModel` của client, key demo không lộ), storage memory, e2e khách với endpoint ảnh giả (chỉ một lần gọi bằng key ảnh, tải lại vẫn còn). E2E ba trình duyệt: 129 qua, 32 bỏ qua, 1 lỗi đã biết (practice khách trên WebKit, từ phase 4).
 

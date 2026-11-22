@@ -13,6 +13,7 @@ import {
   StorageUnavailable,
   type AppendResult,
   type GuestProvider,
+  type GuestImageSettings,
   type GuestSettings,
   type StorageChange,
   type StorageError,
@@ -203,6 +204,10 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
       model: settings.model,
       endpointId: settings.endpointId,
       apiKey: settings.apiKey,
+      imageProvider: settings.image?.provider,
+      imageModel: settings.image?.model,
+      imageEndpointId: settings.image?.endpointId,
+      imageApiKey: settings.image?.apiKey,
     };
     const entries: Partial<Record<SettingsKey, string>> = {};
     const remove: SettingsKey[] = [];
@@ -284,6 +289,17 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
     getSettings: call<Record<string, string>>({ op: 'getSettings' }).pipe(
       Effect.flatMap((stored) => {
         const { provider, model, endpointId, apiKey } = stored;
+        const { imageProvider, imageModel, imageEndpointId, imageApiKey } = stored;
+        const image: GuestImageSettings | undefined =
+          (imageProvider === 'gemini' || imageProvider === 'openai-compatible') &&
+          imageModel !== undefined
+            ? {
+                provider: imageProvider,
+                model: imageModel,
+                ...(imageEndpointId === undefined ? {} : { endpointId: imageEndpointId }),
+                ...(imageApiKey === undefined ? {} : { apiKey: imageApiKey }),
+              }
+            : undefined;
         if (provider === undefined || model === undefined) return Effect.succeed(undefined);
         if (!providers.includes(provider as GuestProvider)) {
           return Effect.fail(
@@ -295,6 +311,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
           model,
           ...(endpointId === undefined ? {} : { endpointId }),
           ...(apiKey === undefined ? {} : { apiKey }),
+          ...(image === undefined ? {} : { image }),
         });
       }),
     ),
@@ -305,6 +322,10 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
       ),
 
     deleteApiKey: call<void>({ op: 'putSettings', entries: {}, remove: ['apiKey'] }).pipe(
+      Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
+    ),
+
+    deleteImageApiKey: call<void>({ op: 'putSettings', entries: {}, remove: ['imageApiKey'] }).pipe(
       Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
     ),
 

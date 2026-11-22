@@ -62,6 +62,17 @@ export interface GuestSettings {
   readonly endpointId?: string;
   /** Absent after `deleteApiKey`. */
   readonly apiKey?: string;
+  /** The image model (phase 5 A6), with its own key. Absent: no images. */
+  readonly image?: GuestImageSettings;
+}
+
+/** The guest's image model: Gemini or an endpoint that makes images. */
+export interface GuestImageSettings {
+  readonly provider: 'gemini' | 'openai-compatible';
+  readonly model: string;
+  readonly endpointId?: string;
+  /** Absent after `deleteImageApiKey`. */
+  readonly apiKey?: string;
 }
 
 /** Something changed in the store, possibly written by another tab. Re-read what you show. */
@@ -176,6 +187,9 @@ export interface StorageService {
 
   /** Removes only the key (plan A7). Provider and model stay. */
   readonly deleteApiKey: Effect.Effect<void, StorageError>;
+
+  /** Removes only the image key (phase 5 A6). The image model stays. */
+  readonly deleteImageApiKey: Effect.Effect<void, StorageError>;
 
   /**
    * The teaching profile this person saved (phase 3 A2), as a `TeachingProfile` so a profile saved

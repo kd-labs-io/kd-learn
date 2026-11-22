@@ -130,5 +130,14 @@ export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
 export const schemaVersion = migrations.length;
 
 /** Keys of the `settings` table. */
-export const settingsKeys = ['provider', 'model', 'endpointId', 'apiKey'] as const;
+export const settingsKeys = [
+  'provider',
+  'model',
+  'endpointId',
+  'apiKey',
+  'imageProvider',
+  'imageModel',
+  'imageEndpointId',
+  'imageApiKey',
+] as const;
 export type SettingsKey = (typeof settingsKeys)[number];

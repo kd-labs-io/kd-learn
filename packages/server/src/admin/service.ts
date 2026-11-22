@@ -1,6 +1,6 @@
 // Admin switches and user management (plan tai-khoan.md A7). Stored in `server_config`; a value
 // an admin never set falls back to the environment default.
-import type { ModelRef } from '@kd-learn/ai/port';
+import type { ImageModelRef, ModelRef } from '@kd-learn/ai/port';
 import type {
   AcpAgent,
   AcpModels,
@@ -34,6 +34,8 @@ export interface AdminService {
   readonly acpAgents: () => ReadonlyArray<AcpAgent>;
   readonly acpModels: () => AcpModels;
   readonly acpMaxConcurrent: () => number;
+  /** Demo budget calls one demo image costs (phase 5 A9). Default 10. */
+  readonly demoImageCost: () => number;
   readonly updateConfig: (change: UpdateAdminConfigRequest) => Omit<AdminConfig, 'acpAvailable'>;
   readonly users: () => ReadonlyArray<AdminUser>;
   /** Undefined when there is no such user. */
@@ -49,7 +51,12 @@ export const makeAdmin = (
   database: ServerDatabase,
   auth: AuthService,
   defaults: SwitchDefaults,
-  demo: { readonly budget: DemoBudgetService; readonly model: () => ModelRef | undefined },
+  demo: {
+    readonly budget: DemoBudgetService;
+    readonly model: () => ModelRef | undefined;
+    /** The demo image model (phase 5 A9); absent: no demo images. */
+    readonly imageModel?: () => ImageModelRef | undefined;
+  },
   now: () => number = Date.now,
 ): AdminService => {
   const { db } = database;
@@ -73,7 +80,14 @@ export const makeAdmin = (
     guestMode: bool(read('guestMode'), defaults.guestMode),
     demoMode: bool(read('demoMode'), defaults.demoMode),
     figureCdn: bool(read('figureCdn'), true),
+    // Off until an admin turns it on (phase 5 A9).
+    demoImages: bool(read('demoImages'), false),
   });
+  const demoImageCost = () => {
+    const stored = Number(read('demoImageCost'));
+    return Number.isInteger(stored) && stored >= 1 ? stored : 10;
+  };
+  const demoImageModel = () => demo.imageModel?.();
   const acpAgents = (): ReadonlyArray<AcpAgent> => {
     const stored = read('acpAgents');
     return stored === undefined ? defaults.acpAgents : (JSON.parse(stored) as AcpAgent[]);
@@ -94,6 +108,10 @@ export const makeAdmin = (
       acpModels: acpModels(),
       acpMaxConcurrent: acpMaxConcurrent(),
       demoBudget: demo.budget.status(),
+      demoImageCost: demoImageCost(),
+      ...(demoImageModel() === undefined
+        ? {}
+        : { demoImageModel: `${demoImageModel()!.provider}:${demoImageModel()!.model}` }),
       // Provider and model name only: the key never leaves the server.
       ...(model === undefined || model.provider === 'acp'
         ? {}
@@ -102,10 +120,12 @@ export const makeAdmin = (
   };
   const publicConfig = (): PublicConfig => {
     const on = switches();
+    const demoMode = on.demoMode && demo.model() !== undefined && demo.budget.status().limit > 0;
     return {
       accounts: true,
       ...on,
-      demoMode: on.demoMode && demo.model() !== undefined && demo.budget.status().limit > 0,
+      demoMode,
+      demoImages: demoMode && on.demoImages && demoImageModel() !== undefined,
     };
   };
 
@@ -135,6 +155,7 @@ export const makeAdmin = (
     acpAgents,
     acpModels,
     acpMaxConcurrent,
+    demoImageCost,
     updateConfig: (change) => {
       database.transaction(() => {
         if (change.registration !== undefined && registrationModes.includes(change.registration)) {
@@ -143,6 +164,10 @@ export const makeAdmin = (
         if (change.guestMode !== undefined) q.put.run('guestMode', String(change.guestMode));
         if (change.demoMode !== undefined) q.put.run('demoMode', String(change.demoMode));
         if (change.figureCdn !== undefined) q.put.run('figureCdn', String(change.figureCdn));
+        if (change.demoImages !== undefined) q.put.run('demoImages', String(change.demoImages));
+        if (change.demoImageCost !== undefined) {
+          q.put.run('demoImageCost', String(change.demoImageCost));
+        }
         if (change.demoBudgetLimit !== undefined) demo.budget.setLimit(change.demoBudgetLimit);
         if (change.demoBudgetPeriod !== undefined) demo.budget.setPeriod(change.demoBudgetPeriod);
         if (change.acpAgents !== undefined) {
