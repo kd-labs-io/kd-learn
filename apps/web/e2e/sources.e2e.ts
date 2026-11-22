@@ -112,7 +112,8 @@ test('guest: notes and a web research become sources; a lesson cites them', asyn
   const title = `Tides ${unique()}`;
   await page.goto('/');
   await page.getByTestId('choose-guest').click();
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('endpoint').click();
@@ -153,7 +154,8 @@ test('account: a PDF and notes on the server; a lesson cites them', async ({ pag
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('who')).toHaveText(email);
 
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('connection-provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('connection-endpoint').click();

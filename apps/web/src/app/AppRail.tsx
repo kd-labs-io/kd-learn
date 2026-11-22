@@ -1,5 +1,6 @@
-import { Button } from '@astryxdesign/core/Button';
+import { Divider } from '@astryxdesign/core/Divider';
 import { DropdownMenu, type DropdownMenuOption } from '@astryxdesign/core/DropdownMenu';
+import { HStack } from '@astryxdesign/core/HStack';
 import { Icon } from '@astryxdesign/core/Icon';
 import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { VStack } from '@astryxdesign/core/VStack';
@@ -18,7 +19,19 @@ import {
 import { createPortal } from 'react-dom';
 import { clientOptions, run, usePublicConfig } from '../account/api';
 import { chooseLocalMode, signOut, useWho } from '../account/auth';
-import { AccountIcon, GraphIcon, HomeIcon, LogoMark, SettingsIcon, SourcesIcon } from './icons';
+import {
+  AccountIcon,
+  AdminIcon,
+  GraphIcon,
+  HomeIcon,
+  LanguageIcon,
+  LoginIcon,
+  LogoMark,
+  LogoutIcon,
+  SettingsIcon,
+  SourcesIcon,
+  SwitchIcon,
+} from './icons';
 import { guestOnly, localModeOf } from './modes';
 
 type Target = '/' | '/settings' | '/admin' | '/login' | '/graph' | '/sources';
@@ -93,16 +106,6 @@ export function AppRail() {
           },
         ]
       : []),
-    ...(mode === 'demo'
-      ? []
-      : [
-          {
-            to: '/settings' as const,
-            label: m.nav_settings(),
-            testId: 'nav-settings',
-            icon: SettingsIcon,
-          },
-        ]),
   ];
   // A lesson (/s/…, /a/…) belongs to "Sessions".
   const isCurrent = (to: Target) =>
@@ -123,10 +126,14 @@ export function AppRail() {
           ? m.mode_guest()
           : m.account_menu();
 
+  // Settings lives in the account menu (not shown in demo mode, which has nothing to set).
   const items: Array<DropdownMenuOption> = [
+    ...(mode === 'demo'
+      ? []
+      : [{ label: m.nav_settings(), icon: SettingsIcon, onClick: () => go('/settings') }]),
     {
-      type: 'section',
-      title: m.locale_label(),
+      label: m.locale_label(),
+      icon: LanguageIcon,
       items: locales.map((locale) => ({
         label: locale === 'vi' ? 'Tiếng Việt' : 'English',
         onClick: () => setLocale(locale),
@@ -135,12 +142,13 @@ export function AppRail() {
     },
     { type: 'divider' },
     ...(current.status === 'signed-in' && current.user.role === 'admin'
-      ? [{ label: m.nav_admin(), onClick: () => go('/admin') }]
+      ? [{ label: m.nav_admin(), icon: AdminIcon, onClick: () => go('/admin') }]
       : []),
     ...(canSwitch
       ? [
           {
             label: m.mode_switch(),
+            icon: SwitchIcon,
             onClick: () => {
               chooseLocalMode(undefined);
               go('/');
@@ -149,10 +157,17 @@ export function AppRail() {
         ]
       : []),
     ...(current.status === 'local' && config.accounts && !canSwitch
-      ? [{ label: m.auth_login(), onClick: () => go('/login') }]
+      ? [{ label: m.auth_login(), icon: LoginIcon, onClick: () => go('/login') }]
       : []),
     ...(signedIn
-      ? [{ label: m.auth_logout(), onClick: () => void logout(), variant: 'destructive' as const }]
+      ? [
+          {
+            label: m.auth_logout(),
+            icon: LogoutIcon,
+            onClick: () => void logout(),
+            variant: 'destructive' as const,
+          },
+        ]
       : []),
   ];
 
@@ -168,21 +183,26 @@ export function AppRail() {
         />
       }
       footer={
-        <DropdownMenu
-          alignment="start"
-          presentation="adaptive"
-          renderTrigger={(trigger) => (
-            <Button
-              {...trigger}
-              label={who}
-              variant="ghost"
-              size="sm"
-              icon={<Icon icon={AccountIcon} size="sm" />}
-              data-testid="who"
+        <VStack gap={2}>
+          <Divider isFullBleed />
+          <HStack hAlign="start">
+            <DropdownMenu
+              alignment="start"
+              presentation="adaptive"
+              renderTrigger={(trigger) => (
+                <SideNavItem
+                  {...trigger}
+                  // SideNavItem types its click with Element; the trigger only reads the event.
+                  onClick={(event) => trigger.onClick(event as MouseEvent<HTMLElement>)}
+                  label={who}
+                  icon={AccountIcon}
+                  data-testid="who"
+                />
+              )}
+              items={items}
             />
-          )}
-          items={items}
-        />
+          </HStack>
+        </VStack>
       }
     >
       <SideNavSection title={m.rail_places()} isHeaderHidden>

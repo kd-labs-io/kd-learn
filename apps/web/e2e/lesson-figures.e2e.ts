@@ -80,7 +80,8 @@ test.describe('guest', () => {
     const outside = await watchOutside(page);
     await page.goto('/');
     await page.getByTestId('choose-guest').click();
-    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('who').click();
+    await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
     await page.getByTestId('provider').click();
     await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
     await page.getByTestId('endpoint').click();
@@ -108,7 +109,8 @@ test.describe('guest', () => {
   }) => {
     await page.goto('/');
     await page.getByTestId('choose-guest').click();
-    await page.getByTestId('nav-settings').click();
+    await page.getByTestId('who').click();
+    await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
     await page.getByTestId('provider').click();
     await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
     await page.getByTestId('endpoint').click();
@@ -159,7 +161,8 @@ test('account: Mermaid and a demo come from the server, and stay after a reload'
   await page.getByLabel('Password').fill('learner-password-1');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('who')).toHaveText(email);
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   await page.getByTestId('connection-provider').click();
   await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
   await page.getByTestId('connection-endpoint').click();
@@ -201,7 +204,8 @@ test('account: the illustrator draws an image, only from an image endpoint, and 
   await page.getByLabel('Password').fill('learner-password-1');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('who')).toHaveText(email);
-  await page.getByTestId('nav-settings').click();
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: /^(Cài đặt|Settings)$/ }).click();
   const connect = async (endpoint: string, name: string) => {
     await page.getByTestId('connection-provider').click();
     await page.getByRole('option', { name: 'OpenAI-compatible' }).click();
