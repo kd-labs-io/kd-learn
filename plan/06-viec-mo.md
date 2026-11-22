@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 4 (nguồn học + việc nền, [mục 4](04-phases.md)): plan phần chính ở [nguon-hoc.md](nguon-hoc.md). Bước hiện tại: các spike bước 0 (tách chữ PDF, C1), 1 (tìm kiếm, C2), 2 (dạy dựa trên nguồn, C3), làm song song với bước 3 (job bền). Tiến độ ở [progress/phase-4.md](progress/phase-4.md).
+Phase 5 (hình và demo, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 5 (quyết định nền, các bước, câu hỏi spike, như [archive/nguon-hoc.md](archive/nguon-hoc.md) của phase 4): sơ đồ SVG / Mermaid, demo HTML trong iframe sandbox, tool sinh ảnh. Bắt đầu làm thì tạo `progress/phase-5.md`. Việc còn mở từ phase 4 ghi ở cuối phần "Bước 11" của [archive/phase-4.md](archive/phase-4.md).

@@ -1,6 +1,7 @@
 # 8. Tiến độ phase 4
 
-**Trạng thái: đang làm.** Plan phần chính: [nguon-hoc.md](../nguon-hoc.md).
+**Trạng thái: xong (2026-11-22).** Mọi tiêu chí đạt ở cả hai chế độ bằng Haiku thật, xem phần "Bước 11". Plan phần chính: [nguon-hoc.md](nguon-hoc.md).
+
 
 ## Phase 4 (cập nhật 2026-11-22)
 
@@ -18,7 +19,25 @@
 | Bước 8: research | Xong (2026-11-22): pipeline `runResearch`, vai `researcher`; `POST /api/research` (khách / demo, SSE, giới hạn theo địa chỉ, ngân sách demo), job `research` của tài khoản (sống qua khởi động lại, tự gắn vào buổi), client khách và tài khoản |
 | Bước 9: model và nguồn tìm kiếm giả cho e2e | Xong (2026-11-22): SearXNG giả (`e2e/fake-searxng.ts`), model giả trả truy vấn và bản tóm tắt research; test mẫu `research.e2e.ts` (khách, API) |
 | Bước 10: giao diện | Xong (2026-11-22): màn `/sources` (thêm PDF, ghi chú, research; xem đoạn, xoá, chạy lại), chọn nguồn và research khi tạo buổi, panel nguồn và nút trích dẫn trong buổi học, tài liệu của mệnh đề trên graph, cấu hình tìm kiếm trong admin, chọn nguồn tìm trong cài đặt (lưu trên máy). `sources.e2e.ts` (cả ba trình duyệt, khách và tài khoản: PDF, ghi chú, research, gắn vào buổi, trích dẫn mở đúng đoạn, tài liệu của mệnh đề trên graph); `restart.e2e.ts` (chromium, server riêng): research của tài khoản bị SIGKILL giữa lời gọi model, khởi động lại vẫn `ready`. Ingest PDF bị ngắt chỉ có test ở server (đọc quá nhanh để giữ lại giữa chừng). Còn hở: research "chủ đề này" của khách mất bước tự gắn nếu đóng tab giữa chừng (nguồn vẫn `ready`, gắn tay được); tài khoản giữ bước gắn trong job. Test `practice.e2e.ts` khách lỗi trên webkit có sẵn từ trước trên `main` (CI chỉ chạy chromium) |
-| Bước 11: kiểm tiêu chí phase | Chưa bắt đầu |
+| Bước 11: kiểm tiêu chí phase | Xong (2026-11-22). Đạt ở tài khoản (kill -9 giữa ingest, research, extraction; cả ba xong sau khi lên lại; buổi học trên PDF thật trích dẫn đúng trang, 16/16 mệnh đề mang tài liệu) và khách (PDF đọc trong tab, research qua SearXNG thật, buổi học có trích dẫn, 11/13 mệnh đề mang tài liệu) bằng Haiku thật. Xem ghi chú bước 11 bên dưới |
+
+## Bước 11: kiểm tiêu chí phase bằng model thật (2026-11-22)
+
+Kịch bản tạm (không giữ trong repo) chạy bản build production, Haiku `claude-haiku-5-5`, key đọc từ `.env` trong kịch bản, không in. PDF thật: "Attention Is All You Need" (arXiv 1706.03762, 15 trang, 2,2 MB). SearXNG thật chạy bằng image ghim trong compose (cổng loopback), Exa bằng key của admin. Hồ sơ dạy học N = 1, M = 1 để buổi ngắn.
+
+| | Tài khoản (API, server riêng, DB riêng) | Khách (Chromium thật qua UI) |
+| --- | --- | --- |
+| Ingest PDF | Kill -9 ngay sau `202`: bảng `jobs` còn `ingest` `running`, lần 1. Lên lại: `ready`, 41 đoạn, đủ 15 trang | Đọc bằng pdf.js trong tab: `ready`, 41 đoạn |
+| Research | Exa. Kill -9 sau 2,5 s: `research` `running`, lần 1. Lên lại: `ready`, 22–24 đoạn | SearXNG của server: `ready`, 20–29 đoạn |
+| Buổi học | Gắn PDF và nguồn web lúc tạo buổi, 4 câu hỏi rồi bỏ dần các bước tới hết | Như bên trái, qua UI (chọn nguồn ở trang chủ, nút bỏ bước) |
+| Trích dẫn | 5 trích dẫn (4 PDF, 1 web), trang đúng với bài báo: tóm tắt trang 1, multi-head trang 5, positional encoding và Table 1 trang 6 | 4 trích dẫn, nút mở đúng đoạn được đánh dấu; 3 khớp nội dung, 1 trỏ vào đoạn đầu trang arXiv của nguồn web (yếu) |
+| Extraction | Kill -9 ngay khi buổi xong: `extraction` `running`, lần 1. Lên lại: `extracted`, 16 mệnh đề, 16 mang tài liệu, trang hợp lý (scaled dot-product trang 4, positional encoding trang 6) | Tự chạy trong tab: 13 mệnh đề, 11 mang tài liệu; nút tài liệu trên graph mở đúng đoạn |
+| Key | Không có trong log server | Không có trên trang, không có trong log server |
+
+- **Chi phí:** vài lần chạy (kể cả các lần hỏng vì kịch bản), ước dưới 0,5 USD cho Haiku và khoảng 0,1 USD cho Exa.
+- **Lần chạy hỏng vì kịch bản:** cổng 4190 bị `fetch` của Node chặn (danh sách cổng cấm), bỏ bước khi bước chưa có lượt nào (`409`, đúng quy tắc), chờ nút Send theo `disabled` trong khi Astryx dùng `aria-disabled`.
+- **Ghi nhận:** một mệnh đề lấy từ ví dụ của Teacher (256 chiều, 4 head) vẫn trỏ vào một đoạn PDF gần nghĩa; trích dẫn nguồn web có lúc trỏ vào đoạn mở đầu của trang (phần giấy phép của arXiv). Không chặn tiêu chí; theo dõi khi có dữ liệu thật.
+- **Còn mở (không chặn tiêu chí):** research "chủ đề này" của khách mất bước tự gắn nếu đóng tab giữa chừng; ingest PDF bị ngắt chỉ có test ở server; `practice.e2e.ts` khách lỗi trên webkit có sẵn từ phase 3 (CI chỉ chạy Chromium).
 
 ## Điều cần biết khi bắt đầu (từ phase 3)
 
