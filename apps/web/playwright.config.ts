@@ -1,7 +1,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { E2E_ADMIN, accountsPort, fakeModelPort } from './e2e/accounts-env';
+import { E2E_ADMIN, accountsPort, fakeModelPort, fakeSearchPort } from './e2e/accounts-env';
 
 // Browser tests run against the production SSR build (`pnpm build`, then `node .output/server`).
 // CI installs Chromium only; Firefox and WebKit run locally (`pnpm exec playwright install`).
@@ -10,6 +10,7 @@ import { E2E_ADMIN, accountsPort, fakeModelPort } from './e2e/accounts-env';
 // - `port`: guest mode only (no accounts), as a server without `KD_LEARN_SECRET_KEY`;
 // - `accountsPort`: accounts on, with a fresh database and a fake OpenAI-compatible model
 //   (e2e/fake-openai.ts on `fakeModelPort`), so account turns run through the real server.
+// Both use a fake SearXNG (e2e/fake-searxng.ts on `fakeSearchPort`) for research.
 const port = 4173;
 const dbDir = join(tmpdir(), 'kd-learn-e2e');
 
@@ -26,7 +27,13 @@ export default defineConfig({
       command: 'node .output/server/index.mjs',
       url: `http://localhost:${port}`,
       reuseExistingServer: !process.env.CI,
-      env: { PORT: String(port) },
+      env: { PORT: String(port), KD_SEARXNG_URL: `http://localhost:${fakeSearchPort}` },
+    },
+    {
+      command: 'node e2e/fake-searxng.ts',
+      url: `http://localhost:${fakeSearchPort}`,
+      reuseExistingServer: !process.env.CI,
+      env: { FAKE_SEARXNG_PORT: String(fakeSearchPort) },
     },
     {
       command: 'node e2e/fake-openai.ts',
@@ -59,6 +66,7 @@ export default defineConfig({
         KD_LEARN_DEMO_MODEL: 'fake-demo',
         KD_LEARN_DEMO_API_KEY: 'demo-key-e2e',
         KD_LEARN_DEMO_BUDGET: '1000',
+        KD_SEARXNG_URL: `http://localhost:${fakeSearchPort}`,
       },
     },
   ],
