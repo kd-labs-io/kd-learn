@@ -18,6 +18,7 @@ import { clientOptions, run } from '../account/api';
 import { useWho } from '../account/auth';
 import {
   formatAppearance,
+  htmlThemeAttribute,
   parseAppearance,
   readAppearance,
   writeAppearanceCookie,
@@ -39,6 +40,15 @@ export const useThemeControl = () => {
   const value = useContext(ThemeControlContext);
   if (!value) throw new Error('useThemeControl must be used inside <ThemeRoot>');
   return value;
+};
+
+/** The same attributes Astryx's root Theme writes for the mode, plus the theme id (plan A2). */
+const setHtmlAttributes = (appearance: Appearance) => {
+  const root = document.documentElement;
+  const mode = htmlThemeAttribute(appearance);
+  if (mode === undefined) root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', mode);
+  root.setAttribute('data-kd-theme', appearance.theme);
 };
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -107,6 +117,8 @@ export function ThemeRoot({ children }: { children: ReactNode }) {
   const [appearance, setLocal] = useState<Appearance>(readAppearance);
   const apply = useCallback((next: Appearance) => {
     writeAppearanceCookie(next);
+    // Before React re-renders: effects of figures and the graph read computed colors.
+    setHtmlAttributes(next);
     setLocal(next);
   }, []);
   const save = useAccountSync(appearance, apply);
@@ -118,9 +130,7 @@ export function ThemeRoot({ children }: { children: ReactNode }) {
     [apply, save],
   );
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-kd-theme', appearance.theme);
-  }, [appearance.theme]);
+  useEffect(() => setHtmlAttributes(appearance), [appearance]);
 
   const system = useSystemMode();
   const resolvedMode: ColorMode = appearance.mode === 'system' ? system : appearance.mode;

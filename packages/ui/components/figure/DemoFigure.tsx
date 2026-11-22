@@ -7,7 +7,7 @@ import { m } from '@kd-learn/i18n';
 import type { FigureVars } from '@kd-learn/tokens';
 import * as stylex from '@stylexjs/stylex';
 import { useEffect, useRef, useState } from 'react';
-import { buildFrameDoc, FrameUnavailable } from './frame-doc.ts';
+import { buildFrameDoc, FrameUnavailable, schemeOf } from './frame-doc.ts';
 import { readFrameMessage } from './messages.ts';
 
 type Run =
@@ -61,7 +61,7 @@ export function DemoFigure({
 
   // A theme change reaches a running demo as a message; it never gets anything else.
   useEffect(() => {
-    frame.current?.contentWindow?.postMessage({ type: 'theme', vars }, '*');
+    frame.current?.contentWindow?.postMessage({ type: 'theme', vars, scheme: schemeOf(vars) }, '*');
   }, [vars]);
 
   const names = (libraries ?? []).flatMap((id) => {

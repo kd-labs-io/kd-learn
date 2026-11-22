@@ -14,9 +14,10 @@ import { m } from '@kd-learn/i18n';
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import FA2Layout from 'graphology-layout-forceatlas2/worker';
-import Sigma from 'sigma';
+import Sigma, { DEFAULT_STYLES } from 'sigma';
 import { extremityArrow } from 'sigma/rendering';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeControl } from '../theme/ThemeRoot';
 import { relationText } from './relation';
 
 export interface GraphFigureProps {
@@ -87,7 +88,31 @@ const around = (graph: GraphView, from: string, hops: number): Set<string> => {
   return seen;
 };
 
+/**
+ * Colours of nodes, edges and labels from the theme in use (plan theme-va-dien-thoai.md A4). Called
+ * when the graph is built and again when the theme or the mode changes.
+ */
+const paint = (element: HTMLElement, g: Graph, renderer: Sigma, topics: ReadonlyArray<string>) => {
+  const token = (name: string, fallback: string) => resolveColor(element, name, fallback);
+  const topicColors = TOPIC_TOKENS.map((name) => token(name, '#888'));
+  g.forEachNode((node, attributes) => {
+    const index = topics.indexOf(attributes['topic'] as string);
+    g.setNodeAttribute(node, 'color', topicColors[Math.max(0, index) % topicColors.length]!);
+  });
+  const text = token('--color-text-primary', '#000');
+  g.forEachNode((node) => g.setNodeAttribute(node, 'labelColor', text));
+  const edge = token('--color-border-emphasized', '#999');
+  const edgeText = token('--color-text-secondary', '#666');
+  g.forEachEdge((key) => {
+    g.setEdgeAttribute(key, 'color', edge);
+    g.setEdgeAttribute(key, 'labelColor', edgeText);
+  });
+  renderer.refresh();
+};
+
 export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigureProps) {
+  const { theme, resolvedMode } = useThemeControl();
+  const colorKey = `${theme.name}.${resolvedMode}`;
   const container = useRef<HTMLElement>(null);
   const sigma = useRef<Sigma | undefined>(undefined);
   const model = useRef<Graph | undefined>(undefined);
@@ -106,7 +131,6 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
   useEffect(() => {
     const element = container.current;
     if (element === null) return;
-    const token = (name: string, fallback: string) => resolveColor(element, name, fallback);
     const g = new Graph({ type: 'directed', multi: true });
     for (const p of graph.propositions) {
       const known = positions.current.get(p.propositionId) ?? seed(p.propositionId);
@@ -115,7 +139,7 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
         x: known.x,
         y: known.y,
         size: 6,
-        color: token(TOPIC_TOKENS[topics.indexOf(p.topic) % TOPIC_TOKENS.length]!, '#888'),
+        topic: p.topic,
       });
     }
     for (const e of graph.edges) {
@@ -123,7 +147,6 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
       g.addEdgeWithKey(e.edgeId, e.from, e.to, {
         label: `${relationText(e.relation)}: ${e.label}`,
         size: 2,
-        color: token('--color-border-emphasized', '#999'),
       });
     }
     const fresh = graph.propositions.some((p) => !positions.current.has(p.propositionId));
@@ -144,6 +167,11 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
     try {
       renderer = new Sigma(g, element, {
         primitives: { edges: { extremities: [extremityArrow()], defaultHead: 'arrow' } },
+        // Label colours from the theme (`paint`), on top of sigma's defaults: dark by default.
+        styles: {
+          nodes: [...[DEFAULT_STYLES.nodes].flat(), { labelColor: { attribute: 'labelColor' } }],
+          edges: [...[DEFAULT_STYLES.edges].flat(), { labelColor: { attribute: 'labelColor' } }],
+        },
         settings: {
           renderEdgeLabels: true,
           enableNodeDrag: true,
@@ -162,6 +190,7 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
       setFailed(true);
       return;
     }
+    paint(element, g, renderer, topics);
     renderer.on('clickNode', ({ node }) => select.current(node));
     sigma.current = renderer;
     model.current = g;
@@ -176,6 +205,13 @@ export default function GraphFigure({ graph, selectedId, onSelect }: GraphFigure
       model.current = undefined;
     };
   }, [graph, topics]);
+
+  // A new theme or mode: same graph, new colours.
+  useEffect(() => {
+    const element = container.current;
+    if (element === null || sigma.current === undefined || model.current === undefined) return;
+    paint(element, model.current, sigma.current, topics);
+  }, [colorKey, topics]);
 
   // What is shown: the selection and its neighbourhood, or everything.
   useEffect(() => {

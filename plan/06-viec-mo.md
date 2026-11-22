@@ -17,4 +17,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 6 (theme + web trên điện thoại, [theme-va-dien-thoai.md](theme-va-dien-thoai.md)): plan xong (2026-11-22). Bước hiện tại: bước 4 (hình, demo, graph theo chế độ), tiến độ ở [progress/phase-6.md](progress/phase-6.md). Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md)).
+Phase 6 (theme + web trên điện thoại, [theme-va-dien-thoai.md](theme-va-dien-thoai.md)): plan xong (2026-11-22). Bước hiện tại: bước 5 (web trên điện thoại bằng giả lập, React #418, `practice.e2e.ts` trên WebKit), tiến độ ở [progress/phase-6.md](progress/phase-6.md). Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md)).
