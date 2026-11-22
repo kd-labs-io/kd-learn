@@ -37,3 +37,4 @@ RULES:
 ## Project overrides
 
 - Themes come from `packages/tokens` (JSON theme validated by Effect Schema, mapped to Astryx CSS variables). Change themes there, not with the Astryx theme editor or hand-written theme files.
+- UX rules for every screen: `DESIGN.md` "UX" (page frame `pageWidth`, one main action, states of every list, opt-in panels, phone limits). Before delivering UI work, follow the `ux-check` skill (`.claude/skills/ux-check/`): screenshots with `pnpm shots` (`playwright.shots.config.ts`, pictures in `ux-shots/`), then look at them.

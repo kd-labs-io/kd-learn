@@ -31,6 +31,7 @@ import { useState } from 'react';
 import { errorText } from '../account/api';
 import { AppHeader } from '../app/AppHeader';
 import type { ProfileSource } from './source';
+import { pageWidth } from '../app/page';
 
 const PROMPT_KEYS: ReadonlyArray<PromptKey> = [
   'prober',
@@ -159,6 +160,7 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

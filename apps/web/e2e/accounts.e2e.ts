@@ -139,7 +139,10 @@ test('signing out forgets the token; the sessions are back after signing in agai
   page,
 }) => {
   const email = await register(page);
-  await page.getByTestId('nav-logout').click();
+  // Opening the menu before home settles loses it to that re-render.
+  await page.waitForLoadState('networkidle');
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByTestId('welcome')).toBeVisible();
   await page.goto('/a/whatever');
   await expect(page).toHaveURL(/\/login$/);
@@ -161,7 +164,11 @@ test('the admin screen: users, an invite code, and a warning when the build has 
   await page.getByLabel('Email').fill(E2E_ADMIN.email);
   await page.getByLabel('Password').fill(E2E_ADMIN.password);
   await page.getByTestId('auth-submit').click();
-  await page.getByTestId('nav-admin').click();
+  // Signed in and home rendered: opening the menu earlier loses it to that re-render.
+  await expect(page.getByTestId('who')).toHaveText(E2E_ADMIN.email);
+  await page.waitForLoadState('networkidle');
+  await page.getByTestId('who').click();
+  await page.getByRole('menuitem', { name: 'Admin' }).click();
 
   await expect(page.getByTestId('admin-user').filter({ hasText: E2E_ADMIN.email })).toBeVisible();
   await page.getByTestId('admin-invite').click();

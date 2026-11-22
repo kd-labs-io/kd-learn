@@ -49,6 +49,12 @@ export interface SessionSummary {
   /** `at` of the last event (epoch ms). */
   readonly updatedAt: number;
   readonly eventCount: number;
+  /** Steps in the lesson plan. Absent before the plan is made. */
+  readonly stepsTotal?: number;
+  /** Steps completed or skipped. */
+  readonly stepsResolved: number;
+  /** The lesson has ended (`SessionCompleted`). */
+  readonly completed: boolean;
 }
 
 /** Provider names of the guest settings. Mirrors the HTTP providers of the AI port (this port cannot import it). */

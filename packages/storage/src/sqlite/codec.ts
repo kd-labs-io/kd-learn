@@ -34,6 +34,11 @@ export interface SessionRow {
   readonly eventCount: number;
   /** Payload of the `SessionCreated` event, when the session has one. */
   readonly created: string | undefined;
+  /** Payload of the `PlanCreated` event (a session has at most one). */
+  readonly plan: string | undefined;
+  /** Number of `StepCompleted` and `StepSkipped` events. */
+  readonly resolved: number;
+  readonly completed: boolean;
 }
 
 const decodeEvent = Schema.decodeUnknownSync(DomainEvent);
@@ -72,12 +77,24 @@ export const summarize = (row: SessionRow): SessionSummary => {
       // A damaged SessionCreated must not hide the session from the list.
     }
   }
+  let stepsTotal: number | undefined;
+  if (row.plan !== undefined) {
+    try {
+      const event = decodeEvent(JSON.parse(row.plan));
+      if (event._tag === 'PlanCreated') stepsTotal = event.plan.nodes.length;
+    } catch {
+      // Progress is a hint on the list: a damaged plan only hides it.
+    }
+  }
   return {
     sessionId: row.sessionId,
     topic,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     eventCount: row.eventCount,
+    ...(stepsTotal === undefined ? {} : { stepsTotal }),
+    stepsResolved: row.resolved,
+    completed: row.completed,
   };
 };
 

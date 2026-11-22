@@ -31,6 +31,7 @@ import { AppHeader } from '../app/AppHeader';
 import { ProfileLink } from '../profile/ProfileLink';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { errorCode, errorText, keys, useAccountApi } from './api';
+import { pageWidth } from '../app/page';
 
 type Provider = ConnectionInfo['provider'];
 
@@ -104,6 +105,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

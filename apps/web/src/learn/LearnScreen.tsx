@@ -1,6 +1,6 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
+import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
 import { Collapsible } from '@astryxdesign/core/Collapsible';
 import { Drawer } from '@astryxdesign/core/Drawer';
 import { Heading } from '@astryxdesign/core/Heading';
@@ -20,6 +20,7 @@ import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
 import { canSkipStep, type Citation, type EventLog, type Session } from '@kd-learn/core';
 import { LessonFigure, type FigureBodyLoader } from '@kd-learn/ui/components/LessonFigure';
+import { preloadMath } from '@kd-learn/ui/components/LessonMarkdown';
 import { Result } from 'effect';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThemeControl } from '../theme/ThemeRoot';
@@ -35,9 +36,44 @@ import {
   failureAction,
   failureText,
   hasUnresolvedTurn,
+  planRows,
   turnBanner,
   type TurnBanner,
 } from './view';
+
+const sideKey = 'kd-learn.side-open';
+
+/** Whether the side chat is open, remembered on this device (a convenience: may fail silently). */
+function useSideOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem(sideKey) === '1');
+    } catch {
+      // Storage blocked: start closed.
+    }
+  }, []);
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      localStorage.setItem(sideKey, next ? '1' : '0');
+    } catch {
+      // Not remembered, still applied.
+    }
+  };
+  return [open, set];
+}
+
+/** Where the lesson stands, under its title: probing, planning, step x of y, finished. */
+export function lessonProgress(session: Session): string {
+  if (session.state._tag === 'Done') return m.lesson_progress_done();
+  const rows = planRows(session);
+  if (rows.length === 0) {
+    return session.state._tag === 'Planning' ? m.plan_phase_planning() : m.plan_phase_probing();
+  }
+  const resolved = session.completedSteps.length + session.skippedSteps.length;
+  return m.lesson_progress({ current: Math.min(resolved + 1, rows.length), total: rows.length });
+}
 
 export interface LearnScreenProps {
   readonly source: LessonSource;
@@ -51,9 +87,14 @@ export interface LearnScreenProps {
  */
 export function LearnScreen({ source, onHome: home, onSettings: settings }: LearnScreenProps) {
   const { view, state, actions: runner, elsewhere, persistent } = source;
-  const showPlanColumn = useMediaQuery('(min-width: 768px)');
-  const showSideColumn = useMediaQuery('(min-width: 1180px)');
-  const [sideOpen, setSideOpen] = useState(false);
+  const showPlanColumn = useMediaQuery('(min-width: 900px)');
+  const wideSide = useMediaQuery('(min-width: 1180px)');
+  // Side chat is closed until asked for (plan cai-thien-ux.md B2): a column on a wide screen, a
+  // drawer elsewhere. The choice is remembered on this device.
+  // Only the column is remembered: a drawer that opens by itself on load would hide the lesson.
+  const [columnOpen, setColumnOpen] = useSideOpen();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const showSideColumn = wideSide && columnOpen;
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [cited, setCited] = useState<Citation | undefined>(undefined);
 
@@ -61,6 +102,9 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
   const session =
     projected !== undefined && Result.isSuccess(projected) ? projected.success : undefined;
   const log: EventLog = view.status === 'ready' ? view.log : [];
+
+  // Formulas render at once on a reload instead of showing raw TeX while KaTeX loads.
+  useEffect(preloadMath, []);
 
   // A stale failure from an earlier visit (no key, a lost connection) must not outlive the visit.
   useEffect(() => runner.clearFailure(), [runner]);
@@ -150,9 +194,19 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                   onClick={home}
                   data-testid="nav-home"
                 />
-                <Heading level={3} accessibilityLevel={1} maxLines={1} data-testid="session-topic">
-                  {session.topic}
-                </Heading>
+                <VStack gap={0}>
+                  <Heading
+                    level={3}
+                    accessibilityLevel={1}
+                    maxLines={1}
+                    data-testid="session-topic"
+                  >
+                    {session.topic}
+                  </Heading>
+                  <Text type="supporting" data-testid="lesson-progress">
+                    {lessonProgress(session)}
+                  </Text>
+                </VStack>
               </HStack>
               <HStack gap={2} vAlign="center" wrap="wrap">
                 {source.sources === undefined ? null : (
@@ -164,15 +218,14 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                     data-testid="lesson-sources-open"
                   />
                 )}
-                {showSideColumn ? null : (
-                  <Button
-                    label={m.side_open()}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setSideOpen(true)}
-                    data-testid="side-open"
-                  />
-                )}
+                <Button
+                  label={showSideColumn ? m.side_hide() : m.side_open()}
+                  variant={showSideColumn ? 'ghost' : 'secondary'}
+                  size="sm"
+                  onClick={() => (wideSide ? setColumnOpen(!columnOpen) : setDrawerOpen(true))}
+                  aria-expanded={wideSide ? columnOpen : drawerOpen}
+                  data-testid="side-open"
+                />
                 <Button label={m.nav_settings()} variant="ghost" size="sm" onClick={settings} />
               </HStack>
             </HStack>
@@ -180,7 +233,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
         }
         start={
           showPlanColumn ? (
-            <LayoutPanel width={300} hasDivider label={m.plan_title()}>
+            <LayoutPanel width={280} hasDivider label={m.plan_title()}>
               {planPanel}
             </LayoutPanel>
           ) : undefined
@@ -193,49 +246,61 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
           ) : undefined
         }
         content={
-          <LayoutContent padding={4} label={m.conv_tutor()}>
-            <VStack gap={5} maxWidth="68ch" data-testid="conversation">
-              {showPlanColumn ? null : (
-                <Collapsible
-                  trigger={<Text type="label">{m.plan_title()}</Text>}
-                  defaultIsOpen={false}
-                >
-                  {planPanel}
-                </Collapsible>
-              )}
-              <Conversation
-                session={session}
-                state={state}
-                onCite={setCited}
-                loadFigure={source.loadFigure}
-              />
-            </VStack>
-          </LayoutContent>
-        }
-        footer={
-          <LayoutFooter hasDivider padding={3}>
-            <VStack gap={3} maxWidth="68ch">
-              {persistent === false ? (
-                <Banner
-                  status="warning"
-                  title={m.storage_not_persistent_title()}
-                  description={m.storage_not_persistent_body()}
-                  data-testid="not-persistent"
-                />
-              ) : null}
-              <Status
-                session={session}
-                state={state}
-                elsewhere={elsewhere}
-                runner={runner}
-                onSettings={settings}
-                onNew={home}
-              />
-              {session.state._tag === 'Done' ? null : (
-                <Composer session={session} state={state} elsewhere={elsewhere} runner={runner} />
-              )}
-            </VStack>
-          </LayoutFooter>
+          // One centred reading column for the conversation and the answer box, so the box sits
+          // under what it answers (plan cai-thien-ux.md A2 #6, #7).
+          <Layout
+            contentWidth="72ch"
+            content={
+              <LayoutContent padding={4} label={m.conv_tutor()}>
+                <VStack gap={5} data-testid="conversation">
+                  {showPlanColumn ? null : (
+                    <Collapsible
+                      trigger={<Text type="label">{m.plan_title()}</Text>}
+                      defaultIsOpen={false}
+                    >
+                      {planPanel}
+                    </Collapsible>
+                  )}
+                  <Conversation
+                    session={session}
+                    state={state}
+                    onCite={setCited}
+                    loadFigure={source.loadFigure}
+                  />
+                </VStack>
+              </LayoutContent>
+            }
+            footer={
+              <LayoutFooter hasDivider padding={3}>
+                <VStack gap={3}>
+                  {persistent === false ? (
+                    <Banner
+                      status="warning"
+                      title={m.storage_not_persistent_title()}
+                      description={m.storage_not_persistent_body()}
+                      data-testid="not-persistent"
+                    />
+                  ) : null}
+                  <Status
+                    session={session}
+                    state={state}
+                    elsewhere={elsewhere}
+                    runner={runner}
+                    onSettings={settings}
+                    onNew={home}
+                  />
+                  {session.state._tag === 'Done' ? null : (
+                    <Composer
+                      session={session}
+                      state={state}
+                      elsewhere={elsewhere}
+                      runner={runner}
+                    />
+                  )}
+                </VStack>
+              </LayoutFooter>
+            }
+          />
         }
       />
       {source.sources === undefined ? null : (
@@ -261,8 +326,8 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
           />
         </>
       )}
-      {showSideColumn ? null : (
-        <Drawer isOpen={sideOpen} onOpenChange={setSideOpen} label={m.side_title()} padding={4}>
+      {wideSide ? null : (
+        <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label={m.side_title()} padding={4}>
           {sideChat}
         </Drawer>
       )}
@@ -305,15 +370,14 @@ function Conversation({
     <VStack gap={5}>
       {items.map((item) =>
         item.role === 'user' ? (
-          <Card key={item.key} padding={3} variant="muted" data-testid="msg-user">
-            <VStack gap={1}>
-              <Text type="supporting">{m.conv_you()}</Text>
-              <Text>{item.content}</Text>
-            </VStack>
-          </Card>
+          <ChatMessage key={item.key} sender="user" data-testid="msg-user">
+            <ChatMessageBubble name={m.conv_you()}>{item.content}</ChatMessageBubble>
+          </ChatMessage>
         ) : (
           <VStack key={item.key} gap={1} data-testid="msg-tutor">
-            <Text type="supporting">{m.conv_tutor()}</Text>
+            <Text type="label" color="accent">
+              {m.conv_tutor()}
+            </Text>
             <LessonFigure figures={figures} loadBody={loadFigure} vars={vars}>
               {item.content}
             </LessonFigure>
@@ -336,7 +400,9 @@ function Conversation({
       )}
       {showLive ? (
         <VStack gap={1} data-testid="msg-live">
-          <Text type="supporting">{m.conv_tutor()}</Text>
+          <Text type="label" color="accent">
+            {m.conv_tutor()}
+          </Text>
           {live.text === '' ? (
             <Spinner size="sm" label={m.conv_writing()} />
           ) : (
@@ -492,18 +558,42 @@ function Composer({ session, state, elsewhere, runner }: ComposerProps) {
     });
   };
 
+  // Enter sends and Shift+Enter breaks the line, on a keyboard; a touch keyboard's Return keeps
+  // its new line and the Send button sends.
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const finePointer = useMediaQuery('(pointer: fine)');
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    const input = inputRef.current;
+    if (input === null || matchMedia('(pointer: coarse)').matches) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        sendRef.current();
+      }
+    };
+    input.addEventListener('keydown', onKey);
+    return () => input.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <VStack gap={2}>
       <TextArea
+        ref={inputRef}
         label={m.composer_label()}
+        isLabelHidden
         placeholder={m.composer_placeholder()}
         value={draft}
         onChange={setDraft}
         rows={3}
         isDisabled={blocked}
+        disabledMessage={m.composer_waiting()}
+        enterKeyHint="send"
         data-testid="composer-input"
       />
-      <HStack justify="end">
+      <HStack gap={3} vAlign="center" justify="between">
+        {finePointer ? <Text type="supporting">{m.composer_hint()}</Text> : <VStack />}
         <Button
           label={m.composer_send()}
           variant="primary"

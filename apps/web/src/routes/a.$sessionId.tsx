@@ -4,6 +4,7 @@ import { m } from '@kd-learn/i18n';
 import { Navigate, createFileRoute } from '@tanstack/react-router';
 import { useWho } from '../account/auth';
 import { AccountLessonScreen } from '../learn/AccountLessonScreen';
+import { pageWidth } from '../app/page';
 
 export const Route = createFileRoute('/a/$sessionId')({ component: AccountLessonRoute });
 
@@ -14,6 +15,7 @@ function AccountLessonRoute() {
   if (current.status === 'unknown') {
     return (
       <Layout
+        contentWidth={pageWidth}
         content={
           <LayoutContent padding={6}>
             <Spinner label={m.learn_loading()} />

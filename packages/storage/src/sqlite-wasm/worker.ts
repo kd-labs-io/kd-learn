@@ -166,20 +166,22 @@ async function appendKnowledge(
 
 async function list(): Promise<WireSession[]> {
   const sessions = await run(
-    `SELECT session_id, MIN(at) AS created_at, MAX(at) AS updated_at, COUNT(*) AS event_count
+    `SELECT session_id, MIN(at) AS created_at, MAX(at) AS updated_at, COUNT(*) AS event_count,
+            MAX(CASE WHEN tag = 'SessionCreated' THEN payload END) AS created,
+            MAX(CASE WHEN tag = 'PlanCreated' THEN payload END) AS plan,
+            SUM(CASE WHEN tag IN ('StepCompleted', 'StepSkipped') THEN 1 ELSE 0 END) AS resolved,
+            MAX(CASE WHEN tag = 'SessionCompleted' THEN 1 ELSE 0 END) AS completed
        FROM events GROUP BY session_id ORDER BY updated_at DESC, session_id`,
-  );
-  const created = new Map(
-    (await run("SELECT session_id, payload FROM events WHERE tag = 'SessionCreated'")).map(
-      (row) => [String(row.session_id), String(row.payload)],
-    ),
   );
   return sessions.map((row) => ({
     sessionId: String(row.session_id),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     eventCount: Number(row.event_count),
-    created: created.get(String(row.session_id)),
+    created: row.created == null ? undefined : String(row.created),
+    plan: row.plan == null ? undefined : String(row.plan),
+    resolved: Number(row.resolved),
+    completed: Number(row.completed) === 1,
   }));
 }
 

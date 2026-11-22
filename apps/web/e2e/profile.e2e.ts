@@ -38,16 +38,16 @@ test('duplicate the default profile, edit a prompt, and a new session snapshots 
 
   // An empty prompt and a bad language tag are blocked, with a message on each field.
   await prompt(page, 'Teacher').fill('');
-  await page.getByLabel('Language').fill('not a tag');
+  await page.getByTestId('profile-language').fill('not a tag');
   await expect(page.getByTestId('profile-invalid')).toBeVisible();
   await expect(page.getByTestId('profile-save')).toBeDisabled();
   await expect(prompt(page, 'Teacher')).toHaveAttribute('aria-invalid', 'true');
   await expect(fieldStatus(page, 'Must not be empty, and at most 20000 characters.')).toBeVisible();
-  await expect(page.getByLabel('Language')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('profile-language')).toHaveAttribute('aria-invalid', 'true');
   await expect(fieldStatus(page, 'Use a language tag such as vi, en or pt-BR.')).toBeVisible();
 
   await prompt(page, 'Teacher').fill('Teach step by step.');
-  await page.getByLabel('Language').fill('en');
+  await page.getByTestId('profile-language').fill('en');
   await prompt(page, 'Prober').fill('MARKER-GUEST: ask one short question at a time.');
   await expect(page.getByTestId('profile-invalid')).toHaveCount(0);
 

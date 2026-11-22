@@ -11,8 +11,22 @@ export interface LessonMarkdownProps {
   isStreaming?: boolean;
 }
 
-// KaTeX is about 77 kB gzip with its CSS: load it the first time a formula shows up.
-const KatexMath = lazy(() => import('./katex-math'));
+// KaTeX is about 77 kB gzip with its CSS: load it the first time a formula shows up, or earlier
+// with `preloadMath` (one shared import, so the lazy component reuses it).
+let katexModule: Promise<typeof import('./katex-math')> | undefined;
+const loadKatex = () => (katexModule ??= import('./katex-math'));
+const KatexMath = lazy(loadKatex);
+
+/**
+ * Starts loading KaTeX now. A lesson calls it as it opens, while its log is still being read, so a
+ * reloaded lesson shows formulas rendered instead of raw TeX for a moment (plan cai-thien-ux.md).
+ */
+export const preloadMath = (): void => {
+  void loadKatex().catch(() => {
+    // Retried by the lazy component when a formula renders.
+    katexModule = undefined;
+  });
+};
 
 function MathExpression({ value, display }: { value: string; display: 'inline' | 'block' }) {
   return (

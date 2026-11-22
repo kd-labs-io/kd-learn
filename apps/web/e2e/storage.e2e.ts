@@ -62,7 +62,15 @@ test('events written in one page load are read back after a reload', async ({ pa
   expect(await read(page, 's1')).toEqual(log);
   expect(await page.evaluate(() => window.__kdStorage!.state('s1'))).toBe('Probing');
   expect(await page.evaluate(() => window.__kdStorage!.list())).toEqual([
-    { sessionId: 's1', topic: 'Fractions', createdAt: 1, updatedAt: 4, eventCount: 4 },
+    {
+      sessionId: 's1',
+      topic: 'Fractions',
+      createdAt: 1,
+      updatedAt: 4,
+      eventCount: 4,
+      stepsResolved: 0,
+      completed: false,
+    },
   ]);
   // The store hooks show the same data without the test asking.
   await expect(page.locator('#session-count')).toHaveText('sessions: 1');

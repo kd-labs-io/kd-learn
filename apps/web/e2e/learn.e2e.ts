@@ -264,6 +264,9 @@ test('the side chat answers about the current step and keeps out of the lesson',
   await answer(page, 'Not much');
   await expect(page.getByTestId('plan-steps')).toBeVisible();
 
+  // Closed until asked for (plan cai-thien-ux.md B2); a column on a wide screen.
+  await expect(page.getByTestId('side-chat')).toBeHidden();
+  await page.getByTestId('side-open').click();
   const side = page.getByTestId('side-chat');
   await expect(side.getByTestId('side-step')).toContainText('First idea');
   await side.getByLabel('Your question').fill('What is a fraction?');
@@ -279,6 +282,7 @@ test('the side chat answers about the current step and keeps out of the lesson',
   // the question is not in the main conversation
   await expect(page.getByTestId('conversation')).not.toContainText('What is a fraction?');
 
+  // Still open after a reload: the choice is remembered on the device.
   await page.reload();
   await expect(page.getByTestId('side-chat')).toContainText('What is a fraction?');
   await expect(page.getByTestId('side-chat')).toContainText('Short side answer.');

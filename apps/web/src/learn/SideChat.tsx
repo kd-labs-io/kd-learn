@@ -1,7 +1,8 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
+import { ChatMessage, ChatMessageBubble } from '@astryxdesign/core/Chat';
 import { Heading } from '@astryxdesign/core/Heading';
+import { Selector } from '@astryxdesign/core/Selector';
 import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
@@ -36,10 +37,29 @@ export interface SideChatProps {
   readonly state: RunnerState['side'];
 }
 
-/** Quick questions tied to the current step. Never part of the main lesson (plan A5). */
+/** Name of a thread for the picker: the step title, or "the lesson in general". */
+const threadName = (session: Session, threadId: string): string => {
+  if (!threadId.startsWith('step:')) return m.side_general();
+  const id = threadId.slice('step:'.length);
+  return session.plan?.nodes.find((node) => node.id === id)?.title ?? id;
+};
+
+/**
+ * Quick questions tied to the current step. Never part of the main lesson (plan A5). Earlier
+ * threads (other steps, or every step once the lesson is done) can be read back from the picker;
+ * only the current one takes new questions.
+ */
 export function SideChat({ session, log, runner, state }: SideChatProps) {
-  const threadId = sideThreadId(session);
-  const step = currentStep(session);
+  const currentThread = sideThreadId(session);
+  const others = Object.keys(session.sideThreads).filter(
+    (id) => id !== currentThread && (session.sideThreads[id]?.length ?? 0) > 0,
+  );
+  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const threadId =
+    picked !== undefined && (picked === currentThread || others.includes(picked))
+      ? picked
+      : currentThread;
+  const isCurrent = threadId === currentThread;
   const thread = session.sideThreads[threadId] ?? [];
   const [draft, setDraft] = useState('');
   const endRef = useRef<HTMLElement>(null);
@@ -56,7 +76,7 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
 
   const send = () => {
     const content = draft.trim();
-    if (content === '' || running) return;
+    if (content === '' || running || !isCurrent) return;
     setDraft('');
     void Promise.resolve(runner.sendSide(threadId, content)).then((kept) => {
       if (kept === false) setDraft((current) => (current === '' ? content : current));
@@ -65,12 +85,30 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
 
   return (
     <VStack gap={3} data-testid="side-chat">
-      <VStack gap={1}>
+      <VStack gap={2}>
         <Heading level={2}>{m.side_title()}</Heading>
         <Text type="supporting">{m.side_hint()}</Text>
-        <Text type="supporting" color="accent" data-testid="side-step">
-          {step === undefined ? m.side_general() : m.side_step({ title: step.title })}
-        </Text>
+        {others.length === 0 ? (
+          <Text type="supporting" color="accent" data-testid="side-step">
+            {m.side_thread_label()}: {threadName(session, threadId)}
+          </Text>
+        ) : (
+          <Selector
+            label={m.side_thread_label()}
+            size="sm"
+            value={threadId}
+            onChange={setPicked}
+            options={[
+              { value: currentThread, label: threadName(session, currentThread) },
+              {
+                type: 'section',
+                title: m.side_history(),
+                options: others.map((id) => ({ value: id, label: threadName(session, id) })),
+              },
+            ]}
+            data-testid="side-thread"
+          />
+        )}
       </VStack>
 
       <VStack gap={3} data-testid="side-messages">
@@ -79,9 +117,9 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
         ) : null}
         {thread.map((message) =>
           message.role === 'user' ? (
-            <Card key={message.messageId} padding={3} variant="muted">
-              <Text>{message.content}</Text>
-            </Card>
+            <ChatMessage key={message.messageId} sender="user">
+              <ChatMessageBubble>{message.content}</ChatMessageBubble>
+            </ChatMessage>
           ) : (
             <LessonMarkdown key={message.messageId}>{message.content}</LessonMarkdown>
           ),
@@ -99,7 +137,7 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
           data-testid="side-failed"
         />
       ) : null}
-      {waitingForAnswer ? (
+      {waitingForAnswer && isCurrent ? (
         <Banner
           status="error"
           title={m.side_error({
@@ -119,22 +157,27 @@ export function SideChat({ session, log, runner, state }: SideChatProps) {
         />
       ) : null}
 
-      <TextArea
-        label={m.side_label()}
-        placeholder={m.side_placeholder()}
-        value={draft}
-        onChange={setDraft}
-        rows={2}
-        isDisabled={running}
-        data-testid="side-input"
-      />
-      <Button
-        label={m.side_send()}
-        variant="secondary"
-        onClick={send}
-        isDisabled={running || draft.trim() === ''}
-        data-testid="side-send"
-      />
+      {isCurrent ? (
+        <>
+          <TextArea
+            label={m.side_label()}
+            placeholder={m.side_placeholder()}
+            value={draft}
+            onChange={setDraft}
+            rows={2}
+            isDisabled={running}
+            enterKeyHint="send"
+            data-testid="side-input"
+          />
+          <Button
+            label={m.side_send()}
+            variant="primary"
+            onClick={send}
+            isDisabled={running || draft.trim() === ''}
+            data-testid="side-send"
+          />
+        </>
+      ) : null}
     </VStack>
   );
 }

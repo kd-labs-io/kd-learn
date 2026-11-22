@@ -27,9 +27,10 @@ import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
-import { formatDate } from '../app/GuestHome';
+import { formatDate } from '../app/format';
 import { agentLabel } from './AccountSettings';
 import { errorText, keys, useAccountApi } from './api';
+import { pageWidth } from '../app/page';
 
 const AGENTS: ReadonlyArray<AcpAgent> = ['claude-code', 'opencode', 'antigravity'];
 
@@ -53,6 +54,7 @@ export function AdminScreen({ token, selfId }: { token: string; selfId: string }
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

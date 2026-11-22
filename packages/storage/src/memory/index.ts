@@ -81,12 +81,17 @@ export const makeMemoryStorage = (): StorageService => {
         const last = log[log.length - 1];
         if (!first || !last) continue;
         const created = log.find((event) => event._tag === 'SessionCreated');
+        const plan = log.find((event) => event._tag === 'PlanCreated');
         rows.push({
           sessionId,
           topic: created?.topic ?? '',
           createdAt: first.at,
           updatedAt: last.at,
           eventCount: log.length,
+          ...(plan === undefined ? {} : { stepsTotal: plan.plan.nodes.length }),
+          stepsResolved: log.filter((e) => e._tag === 'StepCompleted' || e._tag === 'StepSkipped')
+            .length,
+          completed: log.some((event) => event._tag === 'SessionCompleted'),
         });
       }
       return rows.sort((a, b) => b.updatedAt - a.updatedAt);

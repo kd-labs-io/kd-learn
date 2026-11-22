@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { clientOptions, errorCode, errorText, run, usePublicConfig } from './api';
 import { signIn, useWho } from './auth';
+import { pageWidth } from '../app/page';
 
 const authErrorText = (error: unknown): string => {
   switch (errorCode(error)) {
@@ -80,6 +81,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

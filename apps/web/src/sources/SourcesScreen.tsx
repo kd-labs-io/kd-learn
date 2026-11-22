@@ -26,6 +26,7 @@ import {
   type SourceLibrary,
   type SourceRow,
 } from './library';
+import { pageWidth } from '../app/page';
 
 export const kindText = (kind: SourceInfo['kind']) =>
   kind === 'pdf'
@@ -79,6 +80,7 @@ export function SourcesScreen({ library }: { readonly library: SourceLibrary }) 
   const view = library.view;
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

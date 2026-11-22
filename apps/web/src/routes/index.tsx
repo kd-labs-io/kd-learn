@@ -8,12 +8,14 @@ import { useWho } from '../account/auth';
 import { GuestHome } from '../app/GuestHome';
 import { guestOnly, localModeOf } from '../app/modes';
 import { Welcome } from '../app/Welcome';
+import { pageWidth } from '../app/page';
 
 export const Route = createFileRoute('/')({ component: Home });
 
 function Loading() {
   return (
     <Layout
+      contentWidth={pageWidth}
       content={
         <LayoutContent padding={6}>
           <Spinner label={m.learn_loading()} />

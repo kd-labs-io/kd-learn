@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint .",
     "test:e2e": "playwright test",
+    "shots": "playwright test --config playwright.shots.config.ts",
     "check:server-bundle": "node scripts/check-server-bundle.mjs"
   },
   "dependencies": {
