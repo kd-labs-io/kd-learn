@@ -49,6 +49,24 @@ export const knowledgeEventsTable: ReadonlyArray<string> = [
  * deleted with their source. `owner` as for the knowledge log. The original file is kept only until
  * ingest ends, to run it again after an interruption.
  */
+/**
+ * DDL of figure bodies (plan hinh-va-demo.md A1). The log holds `FigureAdded` (metadata); the body
+ * is written in the same transaction as the turn's events. Text kinds fill `text`, images `blob`.
+ * `owner` as for the knowledge log.
+ */
+export const figuresTable: ReadonlyArray<string> = [
+  `CREATE TABLE figures (
+     owner TEXT NOT NULL,
+     figure_id TEXT NOT NULL,
+     session_id TEXT NOT NULL,
+     text TEXT,
+     blob BLOB,
+     PRIMARY KEY (owner, figure_id),
+     CHECK ((text IS NULL) <> (blob IS NULL))
+   ) WITHOUT ROWID`,
+  `CREATE INDEX figures_by_session ON figures (owner, session_id)`,
+];
+
 export const sourcesTables: ReadonlyArray<string> = [
   `CREATE TABLE sources (
      owner TEXT NOT NULL,
@@ -104,6 +122,8 @@ export const migrations: ReadonlyArray<ReadonlyArray<string>> = [
   [...knowledgeEventsTable],
   // v4: learning sources (phase 4 step 4).
   [...sourcesTables],
+  // v5: figure bodies (phase 5 A1).
+  [...figuresTable],
 ];
 
 /** The schema version this build of the code expects. */

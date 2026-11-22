@@ -24,7 +24,9 @@ import {
   toEventRow,
   toKnowledgeRow,
   checkChunks,
+  checkFigures,
   checkNewSourceInfo,
+  fromFigureRow,
   fromChunkRow,
   fromSourceRow,
   toChunkRow,
@@ -70,6 +72,12 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
   );
   const insert = db.prepare(
     'INSERT INTO events (session_id, seq, id, tag, at, payload) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  const insertFigure = db.prepare(
+    'INSERT INTO figures (owner, figure_id, session_id, text, blob) VALUES (?, ?, ?, ?, ?)',
+  );
+  const readFigureRow = db.prepare(
+    'SELECT figure_id, text, blob FROM figures WHERE owner = ? AND figure_id = ?',
   );
   const read = db.prepare(
     `SELECT e.payload FROM events e JOIN sessions s ON s.session_id = e.session_id
@@ -145,12 +153,13 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
   const forUser = (userId: string): StorageService => ({
     persistent: true,
 
-    appendEvents: (sessionId, events) =>
-      events.length === 0
+    appendEvents: (sessionId, events, figures = []) =>
+      events.length === 0 && figures.length === 0
         ? run((): AppendResult => ({
             lastSeq: Number((ownedLastSeq.get(sessionId, userId) as { last: number }).last),
           }))
         : run((): AppendResult => {
+            const figureRows = checkFigures(events, figures);
             const result = transaction(() => {
               const row = owner.get(sessionId) as { user_id: string } | undefined;
               if (row === undefined) claim.run(sessionId, userId, Date.now());
@@ -161,12 +170,22 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
                 seq += 1;
                 insert.run(sessionId, seq, id, tag, at, payload);
               }
+              for (const figure of figureRows) {
+                insertFigure.run(userId, figure.figureId, sessionId, figure.text, figure.blob);
+              }
               return { lastSeq: seq };
             });
             // After COMMIT only.
             notify(userId, { _tag: 'SessionChanged', sessionId });
             return result;
           }),
+
+    readFigure: (figureId) =>
+      run(() => {
+        const row = readFigureRow.get(userId, figureId) as
+          { figure_id: string; text: string | null; blob: Uint8Array | null } | undefined;
+        return row === undefined ? undefined : fromFigureRow(row);
+      }),
 
     readSession: (sessionId) =>
       run(() =>

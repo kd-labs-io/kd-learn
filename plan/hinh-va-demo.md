@@ -40,14 +40,14 @@ Mọi mã do model sinh (demo HTML, và Mermaid nếu spike C2 chọn render tro
 
 - **Iframe `sandbox="allow-scripts"`**, không có `allow-same-origin`: origin mờ (opaque), nên không đọc được cookie, `localStorage`, IndexedDB, OPFS hay `parent.document` của app ([rủi ro 7](05-rui-ro.md)). Không cấp `allow-forms`, `allow-popups`, `allow-top-navigation*`, `allow-modals`, `allow-downloads`.
 - **Tài liệu của khung do app dựng**, mã của model nằm trong `<body>`; phần đầu cố định đứng trước mọi thứ của model:
-  - `<meta http-equiv="Content-Security-Policy">` (chuỗi dưới là điểm xuất phát, spike C1 chốt): `default-src 'none'; script-src 'unsafe-inline' <CDN>; style-src 'unsafe-inline' <CDN>; img-src data: blob:; font-src data: <CDN>; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; worker-src 'none'`. `<CDN>` là URL chính xác của các thư viện được khai báo (A5), không phải cả host.
+  - `<meta http-equiv="Content-Security-Policy">`: `default-src 'none'; script-src <hash>; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; worker-src 'none'`. `<hash>` chỉ gồm hash (chốt ở spike C1): SHA-256 của từng `<script>` nội tuyến và từng thuộc tính `on*` của mã model (kèm `'unsafe-hashes'`), của script của app, và hash SRI của thư viện được khai báo (A5). Không có `'unsafe-inline'` hay URL nào, nên script tạo động, `eval` và thẻ `<script src>` tự viết bị chặn. Client tính hash trên bản phân tích bằng `DOMParser` (không chạy mã).
   - `<meta name="referrer" content="no-referrer">`.
   - Token theme thành `:root { --kd-*: ... }` (A8), và một script nhỏ của app báo chiều cao, bắt lỗi.
-- **`srcdoc` hay trang riêng:** mặc định là `srcdoc` (chạy được như nhau ở bản SSR, bản SPA và Capacitor, không cần header). Phương án khác là một trang tĩnh `sandbox.html` nhận mã qua `postMessage`. Spike C1 chọn. Ghi chú: `srcdoc` thừa hưởng CSP của trang cha, nên nếu sau này app có CSP thì phải xem lại khung.
+- **`srcdoc`** (chốt ở spike C1): chạy như nhau ở bản SSR, bản SPA và Capacitor, không cần header. `srcdoc` thừa hưởng CSP của trang cha, nên CSP của app (dưới) chỉ có `frame-src`.
 - **Kênh tin nhắn hẹp:** app chỉ nhận tin từ khung khi `event.source` đúng là `contentWindow` của khung đó, decode bằng Effect Schema, chỉ ba loại: `resize {height}`, `error {message}`, `ready`. App chỉ gửi vào khung token theme (`theme {vars}`). Không bao giờ gửi dữ liệu học, key hay token.
 - **Demo chỉ chạy khi người học bấm "Chạy"**; có nút "Dừng" (gỡ iframe) và "Chạy lại". Nhãn cố định "Mã do AI sinh, chạy cách ly". Chiều cao theo `resize`, trần 80vh.
-- **Khung tự điều hướng** (`location = 'https://...'`): CSP của khung không chặn được. Spike C1 kiểm hai cách: `frame-src` trên trang cha (nếu chặn được thì app đặt một CSP hẹp chỉ có `frame-src`, ngoại lệ của D), và phát hiện khung `load` lần hai để gỡ khung và báo lỗi; không chặn được thì ghi thành rủi ro còn lại ([rủi ro 43](05-rui-ro.md)): khung chỉ có dữ liệu do model viết, không có dữ liệu app.
-- **Vòng lặp vô hạn:** iframe sandbox có thể chạy chung tiến trình với app (nhất là Safari), nên `while(true){}` có thể đơ cả trang. Spike C1 đo trên Chromium, Firefox, WebKit ([rủi ro 44](05-rui-ro.md)).
+- **Khung tự điều hướng** (link, `location`, meta refresh): CSP của khung không chặn được, nhưng CSP của trang cha `frame-src 'self' about:` chặn được ở cả ba trình duyệt (spike C1). App đặt CSP hẹp này bằng thẻ `<meta>` trong tài liệu gốc (bản SSR và SPA như nhau) ([rủi ro 43](05-rui-ro.md)).
+- **Vòng lặp vô hạn:** spike C1: khung chạy chung luồng với app ở cả ba trình duyệt, `while(true){}` đơ cả trang. Không tự chạy demo là cách thoát: tải lại trang thì demo không chạy lại ([rủi ro 44](05-rui-ro.md)).
 
 ### A3. Sơ đồ SVG
 
@@ -60,25 +60,25 @@ Mọi mã do model sinh (demo HTML, và Mermaid nếu spike C2 chọn render tro
 ### A4. Sơ đồ Mermaid
 
 - Teacher viết mã Mermaid; render ở client, không ở server.
-- **Chỗ render** (spike C2 chọn): (a) trong app với `securityLevel: 'strict'`, kết quả SVG hiện bằng `<img>` như A3; hoặc (b) trong một khung sandbox (A2) dùng riêng để render, trả chuỗi SVG qua tin nhắn, app hiện bằng `<img>`. Dù cách nào, SVG kết quả không vào DOM của app.
+- **Chỗ render** (chốt ở spike C2): trong app, nạp lười, với `securityLevel: 'strict'`, `htmlLabels: false` (strict vẫn để `<img>` trong nhãn HTML bắn request lúc render), `layout: 'dagre'`, `suppressErrorRendering: true`, trong một vùng ẩn ngoài cây hiển thị; SVG kết quả được chuẩn hoá (`XMLSerializer`, kích thước từ `viewBox`) rồi hiện bằng `<img>` như A3, không ở lại trong DOM.
 - Nạp lười (Mermaid lớn, đo ở spike C2), chỉ khi buổi học có hình `mermaid`.
 - **Màu:** `themeVariables` của Mermaid lấy từ token; đổi theme thì render lại.
-- **Mã sai:** hiện mã nguồn kèm lỗi phân tích. Spike C2 thử phân tích Mermaid trong Node (không DOM) để tool trả lỗi cho model sửa ngay trong lượt; không được thì chỉ có phương án hiện mã ở client.
+- **Mã sai:** hiện mã nguồn kèm lỗi phân tích. Không kiểm Mermaid trên server (spike C2: cần jsdom, khoảng 200 MB RSS).
 
 ### A5. Demo HTML
 
 - Tool `show_demo {title, html, libraries?, height?}`: `html` là phần thân (có thể kèm `<style>`, `<script>` nội tuyến), trần 128 KiB.
-- **Thư viện từ CDN:** danh sách cho phép viết trong code (`core`, dữ liệu thuần): mỗi mục có id (ví dụ `d3@7`), URL chính xác tới một file trên CDN đã ghim phiên bản, và hash SRI. Danh sách mặc định chốt ở spike C1 (ứng viên: d3, three.js, p5.js, Chart.js). Model chỉ khai báo id trong `libraries`; khung tự chèn `<script src integrity crossorigin="anonymous">` và CSP chỉ mở đúng các URL đó. Thẻ `<script src>` do model tự viết tới URL khác bị CSP chặn. Thẻ tự viết tới đúng URL được phép thì vẫn nạp được mà không có `integrity`; spike C1 tìm cách buộc SRI (ví dụ `require-sri-for` nếu còn hỗ trợ, hay CSP dùng hash thay URL). Không buộc được thì SRI chỉ bảo vệ thẻ do khung chèn, ghi rõ ở [rủi ro 45](05-rui-ro.md).
+- **Thư viện từ CDN:** danh sách cho phép viết trong code (`core`, dữ liệu thuần): mỗi mục có id (ví dụ `d3@7`), URL chính xác tới một file trên CDN đã ghim phiên bản, và hash SRI. Danh sách chốt ở spike C1: d3 7.9.2, Chart.js 4.6.1, Matter.js 0.20.0 (bản cổ điển trên jsDelivr). Model chỉ khai báo id trong `libraries`; khung tự chèn `<script src integrity crossorigin="anonymous">` và CSP chỉ có hash SRI của chúng (A2). Mọi thẻ `<script src>` do model tự viết bị chặn ([rủi ro 45](05-rui-ro.md)).
 - **Admin tắt được CDN** (cấu hình server, mặc định bật). Tắt thì prompt không liệt kê thư viện, `libraries` bị từ chối, CSP không có URL ngoài.
 - Thư viện mới vào danh sách phải có giấy phép hợp MIT và được kiểm SRI trong CI (test tải đúng URL và so hash, chỉ chạy khi có mạng, không chặn CI) ([rủi ro 45](05-rui-ro.md)).
 - Không có mạng nào khác: `connect-src 'none'`, không form, không popup (A2). Request tới CDN không mang referrer.
 
 ### A6. Sinh ảnh
 
-- **Port mới** `ImagePort` trong `@kd-learn/ai/port` (cạnh `AiPort`, chỉ import `effect`): `generate({model, prompt, size}): Effect<GeneratedImage, ProviderError>`; `GeneratedImage {mime, bytes}`. Adapter trong `packages/ai` (TanStack nếu spike C4 cho thấy TanStack AI 1.4 hỗ trợ, không thì gọi thẳng API ảnh của provider). `agent` chỉ import port; thêm vào rule ranh giới và test của rule.
+- **Port mới** `ImagePort` trong `@kd-learn/ai/port` (cạnh `AiPort`, chỉ import `effect`): `generate({model, prompt, size}): Effect<GeneratedImage, ProviderError>`; `GeneratedImage {mime, bytes}`. Adapter trong `packages/ai` gọi thẳng HTTP (chốt ở spike C4: `generateImage` của TanStack AI 1.4 không xin được JPEG ở Gemini, không trả mime type): Gemini `POST /v1beta/interactions`, endpoint tương thích OpenAI `POST {base}/images/generations`. `agent` chỉ import port; thêm vào rule ranh giới và test của rule.
 - **Provider:** Gemini và endpoint tương thích OpenAI do admin khai báo (endpoint có thêm cờ `images: true` trong `KD_OPENAI_COMPATIBLE_ENDPOINTS` khi nó có API ảnh). Anthropic không có model ảnh; kết nối ACP không làm vai này được (UI không cho chọn, server từ chối).
 - **Vai `illustrator`** trong `ModelRole` / `RoleModels`, **không có fallback**: chưa đặt thì tool `generate_image` không có trong bộ tool của Teacher. Không thêm vào `AgentRole` (Teacher viết prompt ảnh, vai này không có prompt riêng).
-- **Lúc chạy:** tool gọi `ImagePort` trong lượt, thời hạn 90 s (đo ở spike C4); lỗi provider thành `ToolError`, Teacher viết tiếp không có ảnh. Ảnh ra dưới dạng PNG, JPEG hay WebP (xin định dạng nén nếu provider cho, spike C4), trên 2 MiB thì từ chối. Usage của lời gọi ảnh ghi vào `UsageRecorded` riêng với `model` là model ảnh.
+- **Lúc chạy:** tool gọi `ImagePort` trong lượt, thời hạn 90 s (đo ở spike C4); lỗi provider thành `ToolError`, Teacher viết tiếp không có ảnh. Ảnh ra JPEG (Gemini chỉ cho JPEG) hoặc WebP / JPEG nén ở endpoint tương thích OpenAI; mime đọc từ phản hồi; trên 2 MiB thì từ chối. Phản hồi 200 không có ảnh là bị từ chối (bộ lọc nội dung), vẫn ghi usage. Usage của lời gọi ảnh ghi vào `UsageRecorded` riêng với `model` là model ảnh.
 - **Khách:** cài đặt của khách hiện chỉ có một provider, một model, một key (`GuestSettings` trong `@kd-learn/storage/port`). Thêm khối tuỳ chọn `image {provider: 'gemini' | 'openai-compatible', model, endpointId?, apiKey?}` (key riêng, nút xoá riêng như key chữ). Request `/api/turns` có thêm `imageModel` tuỳ chọn (`ModelChoice` kèm key ảnh, cùng quy tắc không log key, [rủi ro 19](05-rui-ro.md)). Màn cài đặt của khách có phần "model ảnh".
 - **Tài khoản:** vai `illustrator` trong màn cài đặt vai, kết nối lấy từ danh sách sẵn có.
 - **Demo:** công tắc admin `demo.images` (mặc định tắt) và giá N lần gọi mỗi ảnh (mặc định 10). Tắt thì tool không có. Bật thì tool giữ chỗ N lần gọi lúc được gọi; thiếu ngân sách thì `ToolError`, không gọi provider ([rủi ro 46](05-rui-ro.md)).

@@ -7,6 +7,7 @@ import type { StorageChange } from '../port/index.ts';
 import {
   portContract,
   propositionAdded,
+  figureAdded,
   savedProfile,
   sessionCreated,
   turnStarted,
@@ -241,6 +242,38 @@ describe('sqlite-node: two users', () => {
     await Effect.runPromise(bob.createSource({ state: 'ready', info, chunks }));
     expect(await Effect.runPromise(alice.readChunks(['doc']))).toEqual([]);
     expect((await Effect.runPromise(alice.getSource('doc')))?.state).toBe('pending');
+  });
+
+  it("neither reads nor shadows another user's figures", async () => {
+    const { alice, bob } = await setup();
+    const body = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+    await Effect.runPromise(
+      alice.appendEvents(
+        'a1',
+        [turnStarted('t', 3), figureAdded('f1', 'turn-t', 'svg', body.length)],
+        [{ figureId: 'f1', body }],
+      ),
+    );
+    expect(await Effect.runPromise(bob.readFigure('f1'))).toBeUndefined();
+    // The same figure id in Bob's own session is his own row.
+    await Effect.runPromise(
+      bob.appendEvents(
+        'b1',
+        [turnStarted('t2', 4), figureAdded('f1', 'turn-t2', 'svg', body.length)],
+        [{ figureId: 'f1', body }],
+      ),
+    );
+    expect((await Effect.runPromise(alice.readFigure('f1')))?.body).toBe(body);
+    // A figure written to Alice's session by Bob fails like any write to it.
+    const exit = await Effect.runPromiseExit(
+      bob.appendEvents(
+        'a1',
+        [turnStarted('t3', 5), figureAdded('f9', 'turn-t3', 'svg', body.length)],
+        [{ figureId: 'f9', body }],
+      ),
+    );
+    expect(exit._tag).toBe('Failure');
+    expect(await Effect.runPromise(alice.readFigure('f9'))).toBeUndefined();
   });
 
   it('does not store guest settings', async () => {

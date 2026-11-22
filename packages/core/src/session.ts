@@ -7,6 +7,7 @@ import { isPlanResolved, nextStep, validatePlan } from './plan.ts';
 import type { LessonPlan, PlanNode, StepId } from './plan.ts';
 import type { TeachingProfile } from './profile.ts';
 import type { Citation, SourceKind } from './source-schema.ts';
+import type { FigureInfo } from './figure.ts';
 
 /** `probing -> planning -> teaching(step) -> done` (plan A4). */
 export type SessionState =
@@ -47,6 +48,11 @@ export interface HistoryMessage {
   readonly content: string;
   /** Resolved `[S<n>]` marks of an assistant message (phase 4 A3). */
   readonly citations?: ReadonlyArray<Citation>;
+}
+
+/** A figure of a completed turn (phase 5 A1). */
+export interface SessionFigure extends FigureInfo {
+  readonly turnId: string;
 }
 
 /** A source attached to the session (phase 4 A2). */
@@ -90,6 +96,8 @@ export interface Session {
   readonly sideThreads: Readonly<Record<string, ReadonlyArray<SideMessage>>>;
   /** Attached sources, in attach order. */
   readonly sources: ReadonlyArray<AttachedSource>;
+  /** Figures of completed turns (phase 5 A1), in log order. */
+  readonly figures: ReadonlyArray<SessionFigure>;
   readonly usage: { readonly inputTokens: number; readonly outputTokens: number };
 }
 
@@ -133,6 +141,8 @@ export const projectSession = (
   const turnById = new Map<string, TurnDraft>();
   const sideThreads: Record<string, Array<SideMessage>> = {};
   const sources: Array<AttachedSource> = [];
+  const figures: Array<SessionFigure & { readonly draft: TurnDraft }> = [];
+  const figureIds = new Set<string>();
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -310,6 +320,18 @@ export const projectSession = (
         break;
       }
 
+      case 'FigureAdded': {
+        const turn = openTurn(event.turnId);
+        if (typeof turn === 'string') return fail(index, turn);
+        if (figureIds.has(event.figureId)) {
+          return fail(index, `Figure "${event.figureId}" already exists.`);
+        }
+        figureIds.add(event.figureId);
+        const { _tag, id: _id, at: _at, ...figure } = event;
+        figures.push({ ...figure, draft: turn });
+        break;
+      }
+
       case 'SourceDetached': {
         const at = sources.findIndex((source) => source.sourceId === event.sourceId);
         if (at < 0) return fail(index, `Source "${event.sourceId}" is not attached.`);
@@ -344,6 +366,9 @@ export const projectSession = (
     history,
     sideThreads,
     sources,
+    figures: figures
+      .filter((figure) => figure.draft.status === 'completed')
+      .map(({ draft: _draft, ...figure }) => figure),
     usage: { inputTokens, outputTokens },
   });
 };

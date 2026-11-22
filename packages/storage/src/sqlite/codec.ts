@@ -9,7 +9,10 @@ import {
   SourceInfo,
   TeachingProfile,
   chunksBytes,
+  figureBodyBytes,
+  figureMaxBytes,
   maxSourceTextBytes,
+  type FigureBody,
   type EventLog,
   type KnowledgeLog,
 } from '@kd-learn/core';
@@ -145,3 +148,60 @@ export const fromChunkRow = (row: { ordinal: number; text: string; locator: stri
 export const checkNewSourceInfo = (
   info: Omit<SourceInfo, 'state' | 'failure' | 'bytes' | 'chunkCount'>,
 ) => decodeSourceInfo({ ...info, state: 'pending', bytes: 0, chunkCount: 0 });
+
+/** A figure body as stored: text kinds in `text`, images in `blob`. */
+export interface FigureRow {
+  readonly figureId: string;
+  readonly text: string | null;
+  readonly blob: Uint8Array | null;
+}
+
+/**
+ * Checks the figure bodies of a batch against its `FigureAdded` events (plan hinh-va-demo.md A1):
+ * every figure has exactly one body of the declared size and type, and every body has its event.
+ * Throws on the first problem, so a driver writes nothing.
+ */
+export const checkFigures = (
+  events: ReadonlyArray<DomainEvent>,
+  figures: ReadonlyArray<FigureBody>,
+): ReadonlyArray<FigureRow> => {
+  const added = new Map<string, Extract<DomainEvent, { _tag: 'FigureAdded' }>>();
+  for (const event of events) if (event._tag === 'FigureAdded') added.set(event.figureId, event);
+  const seen = new Set<string>();
+  const rows = figures.map((figure): FigureRow => {
+    const event = added.get(figure.figureId);
+    if (event === undefined) throw new Error(`Figure "${figure.figureId}" has no FigureAdded.`);
+    if (seen.has(figure.figureId)) throw new Error(`Figure "${figure.figureId}" appears twice.`);
+    seen.add(figure.figureId);
+    const isText = typeof figure.body === 'string';
+    if (isText !== (event.kind !== 'image')) {
+      throw new Error(`Figure "${figure.figureId}" has the wrong body type.`);
+    }
+    const bytes = figureBodyBytes(figure.body);
+    if (bytes !== event.bytes)
+      throw new Error(`Figure "${figure.figureId}" is not ${event.bytes} bytes.`);
+    if (bytes > figureMaxBytes[event.kind])
+      throw new Error(`Figure "${figure.figureId}" is too large.`);
+    return typeof figure.body === 'string'
+      ? { figureId: figure.figureId, text: figure.body, blob: null }
+      : { figureId: figure.figureId, text: null, blob: figure.body };
+  });
+  for (const figureId of added.keys()) {
+    if (!seen.has(figureId)) throw new Error(`Figure "${figureId}" has no body.`);
+  }
+  return rows;
+};
+
+export const fromFigureRow = (row: {
+  readonly figure_id: unknown;
+  readonly text: unknown;
+  readonly blob: unknown;
+}): FigureBody => ({
+  figureId: String(row.figure_id),
+  body:
+    row.text === null || row.text === undefined
+      ? row.blob instanceof Uint8Array
+        ? row.blob
+        : new Uint8Array(row.blob as ArrayBuffer)
+      : String(row.text),
+});

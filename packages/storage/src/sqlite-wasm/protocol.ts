@@ -1,5 +1,5 @@
 // Messages between the page (index.ts) and the Worker (worker.ts). Structured-clone values only.
-import type { EventRow, SessionRow, SourceRow } from '../sqlite/codec.ts';
+import type { EventRow, FigureRow, SessionRow, SourceRow } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 
 /** An event as stored. */
@@ -10,7 +10,13 @@ export type WireSession = SessionRow;
 
 export type Operation =
   | { readonly op: 'open'; readonly name: string }
-  | { readonly op: 'append'; readonly sessionId: string; readonly events: ReadonlyArray<WireEvent> }
+  | {
+      readonly op: 'append';
+      readonly sessionId: string;
+      readonly events: ReadonlyArray<WireEvent>;
+      readonly figures: ReadonlyArray<FigureRow>;
+    }
+  | { readonly op: 'readFigure'; readonly figureId: string }
   | { readonly op: 'read'; readonly sessionId: string }
   | { readonly op: 'list' }
   | {

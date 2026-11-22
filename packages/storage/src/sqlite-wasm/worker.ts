@@ -16,6 +16,7 @@ import type {
   WireSession,
   WireStoredChunk,
 } from './protocol.ts';
+import type { FigureRow } from '../sqlite/codec.ts';
 
 type Row = Record<string, unknown>;
 type Sqlite3 = ReturnType<typeof SQLite.Factory>;
@@ -103,7 +104,11 @@ async function migrate(): Promise<void> {
   });
 }
 
-async function append(sessionId: string, events: ReadonlyArray<WireEvent>): Promise<AppendReply> {
+async function append(
+  sessionId: string,
+  events: ReadonlyArray<WireEvent>,
+  figures: ReadonlyArray<FigureRow>,
+): Promise<AppendReply> {
   return transaction(async () => {
     const [head] = await run(
       'SELECT COALESCE(MAX(seq), -1) AS last FROM events WHERE session_id = ?',
@@ -115,6 +120,12 @@ async function append(sessionId: string, events: ReadonlyArray<WireEvent>): Prom
       await run(
         'INSERT INTO events (session_id, seq, id, tag, at, payload) VALUES (?, ?, ?, ?, ?, ?)',
         [sessionId, seq, event.id, event.tag, event.at, event.payload],
+      );
+    }
+    for (const figure of figures) {
+      await run(
+        'INSERT INTO figures (owner, figure_id, session_id, text, blob) VALUES (?, ?, ?, ?, ?)',
+        [guestOwner, figure.figureId, sessionId, figure.text, figure.blob],
       );
     }
     return { lastSeq: seq };
@@ -310,7 +321,14 @@ async function handleRequest(request: Request): Promise<unknown> {
     case 'open':
       return open(request.name);
     case 'append':
-      return append(request.sessionId, request.events);
+      return append(request.sessionId, request.events, request.figures);
+    case 'readFigure':
+      return (
+        await run('SELECT figure_id, text, blob FROM figures WHERE owner = ? AND figure_id = ?', [
+          guestOwner,
+          request.figureId,
+        ])
+      )[0];
     case 'read':
       return read(request.sessionId);
     case 'list':

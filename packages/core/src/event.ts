@@ -4,6 +4,7 @@ import { Schema } from 'effect';
 import { LessonPlan, StepId } from './plan.ts';
 import { TeachingProfile } from './profile.ts';
 import { Citation, SourceChunkRef, SourceId, SourceKind, SourceTitle } from './source-schema.ts';
+import { FigureInfo } from './figure.ts';
 
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -171,6 +172,16 @@ export const SourceDetached = Schema.TaggedStruct('SourceDetached', {
   sourceId: SourceId,
 });
 
+/**
+ * A figure the Teacher put in this turn (phase 5 A1). Metadata only: the body is stored next to the
+ * log, in the same batch. The message of the turn holds its marker.
+ */
+export const FigureAdded = Schema.TaggedStruct('FigureAdded', {
+  ...base,
+  turnId: TurnId,
+  ...FigureInfo.fields,
+});
+
 export const DomainEvent = Schema.Union([
   SessionCreated,
   TurnStarted,
@@ -187,6 +198,7 @@ export const DomainEvent = Schema.Union([
   SideTurnFailed,
   SourceAttached,
   SourceDetached,
+  FigureAdded,
 ]);
 export type DomainEvent = typeof DomainEvent.Type;
 

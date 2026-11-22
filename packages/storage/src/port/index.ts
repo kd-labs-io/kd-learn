@@ -10,6 +10,7 @@
 import { Context, Data } from 'effect';
 import type { Effect, Stream } from 'effect';
 import type {
+  FigureBody,
   DomainEvent,
   EventLog,
   KnowledgeEvent,
@@ -138,7 +139,15 @@ export interface StorageService {
   readonly appendEvents: (
     sessionId: string,
     events: ReadonlyArray<DomainEvent>,
+    /**
+     * Bodies of the batch's `FigureAdded` events (phase 5 A1), written in the same transaction.
+     * Every figure needs exactly one body of the declared size; otherwise nothing is written.
+     */
+    figures?: ReadonlyArray<FigureBody>,
   ) => Effect.Effect<AppendResult, StorageError>;
+
+  /** The body of one figure of this owner, or undefined. */
+  readonly readFigure: (figureId: string) => Effect.Effect<FigureBody | undefined, StorageError>;
 
   /** The event log of one session, oldest first. Empty for an unknown session. */
   readonly readSession: (sessionId: string) => Effect.Effect<EventLog, StorageError>;
