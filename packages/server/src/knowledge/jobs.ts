@@ -1,9 +1,12 @@
 // Extraction of account sessions (phase 3 A3). The server starts one right after it writes a batch
-// with `SessionCompleted`, in a daemon fiber like a turn, so closing the tab does not stop it.
+// with `SessionCompleted`, as a durable job (phase 4 A1), so closing the tab does not stop it.
 // The knowledge log is shared by all sessions of a user: one extraction runs at a time per user,
-// the others wait in a queue. `ExtractionStarted` is written when the job is queued (the attempt
-// exists from then on); after a restart, attempts that never ended become `Interrupted`.
-import { Cause, Duration, Effect, Exit, Fiber, Layer, Result } from 'effect';
+// the others wait in the queue of the job runner. `ExtractionStarted` is written when the job is
+// queued (the attempt exists from then on). A job cut by a restart runs again with the same
+// `extractionId`: the result is one batch ending in `SessionExtracted`, which the projection
+// accepts once. An open attempt without a job (written just before a crash, or by phase 3)
+// becomes `Interrupted` at startup.
+import { Cause, Duration, Effect, Layer, Result, Schema } from 'effect';
 import { EXTRACTION_MAX_OUTPUT_TOKENS, runExtraction } from '@kd-learn/agent';
 import type { AiPort } from '@kd-learn/ai/port';
 import { ErrorCode } from '@kd-learn/api';
@@ -22,6 +25,7 @@ import {
 import { appendKnowledgeChecked, type StorageService } from '@kd-learn/storage/port';
 import type { ServerStorage } from '@kd-learn/storage/sqlite-node';
 import type { Logger } from '../handler.ts';
+import type { JobKind, JobRunner } from '../jobs/runner.ts';
 import { activeProfile } from '../profile.ts';
 import { redact, scrubDeep } from '../safety.ts';
 import type { ResolveResult, SettingsService } from '../settings/service.ts';
@@ -43,12 +47,11 @@ export interface ExtractionJobs {
   readonly request: (userId: string, sessionId: string) => ExtractRequestResult;
   /** Every session of the user with its extraction state, newest first. */
   readonly list: (userId: string) => ReadonlyArray<SessionExtraction>;
-  /** Startup: attempts that never ended are written as `Interrupted` (no job survives a restart). */
+  /**
+   * Startup, after `JobRunner.resume`: attempts that never ended and have no job are written as
+   * `Interrupted`.
+   */
   readonly recoverInterrupted: (userIds: ReadonlyArray<string>) => void;
-  /** Resolves when the user has nothing queued or running (tests). */
-  readonly idle: (userId: string) => Promise<void>;
-  /** Interrupts every job (shutdown, tests). Nothing is written for them. */
-  readonly stopAll: () => Promise<void>;
 }
 
 export interface ExtractionJobDeps {
@@ -56,17 +59,18 @@ export interface ExtractionJobDeps {
   readonly settings: SettingsService;
   readonly ai: Layer.Layer<AiPort>;
   readonly log: Logger;
+  readonly jobs: JobRunner;
   readonly newId?: () => string;
   readonly now?: () => number;
   /** Upper bound on one extraction (three model calls). Default 10 minutes. */
   readonly timeoutMs?: number;
 }
 
-interface Queue {
-  running?: { readonly sessionId: string; fiber?: Fiber.Fiber<void> };
-  readonly waiting: Array<{ readonly sessionId: string; readonly extractionId: string }>;
-  readonly idle: Array<() => void>;
-}
+const ExtractionPayload = Schema.Struct({
+  sessionId: Schema.NonEmptyString,
+  extractionId: Schema.NonEmptyString,
+});
+type ExtractionPayload = typeof ExtractionPayload.Type;
 
 const graphOf = (storage: StorageService): KnowledgeGraph => {
   const projected = projectKnowledge(Effect.runSync(storage.readKnowledge));
@@ -81,24 +85,8 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const now = deps.now ?? Date.now;
   const timeoutMs = deps.timeoutMs ?? 10 * 60 * 1000;
-  const queues = new Map<string, Queue>();
-
-  const queueOf = (userId: string): Queue => {
-    let queue = queues.get(userId);
-    if (queue === undefined) {
-      queue = { waiting: [], idle: [] };
-      queues.set(userId, queue);
-    }
-    return queue;
-  };
-  const busy = (userId: string, sessionId: string) => {
-    const queue = queues.get(userId);
-    return (
-      queue !== undefined &&
-      (queue.running?.sessionId === sessionId ||
-        queue.waiting.some((job) => job.sessionId === sessionId))
-    );
-  };
+  const busy = (userId: string, sessionId: string) =>
+    deps.jobs.state(userId, 'extraction', sessionId) !== undefined;
 
   const failed = (
     sessionId: string,
@@ -132,6 +120,10 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
         fields: { ...fields, durationMs: now() - startedAt },
       });
     return Effect.gen(function* () {
+      // Resumed after a restart: run only while this attempt is still open.
+      const attempt = graphOf(storage)
+        .extractions[sessionId]?.attempts.find((a) => a.extractionId === extractionId);
+      if (attempt?.status !== 'started') return;
       const resolved = deps.settings.resolveModel(userId, 'extractor');
       if (resolved._tag !== 'Ok') {
         end({ outcome: 'failed', code: ErrorCode.RoleNotConfigured });
@@ -234,30 +226,21 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
     ) as Effect.Effect<void>;
   };
 
-  const pump = (userId: string) => {
-    const queue = queueOf(userId);
-    if (queue.running !== undefined) return;
-    const next = queue.waiting.shift();
-    if (next === undefined) {
-      queues.delete(userId);
-      queue.idle.splice(0).forEach((resolve) => resolve());
-      return;
-    }
-    const running: NonNullable<Queue['running']> = { sessionId: next.sessionId };
-    queue.running = running;
-    running.fiber = Effect.runFork(
-      job(userId, next.sessionId, next.extractionId).pipe(
-        Effect.onExit((exit) =>
-          Effect.sync(() => {
-            if (queue.running === running) delete queue.running;
-            // Interrupted by `stopAll`: leave the rest for the next start (they become Interrupted).
-            if (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)) return;
-            pump(userId);
-          }),
-        ),
-      ),
-    );
+  const kind: JobKind<ExtractionPayload> = {
+    kind: 'extraction',
+    payload: ExtractionPayload,
+    run: (userId, { sessionId, extractionId }) => job(userId, sessionId, extractionId),
+    abandon: (userId, { sessionId, extractionId }) => {
+      Effect.runSync(
+        writeFailure(deps.storage.forUser(userId), sessionId, extractionId, {
+          code: 'Interrupted',
+          message: 'The server restarted during the extraction.',
+          retryable: true,
+        }),
+      );
+    },
   };
+  deps.jobs.register(kind);
 
   /** Checks, writes `ExtractionStarted` and queues. `auto`: only a session never attempted. */
   const enqueue = (userId: string, sessionId: string, auto: boolean): ExtractRequestResult => {
@@ -300,9 +283,8 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
     if (Result.isFailure(written)) {
       return { _tag: 'NothingToRun', message: 'The extraction cannot start now. Try again.' };
     }
-    queueOf(userId).waiting.push({ sessionId, extractionId });
+    deps.jobs.enqueue(userId, kind, sessionId, { sessionId, extractionId });
     deps.log({ event: 'knowledge.extract.queued', fields: { auto } });
-    pump(userId);
     return { _tag: 'Ok' };
   };
 
@@ -311,9 +293,8 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
     sessionId: string,
     graph: KnowledgeGraph,
   ): { state: ExtractionState; failure?: Failure } => {
-    const queue = queues.get(userId);
-    if (queue?.running?.sessionId === sessionId) return { state: 'running' };
-    if (queue?.waiting.some((job) => job.sessionId === sessionId)) return { state: 'queued' };
+    const job = deps.jobs.state(userId, 'extraction', sessionId);
+    if (job !== undefined) return { state: job };
     const status = extractionStatus(graph, sessionId);
     if (status === 'failed') {
       const failure = graph.extractions[sessionId]?.attempts.at(-1)?.failure;
@@ -384,21 +365,6 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
           deps.log({ event: 'knowledge.recover.failed', fields: {} });
         }
       }
-    },
-
-    idle: (userId) =>
-      queues.has(userId)
-        ? new Promise<void>((resolve) => queueOf(userId).idle.push(resolve))
-        : Promise.resolve(),
-
-    stopAll: async () => {
-      const fibers = [...queues.values()].flatMap((queue) => {
-        queue.waiting.length = 0;
-        return queue.running?.fiber === undefined ? [] : [queue.running.fiber];
-      });
-      await Effect.runPromise(Fiber.interruptAll(fibers));
-      for (const queue of queues.values()) queue.idle.splice(0).forEach((resolve) => resolve());
-      queues.clear();
     },
   };
 };

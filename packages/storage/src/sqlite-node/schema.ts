@@ -101,4 +101,22 @@ export const serverMigrations: ReadonlyArray<ReadonlyArray<string>> = [
   ],
   // v7: knowledge log (phase 3 step 2); `owner` is the user id.
   [...knowledgeEventsTable],
+  // v8: durable background jobs (phase 4 A1). Owned by the job runner of packages/server. A row
+  // exists only while the job has work left (queued or running); its result lives in the domain
+  // data (knowledge log, sources), so a finished job deletes its row. `key` dedupes per user and
+  // kind (e.g. the session id of an extraction). The payload never holds a key.
+  [
+    `CREATE TABLE jobs (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       kind TEXT NOT NULL,
+       key TEXT NOT NULL,
+       payload TEXT NOT NULL,
+       state TEXT NOT NULL CHECK (state IN ('queued', 'running')),
+       attempts INTEGER NOT NULL DEFAULT 0,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       UNIQUE (user_id, kind, key)
+     )`,
+  ],
 ];

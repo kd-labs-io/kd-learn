@@ -297,32 +297,86 @@ describe('account extraction', () => {
     expect(t.tagsOf()).toEqual([]);
   });
 
-  it('after a restart, an open attempt is interrupted and not run again by itself', async () => {
-    const hung = held(structured({ propositions: [], edges: [] }));
-    const before = await setup([hung.program]);
-    before.seed('s1', 'Binary search');
-    await before.account('POST', 'sessions/s1/skip', { stepId: 'n1' });
-    await until(() => before.fake.requests.length === 1);
-
-    // A new process over the same file.
-    const fake = scriptedAi([]);
-    const after = make({}, { ai: fake.layer, dbPath: before.dbPath });
+  /** A new process over the same file, logged in as the first user. */
+  const restart = async (dbPath: string, programs: Parameters<typeof scriptedAi>[0]) => {
+    const fake = scriptedAi(programs);
+    const after = make({}, { ai: fake.layer, dbPath });
     const login = (await (
       await request(after.handlers.login, 'POST', '/api/auth/login', undefined, {
         email: 'a@kd.test',
         password: 'password-123',
       })
     ).json()) as { token: string };
-    const listed = (await (
-      await request(
-        after.handlers.account,
-        'GET',
-        '/api/account/knowledge/extractions',
-        login.token,
-      )
-    ).json()) as { sessions: Array<{ state: string; failure?: { code: string } }> };
-    expect(listed.sessions[0]).toMatchObject({ state: 'failed', failure: { code: 'Interrupted' } });
+    const list = async () =>
+      (
+        (await (
+          await request(
+            after.handlers.account,
+            'GET',
+            '/api/account/knowledge/extractions',
+            login.token,
+          )
+        ).json()) as { sessions: Array<{ state: string; failure?: { code: string } }> }
+      ).sessions;
+    return { fake, list };
+  };
+
+  it('after a restart, a running extraction runs again with the same attempt and completes', async () => {
+    const hung = held(structured({ propositions: [], edges: [] }));
+    const before = await setup([hung.program]);
+    before.seed('s1', 'Binary search');
+    await before.account('POST', 'sessions/s1/skip', { stepId: 'n1' });
+    await until(() => before.fake.requests.length === 1);
+
+    const after = await restart(before.dbPath, extraction('Binary search needs a sorted array.'));
+    await until(() => before.tagsOf().includes('SessionExtracted'));
+    expect(before.tagsOf()).toEqual(['ExtractionStarted', 'PropositionAdded', 'SessionExtracted']);
+    const [started, , extracted] = before.knowledge();
+    expect(started).toMatchObject({ _tag: 'ExtractionStarted', sessionId: 's1' });
+    expect(extracted).toMatchObject({
+      _tag: 'SessionExtracted',
+      extractionId: (started as { extractionId: string }).extractionId,
+    });
+    expect(after.fake.requests).toHaveLength(2);
+    expect((await after.list())[0]).toMatchObject({ state: 'extracted' });
+  });
+
+  it('gives up after three starts cut by restarts: the attempt becomes Interrupted', async () => {
+    const hang = () => held(structured({ propositions: [], edges: [] })).program;
+    const before = await setup([hang()]);
+    before.seed('s1', 'Binary search');
+    await before.account('POST', 'sessions/s1/skip', { stepId: 'n1' });
+    await until(() => before.fake.requests.length === 1);
+    for (let start = 2; start <= 3; start++) {
+      const again = await restart(before.dbPath, [hang()]);
+      await until(() => again.fake.requests.length === 1);
+    }
+    const last = await restart(before.dbPath, []);
+    expect((await last.list())[0]).toMatchObject({
+      state: 'failed',
+      failure: { code: 'Interrupted' },
+    });
     expect(before.tagsOf()).toEqual(['ExtractionStarted', 'ExtractionFailed']);
-    expect(fake.requests).toHaveLength(0);
+    expect(last.fake.requests).toHaveLength(0);
+  });
+
+  it('after a restart, an open attempt without a job is interrupted and not run again', async () => {
+    const before = await setup([]);
+    before.seed('s1', 'Binary search');
+    // Written by phase 3, or just before a crash that left no job row.
+    const db = makeServerStorage(Effect.runSync(openServerDatabase({ path: before.dbPath })));
+    Effect.runSync(
+      db.forUser(before.userId).appendKnowledge(
+        [{ _tag: 'ExtractionStarted', id: 'x1', at: 9, sessionId: 's1', extractionId: 'old' }],
+        { expectedLastSeq: -1 },
+      ),
+    );
+    const after = await restart(before.dbPath, []);
+    expect((await after.list())[0]).toMatchObject({
+      state: 'failed',
+      failure: { code: 'Interrupted' },
+    });
+    expect(before.tagsOf()).toEqual(['ExtractionStarted', 'ExtractionFailed']);
+    expect(after.fake.requests).toHaveLength(0);
   });
 });

@@ -73,7 +73,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
   2. **Tìm:** gọi port tìm kiếm (A6) cho từng truy vấn, gộp và bỏ kết quả trùng URL, giữ tối đa R kết quả (mặc định 8).
   3. **Tổng hợp:** một lần gọi model viết bản tóm tắt có trích dẫn kết quả theo số. Kết quả và nội dung trang là dữ liệu không tin cậy trong prompt ([rủi ro 37](05-rui-ro.md)).
 - Nguồn `web` gồm một đoạn tóm tắt và mỗi kết quả một đoạn (tiêu đề, URL, nội dung lấy được). Gắn vào buổi học như mọi nguồn.
-- **Nội dung kết quả:** dùng nội dung nguồn tìm kiếm trả về (đoạn trích của SearXNG, nội dung của Exa, câu trả lời có trích dẫn của provider). **Không tự tải trang kết quả** trong phase 4, trừ khi spike C2 cho thấy đoạn trích không đủ để dạy; khi đó thêm bộ tải có chặn SSRF ([rủi ro 38](05-rui-ro.md)) như một bước riêng.
+- **Nội dung kết quả:** Exa trả `highlights` đủ dùng. Đoạn trích của SearXNG quá ngắn (spike C2), nên với SearXNG server **tải vài trang đầu** (mặc định 4) bằng bộ tải có chặn SSRF ([rủi ro 38](05-rui-ro.md)): chỉ `http(s)`, chỉ IP công khai (kiểm sau khi phân giải, cả sau mỗi lần chuyển hướng, tối đa 3), trần 2 MiB và 10 s mỗi trang, chỉ `text/html` và `text/plain`, HTML sang chữ. Trang tải hỏng thì giữ đoạn trích. **Chốt ở bước 1 (2026-11-22).**
 - **Vai mới `researcher`** trong `ModelRole` / `AgentRole`, chưa đặt thì dùng model của `teacher` (như A5 phase 3). Prompt lập truy vấn và tổng hợp nằm trong hồ sơ dạy học, trường tuỳ chọn.
 - **Lúc nào chạy:** người học bấm "research" khi tạo buổi (research theo chủ đề và tự gắn nguồn khi xong) hoặc ở màn nguồn (câu hỏi tự do). Buổi học không chờ research: Prober chạy ngay, nguồn có mặt từ lượt sau khi `ready`.
 - **Tài khoản:** job `research` bền (A1). **Khách và demo:** `POST /api/research` không trạng thái, stream SSE như `/api/knowledge/extract`, client ghi nguồn trong một lô. Đóng tab thì nguồn `pending` thành "bị ngắt", có nút chạy lại.
@@ -81,14 +81,14 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 ### A6. Port tìm kiếm
 
 - `packages/search` mới. Port ở `@kd-learn/search/port` (chỉ import `effect`): service `SearchPort` với `search({query, limit, language?}): Effect<ReadonlyArray<SearchResult>, SearchError>`; `SearchResult`: `title`, `url`, `snippet`, `content?`, `publishedAt?`. `SearchError` có kiểu (`Unavailable`, `Unauthorized`, `RateLimited`, `Invalid`), không chứa key.
-- Adapter: `searxng` (API JSON), `exa`, và web search của OpenAI, Anthropic, Gemini. Web search của provider là tool do provider chạy, không phải tool của kd-learn: spike C2 trả lời nó vào `SearchPort` được không (một lần gọi model chỉ để tìm, trả danh sách kết quả), hay cần mở rộng `AiPort`. ACP không có web search qua kd-learn.
+- Adapter: `searxng` (API JSON) và `exa`, cộng bộ tải trang (`fetchPage`) trong cùng package. **Web search của provider bị cắt (bước 1, 2026-11-22):** kết quả của provider chỉ có tiêu đề, URL và nội dung mã hoá, không vừa `SearchPort`; làm sau thì là biến thể của pipeline research, cần mở rộng `AiPort` (D). `SearchError` thêm `PaymentRequired` (Exa 402).
 - Lint: `agent` chỉ import `@kd-learn/search/port` ([mục 3.2](03-kien-truc.md)); thêm `packages/search` vào rule ranh giới và test của rule.
 - **Cấu hình server (admin):**
   - SearXNG: URL chỉ lấy từ env `KD_SEARXNG_URL` (mặc định trỏ tới service trong compose), không sửa từ UI, không nhận từ client ([rủi ro 6](05-rui-ro.md)).
   - Exa: key do admin nhập trong màn admin, mã hoá bằng secret box như key của tài khoản ([rủi ro 22](05-rui-ro.md)).
   - Màn admin bật / tắt từng nguồn của server, chọn nguồn của server cho khách và cho demo (hoặc tắt).
   - **Khách chỉ dùng được SearXNG** của server (tự host, không tốn tiền theo lần gọi), không dùng Exa: khách không có ngân sách như demo. `/api/research` của khách có giới hạn theo IP (cùng cơ chế với giới hạn đăng ký) và tối đa Q truy vấn mỗi lượt ([rủi ro 40](05-rui-ro.md)).
-- **Người dùng:** màn cài đặt (tài khoản và khách) chọn một nguồn cho research: một nguồn của server đang bật cho chế độ đó, hoặc web search của provider đang dùng (chỉ khi provider có).
+- **Người dùng:** màn cài đặt (tài khoản và khách) chọn một nguồn cho research trong các nguồn của server đang bật cho chế độ đó.
 - **Docker Compose:** thêm service `searxng` (image chính thức, ghim phiên bản, chỉ mạng nội bộ, không mở cổng ra ngoài), cấu hình bật định dạng JSON. Tài liệu triển khai (`docs/deploy.md`) nói cách bật / tắt.
 
 ### A7. Hợp đồng và route
@@ -120,7 +120,7 @@ Mọi route tài khoản có test cross-user ([rủi ro 26](05-rui-ro.md)); rout
 ### A9. Demo
 
 - **Nguồn:** PDF và ghi chú xử lý ở client, không tốn ngân sách. Lát nguồn tính vào giới hạn 256 KiB mỗi request.
-- **Research:** chỉ khi admin chọn một nguồn của server cho demo (A6); demo không dùng web search của provider (key của server, chi phí khó đoán). Một lượt research giữ chỗ 2 lần gọi model cộng Q lần tìm, mỗi lần tìm tính là một lần gọi trong ngân sách chung (A8 phase 2). Còn ít hơn số cần giữ thì từ chối ngay, không gọi provider hay nguồn tìm kiếm ([rủi ro 40](05-rui-ro.md)).
+- **Research:** chỉ khi admin chọn một nguồn của server cho demo (A6). Một lượt research giữ chỗ 2 lần gọi model cộng Q lần tìm, mỗi lần tìm tính là một lần gọi trong ngân sách chung (A8 phase 2). Còn ít hơn số cần giữ thì từ chối ngay, không gọi provider hay nguồn tìm kiếm ([rủi ro 40](05-rui-ro.md)).
 - Server dùng hồ sơ của mình cho research như mọi việc khác của demo ([rủi ro 29](05-rui-ro.md)).
 
 ## B. Các bước
@@ -130,11 +130,11 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model 
 | # | Bước | Package | Xong khi |
 | --- | --- | --- | --- |
 | 0 | Spike tách chữ PDF (C1) | spike | Trả lời đủ C1; chốt thư viện, giới hạn kích thước, chỗ chạy trên server; ghi vào [mục 2.4](02-ky-thuat.md) |
-| 1 | Spike tìm kiếm (C2) | spike | Trả lời đủ C2; chốt hình dạng `SearchPort`, cách đưa web search của provider vào, có cần tải trang không |
+| 1 | Spike tìm kiếm (C2) | spike | Trả lời đủ C2; chốt hình dạng `SearchPort`, cách đưa web search của provider vào, có cần tải trang không. **Xong (2026-11-22):** cắt web search của provider, thêm bộ tải trang cho SearXNG |
 | 2 | Spike dạy dựa trên nguồn với Haiku (C3) | spike | Trả lời đủ C3; chốt cỡ đoạn, K, trần byte của lát, định dạng nhãn trích dẫn; đo token thêm mỗi lượt |
 | 3 | Job bền: bảng `jobs`, runner, chạy lại sau khởi động lại có trần, chuyển job extraction sang runner (A1) | storage, server | Test khởi động lại trên cùng file DB: job extraction đang chạy thì chạy lại và xong, `extractionId` giữ nguyên, không có mệnh đề trùng; quá trần thì `Interrupted`; lỗi thật không tự chạy lại; cross-user; test phase 3 vẫn xanh |
 | 4 | Nguồn trong `core` và `storage`: schema nguồn, đoạn, hàm cắt đoạn, `SourceAttached` / `SourceDetached`, `citations`, `sourceChunkIds`, `documents` của mệnh đề; bảng ở cả ba driver, port, `forUser` (A2, A3) | core, storage | Log buổi học và log kiến thức cũ (fixture phase 1–3) vẫn dựng được; bộ test port chạy trên cả ba driver; `completeSource` lần hai bị từ chối; test hai người dùng |
-| 5 | `packages/search`: port, adapter SearXNG, Exa, web search của provider theo C2; lint ranh giới; service SearXNG trong compose; cấu hình admin, key Exa mã hoá (A6) | search, server, config | Test adapter với server HTTP giả (kết quả, lỗi có kiểu, key không lộ trong lỗi); lint chặn `agent` import adapter; `docker compose config` hợp lệ |
+| 5 | `packages/search`: port, adapter SearXNG, Exa, bộ tải trang có chặn SSRF; lint ranh giới; service SearXNG trong compose; cấu hình admin, key Exa mã hoá (A6) | search, server, config | Test adapter với server HTTP giả (kết quả, lỗi có kiểu, key không lộ trong lỗi); bộ tải từ chối IP nội bộ, cả sau chuyển hướng; lint chặn `agent` import adapter; `docker compose config` hợp lệ |
 | 6 | Ingest: ghi chú ở client, PDF trong Worker (khách / demo) và job `ingest` (tài khoản), route tải lên có giới hạn (A4) | web, server, api | Test: PDF mẫu (có chữ tiếng Việt, nhiều trang) cho cùng đoạn ở cả hai chế độ; PDF scan thành `NoText`; file quá lớn bị từ chối khi đang đọc; khởi động lại giữa ingest thì chạy lại và xong; khách đóng tab thì nguồn "bị ngắt", chạy lại được |
 | 7 | Dạy dựa trên nguồn: chọn lát, prompt, trích dẫn, `sourceSlice` của khách, extraction gán `documents` (A3) | core, agent, server, api | Với `AiPort` giả: lát đúng trần byte, nhãn ngoài lát bị bỏ, `citations` trỏ đúng đoạn; extraction gán `documents` chỉ trong các đoạn đã dùng; demo vượt 256 KiB thì 413 |
 | 8 | Research: pipeline trong `agent`, route khách / demo, job tài khoản, ngân sách demo, vai `researcher` (A5, A9) | agent, server, api, web | Với `AiPort` và `SearchPort` giả: ra nguồn `web` đúng schema; job tài khoản sống sót khi khởi động lại; demo trừ đúng số lần gọi, thiếu ngân sách thì không gọi provider hay nguồn tìm kiếm; khách không dùng được nguồn của server khi admin tắt |
@@ -181,6 +181,7 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 ## D. Ngoài phạm vi phase 4
 
 - Trích thẳng tài liệu vào graph không qua buổi học.
+- Web search của OpenAI, Anthropic, Gemini (cắt ở bước 1, A6).
 - OCR cho PDF scan, đọc ảnh và bảng trong PDF bằng model có thị giác.
 - Import thư mục hay file nén (vault Obsidian, Notion export), đồng bộ ghi chú hai chiều.
 - Embedding và tìm theo nghĩa cho lát nguồn (vẫn theo từ vựng như A4 phase 3), trừ khi C3 cho thấy bắt buộc.
