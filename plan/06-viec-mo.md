@@ -13,4 +13,4 @@
 
 ## 7. Bước tiếp theo
 
-Phase 4 (nguồn học + việc nền, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: viết plan phần chính phase 4 (quyết định nền, các bước, câu hỏi spike, như [archive/luyen-tap-graph.md](archive/luyen-tap-graph.md) của phase 3): PDF, import ghi chú, research web với port tìm kiếm, job của tài khoản sống sót khi server khởi động lại. Bắt đầu làm thì tạo `progress/phase-4.md`.
+Phase 4 (nguồn học + việc nền, [mục 4](04-phases.md)): plan phần chính ở [nguon-hoc.md](nguon-hoc.md). Bước hiện tại: các spike bước 0 (tách chữ PDF, C1), 1 (tìm kiếm, C2), 2 (dạy dựa trên nguồn, C3), làm song song với bước 3 (job bền). Tiến độ ở [progress/phase-4.md](progress/phase-4.md).
