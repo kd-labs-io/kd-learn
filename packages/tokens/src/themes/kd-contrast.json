@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "name": "kd-contrast",
+  "colors": {
+    "light": {
+      "bg": "#FFFFFF",
+      "surface": "#F3F3F1",
+      "border": "#8A8A85",
+      "text": "#000000",
+      "text-muted": "#333331",
+      "text-subtle": "#5C5C58",
+      "accent": "#B84A1F",
+      "accent-strong": "#7F2F0F",
+      "on-accent": "#FFFFFF",
+      "success": "#22472A",
+      "warning": "#5C3F0C",
+      "danger": "#821F18",
+      "info": "#22446A",
+      "focus-ring": "#7F2F0F"
+    },
+    "dark": {
+      "bg": "#000000",
+      "surface": "#121212",
+      "border": "#77776F",
+      "text": "#FFFFFF",
+      "text-muted": "#DADAD5",
+      "text-subtle": "#ABABA5",
+      "accent": "#FF9A73",
+      "accent-strong": "#FFB89C",
+      "on-accent": "#000000",
+      "success": "#A6DDAB",
+      "warning": "#F4C97A",
+      "danger": "#FFA49C",
+      "info": "#AFCFF2",
+      "focus-ring": "#FFB89C"
+    }
+  },
+  "fonts": {
+    "heading": "Source Serif 4",
+    "body": "Inter",
+    "code": "JetBrains Mono"
+  },
+  "typeScale": {
+    "xs": {
+      "size": 12,
+      "lineHeight": 16
+    },
+    "sm": {
+      "size": 14,
+      "lineHeight": 20
+    },
+    "base": {
+      "size": 16,
+      "lineHeight": 26
+    },
+    "lg": {
+      "size": 18,
+      "lineHeight": 28
+    },
+    "xl": {
+      "size": 22,
+      "lineHeight": 30
+    },
+    "2xl": {
+      "size": 28,
+      "lineHeight": 36
+    },
+    "3xl": {
+      "size": 36,
+      "lineHeight": 44
+    }
+  },
+  "radius": {
+    "sm": 6,
+    "md": 10,
+    "lg": 16
+  },
+  "shadow": {
+    "sm": {
+      "offsetY": 1,
+      "blur": 2,
+      "opacity": 0.06
+    },
+    "md": {
+      "offsetY": 4,
+      "blur": 12,
+      "opacity": 0.08
+    },
+    "lg": {
+      "offsetY": 12,
+      "blur": 32,
+      "opacity": 0.1
+    }
+  }
+}

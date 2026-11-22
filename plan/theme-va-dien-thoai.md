@@ -30,7 +30,7 @@ Ba quyết định sản phẩm chốt ngày 2026-11-22:
   - `kd`: mặc định, light theo `DESIGN.md`, dark mới (nền ấm tối, cùng tông terracotta). Bảng dark ghi vào mục "Dark mode" của `DESIGN.md`.
   - `kd-contrast`: tương phản cao (mục tiêu AAA 7:1 cho chữ chính), cho người cần đọc rõ.
   - `ocean`: tông lạnh (xanh), để chứng minh đổi theme đổi cả accent mà không vỡ gì.
-- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ có tuple light / dark. Theme khác áp lúc chạy bằng biến inline như hiện nay (đã kiểm ở [rủi ro 12](05-rui-ro.md)).
+- **Theme tĩnh của Astryx** (`kdTheme.ts`) vẫn build từ `kd`, giờ mỗi màu là `light-dark()`. Theme khác áp lúc chạy bằng một thẻ `<style>` trong layer `product`, chọn `[data-astryx-theme]` (cả `<html>` lẫn wrapper), không còn là biến inline trên một phần tử: spike C1 thấy biến inline không tới được popover, toast (portal nằm ngoài wrapper). Giá trị đã qua schema (hex, độ dài) nên dựng CSS từ chúng an toàn ([rủi ro 11](05-rui-ro.md)). Thẻ này render giống nhau ở SSR và client (từ cookie, A3).
 - Tên hiện cho người dùng nằm ở i18n (`packages/i18n/messages/`), không ở JSON của theme.
 
 ### A3. Chế độ và lựa chọn của người dùng
@@ -87,6 +87,16 @@ Mỗi bước một PR (bước lớn có thể tách), `turbo typecheck lint te
 ## C. Câu hỏi cho spike
 
 ### C1. Dark mode của Astryx
+
+**Kết quả (2026-11-22, bản build SSR, Playwright 1.65 trên Chromium, Firefox, WebKit):**
+
+1. Theme tĩnh với mọi màu là `light-dark()`: đúng màu ở `light`, `dark` và `system` (theo `prefers-color-scheme` giả lập) ở cả ba; Astryx đặt `data-theme` trên `<html>` (bỏ thuộc tính khi `system`, `color-scheme: light dark`). Phần tử gắn thẳng vào `<body>` (như portal) cũng theo, vì `data-astryx-theme` có trên `<html>`.
+2. Biến inline trên wrapper chỉ tới phần tử bên trong; phần tử ở `<body>` vẫn lấy màu của theme tĩnh. Chốt: theme lúc chạy là thẻ `<style>` trong layer `product` (A2).
+3. Bản SSR luôn gửi `data-theme="light"` (viết cứng), `Theme` của Astryx đổi sau khi mount: loé ở dark. Đổi thuộc tính này không gây lỗi hydrate. Cookie ở A3 giữ nguyên.
+4. Làm ở bước 3 (script trước lần vẽ đầu của SPA).
+5. Màu cú pháp mặc định của Astryx (`--color-syntax-*`) trỏ vào token ngữ nghĩa (`var(--color-text-accent)`, ...), nên khối code tự theo chế độ; không cần theme cú pháp riêng.
+6. `light-dark()` trong `color-mix()` và trong màu của `box-shadow` chạy ở cả ba.
+7. Lỗi React #418 thấy trên Chromium ở mọi lần tải `/login`, không thấy trên Firefox và WebKit (bước 5).
 
 1. Theme tĩnh build với tuple `[light, dark]`: component Astryx đổi màu đúng khi `mode` là `light`, `dark`, `system`? Popover, toast (portal ngoài wrapper) có theo không?
 2. Theme lúc chạy (biến inline `light-dark(...)` trên phần tử trong wrapper) có thắng biến của theme tĩnh ở cả hai chế độ không (như [rủi ro 12](05-rui-ro.md) ở light)?

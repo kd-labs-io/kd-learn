@@ -64,4 +64,23 @@ This file defines the default theme. The token names above are the contract for 
 
 ## Dark mode
 
-Deferred until after the core phases. All colors go through tokens so it can be added without touching components.
+Every theme has a light and a dark color set with the same token names. The mode is `system` (follows the OS), `light` or `dark`. Default dark set:
+
+| Token | Value |
+| --- | --- |
+| `bg` | `#1A1915` |
+| `surface` | `#262520` |
+| `border` | `#3A3832` |
+| `text` | `#F0EEE6` |
+| `text-muted` | `#B5B2A8` |
+| `text-subtle` | `#8A877E` |
+| `accent` | `#D97757` |
+| `accent-strong` | `#E8906F` |
+| `on-accent` | `#1A1915` |
+| `success` | `#82B988` |
+| `warning` | `#D9A757` |
+| `danger` | `#EC8078` |
+| `info` | `#8AAFD6` |
+| `focus-ring` | `#E8906F` |
+
+The same AA rule holds in both sets. Dark shadows are black at twice the light opacity.

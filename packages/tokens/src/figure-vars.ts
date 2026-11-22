@@ -1,16 +1,17 @@
 import type { FigureColorToken } from '@kd-learn/core';
-import type { Theme } from './schema.ts';
+import type { ColorMode, Theme } from './schema.ts';
 
 /** The `--kd-*` colors a figure may use (plan hinh-va-demo.md A3, A8), as CSS custom properties. */
 export type FigureVars = Readonly<Record<`--kd-${FigureColorToken}`, string>>;
 
 /**
- * Picks the figure colors from a theme. Plain colors only (no `var()`, no `color-mix`): the values
- * go into SVG blobs, a sandboxed frame and Mermaid's theme, none of which see the app's variables.
- * The six categorical colors reuse the accent and status colors, so every theme has them.
+ * Picks the figure colors of a theme in one resolved mode. Plain colors only (no `var()`, no
+ * `light-dark()`, no `color-mix`): the values go into SVG blobs, a sandboxed frame and Mermaid's
+ * theme, none of which see the app's variables. The six categorical colors reuse the accent and
+ * status colors, so every theme has them.
  */
-export const figureVars = (theme: Theme): FigureVars => {
-  const c = theme.colors;
+export const figureVars = (theme: Theme, mode: ColorMode): FigureVars => {
+  const c = theme.colors[mode];
   return {
     '--kd-fg': c.text,
     '--kd-bg': c.bg,

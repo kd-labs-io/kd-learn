@@ -30,7 +30,7 @@ declare global {
 
 function DevFigures() {
   const [shown, setShown] = useState<Shown>();
-  const [vars, setVars] = useState<FigureVars>(figureVars(defaultTheme));
+  const [vars, setVars] = useState<FigureVars>(figureVars(defaultTheme, 'light'));
   useEffect(() => {
     window.__kdFigures = {
       show: setShown,

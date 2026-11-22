@@ -47,7 +47,7 @@ export const figureVarsOf = (theme: Theme | null) => {
   const current = theme ?? defaultTheme;
   let vars = varsCache.get(current);
   if (vars === undefined) {
-    vars = figureVars(current);
+    vars = figureVars(current, 'light');
     varsCache.set(current, vars);
   }
   return vars;
