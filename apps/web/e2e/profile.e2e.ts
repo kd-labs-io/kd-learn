@@ -60,6 +60,8 @@ test('duplicate the default profile, edit a prompt, and a new session snapshots 
   await n.fill('5');
   await n.blur();
   await expect(page.getByTestId('profile-invalid')).toHaveCount(0);
+  // Figures (phase 5): demos off.
+  await page.getByTestId('profile-figures-demos').getByRole('switch').click();
   await page.getByTestId('profile-save').click();
   await expect(page.getByTestId('profile-message')).toContainText('Profile saved');
   await expect(page.getByTestId('profile-reset')).toBeVisible();
@@ -81,6 +83,7 @@ test('duplicate the default profile, edit a prompt, and a new session snapshots 
   expect(created.profile.prompts.prober).toContain('MARKER-GUEST');
   expect(created.profile.prompts.teacher).toBe('Teach step by step.');
   expect(created.profile.maxProbeQuestions).toBe(5);
+  expect(created.profile.figures).toEqual({ diagrams: true, demos: false, images: true });
 
   // Back to default: the read-only view again.
   await page.goto('/profile');

@@ -5,6 +5,7 @@ import { clientOptions } from '../account/api';
 import { signOut } from '../account/auth';
 import { useAccountLessonSources } from '../sources/library';
 import { getAccountLesson } from './account-lesson';
+import { accountFigureLoader } from './figures';
 import { LearnScreen } from './LearnScreen';
 
 export function AccountLessonScreen({ token, sessionId }: { token: string; sessionId: string }) {
@@ -28,6 +29,7 @@ export function AccountLessonScreen({ token, sessionId }: { token: string; sessi
         elsewhere: false,
         persistent: true,
         sources,
+        loadFigure: accountFigureLoader(token),
       }}
       onHome={() => void navigate({ to: '/' })}
       onSettings={() => void navigate({ to: '/settings' })}

