@@ -1,0 +1,7 @@
+#!/bin/sh
+# Format check on staged files only (fast). Fix with `pnpm format`; skip with `git commit --no-verify`.
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$files" ] && exit 0
+git diff --cached --name-only -z --diff-filter=ACMR |
+  xargs -0 pnpm exec prettier --check --ignore-unknown --log-level warn ||
+  { echo "pre-commit: run \`pnpm format\` and stage the result." >&2; exit 1; }

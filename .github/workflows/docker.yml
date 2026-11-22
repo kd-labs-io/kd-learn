@@ -1,0 +1,36 @@
+name: Docker
+
+# The Compose stack (plan step 9): build the image, healthcheck, first admin signs in, data
+# survives down and up. Runs only when the image or what it depends on most changes, plus nightly
+# and on demand.
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - deploy/**
+      - scripts/compose-smoke.sh
+      - pnpm-lock.yaml
+      - .node-version
+      - packages/server/**
+      - packages/storage/**
+      - apps/web/vite.config.*
+      - .github/workflows/docker.yml
+  pull_request:
+    paths: *paths
+  schedule:
+    - cron: '0 19 * * *' # 02:00 Asia/Ho_Chi_Minh
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: ./scripts/compose-smoke.sh

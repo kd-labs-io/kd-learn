@@ -130,4 +130,4 @@ The database is migrated at start. Take a backup first.
 
 ## Checking the stack
 
-`scripts/compose-smoke.sh` builds the image and starts a throwaway stack on port 3999. It waits for the healthcheck, signs in as the first admin, checks that data survives `down` and `up`, runs the backup and restore commands above, and checks that the admin password is not in the log. CI runs it on every pull request.
+`scripts/compose-smoke.sh` builds the image and starts a throwaway stack on port 3999. It waits for the healthcheck, signs in as the first admin, checks that data survives `down` and `up`, runs the backup and restore commands above, and checks that the admin password is not in the log. CI runs it nightly, on demand, and on every push or pull request that changes the image, the server or storage (`.github/workflows/docker.yml`).

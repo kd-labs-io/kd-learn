@@ -1,0 +1,14 @@
+#!/bin/sh
+# Typecheck, lint and unit tests of the packages changed by this push (turbo --affected, cached).
+# Playwright and the Docker smoke test run in CI. Skip with `git push --no-verify`.
+set -e
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # branch deletion
+  base=$remote_sha
+  if [ "$base" = "$zero" ] || ! git cat-file -e "$base" 2>/dev/null; then
+    base=$(git merge-base origin/main "$local_sha")
+  fi
+  TURBO_SCM_BASE=$base TURBO_SCM_HEAD=$local_sha \
+    pnpm exec turbo typecheck lint test --affected --output-logs=errors-only
+done

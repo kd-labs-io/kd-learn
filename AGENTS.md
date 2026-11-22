@@ -4,7 +4,8 @@
 - Chat: reply in the conversation's language.
 - Code, names, comments: English.
 - `plan/**`, `proble/**` : using language in the file.
-- MVP, solo developer: when a PR's CI is green and you are confident in the change, merge it into `main` without asking.
+- MVP, solo developer: commit and push straight to `main` (no PR) once the pre-push hook passes. Open a PR, and merge it yourself when CI is green, only for changes that are hard to undo: storage schema or migrations, auth and accounts, Docker or deploy, major dependency upgrades. Never run parallel branches on the same area. If CI on `main` goes red, fix it before anything else.
+- Tests: unit tests for logic (storage, server, api, grading, scheduling). Pure UI or styling changes need no new test; check them with the `ux-check` skill. A test broken by an intended UI change gets fixed or deleted right away. Add an e2e test to the smoke set (`apps/web` `test:e2e:smoke`) only for a critical flow.
 
 ## Directories
 

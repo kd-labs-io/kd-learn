@@ -1,13 +1,25 @@
 name: CI
 
+# Fast tier on every push to main and every pull request: format, build, typecheck, lint, unit
+# tests, server-bundle check and a Playwright smoke set (Chromium). The full Playwright suite and
+# the SPA build run nightly and on demand (workflow_dispatch), e.g. before closing a phase.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 19 * * *' # 02:00 Asia/Ho_Chi_Minh
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -15,15 +27,23 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm exec turbo build test lint typecheck
       # The browser-only SQLite driver must not end up in the server bundle (plan step 5).
       - run: pnpm --filter @kd-learn/web check:server-bundle
-      # Browser tests of the local DB against the SSR build above. Chromium only in CI; Firefox
-      # runs locally, Playwright's WebKit has no OPFS (see plan/progress/phase-1.md).
+      # Browser tests against the SSR build above. Chromium only in CI; Firefox runs locally,
+      # Playwright's WebKit has no OPFS (see plan/archive/phase-1.md).
       - run: pnpm --filter @kd-learn/web exec playwright install --with-deps chromium
-      - run: pnpm --filter @kd-learn/web exec playwright test --project=chromium --project=pixel
+      - if: env.FULL != 'true'
+        run: pnpm --filter @kd-learn/web test:e2e:smoke
+      - if: env.FULL == 'true'
+        run: pnpm --filter @kd-learn/web exec playwright test --project=chromium --project=pixel
       - uses: actions/upload-artifact@v5
         if: failure()
         with:
@@ -31,12 +51,5 @@ jobs:
           path: apps/web/test-results
           if-no-files-found: ignore
       # The static SPA build is what Capacitor wraps (plan 2.4).
-      - run: pnpm --filter @kd-learn/web build:spa
-
-  # The Compose stack (plan step 9): build the image, healthcheck, first admin signs in, data
-  # survives down and up.
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - run: ./scripts/compose-smoke.sh
+      - if: env.FULL == 'true'
+        run: pnpm --filter @kd-learn/web build:spa

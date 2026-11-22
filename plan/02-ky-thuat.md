@@ -11,7 +11,7 @@
 | Test | Vitest. Test trình duyệt (DB local, sau này luồng UI): Playwright (`@playwright/test`, `apps/web/e2e`, đuôi `*.e2e.ts` để Vitest không nhặt), chạy trên bản build SSR; CI chỉ cài Chromium (chốt ở bước 5 phase 1, [archive/phase-1.md](archive/phase-1.md)) |
 | Lint | ESLint, gồm rule chặn import theo package (ranh giới ở [mục 3.2](03-kien-truc.md)) |
 | Format | Prettier |
-| CI | GitHub Actions chạy `turbo build test lint` |
+| CI | Không mở PR cho thay đổi thường: hook pre-commit (prettier trên file staged) và pre-push (`turbo typecheck lint test --affected`) ở `.githooks/`. GitHub Actions mỗi lần push hoặc PR: `turbo build test lint typecheck` và bộ e2e smoke (`test:e2e:smoke`, Chromium). Toàn bộ e2e, build SPA và Docker smoke chạy hằng đêm và khi bấm tay (`workflow_dispatch`); Docker smoke chạy thêm khi đổi image, `server` hoặc `storage` |
 | Web | TanStack Start. API là route HTTP thường viết bằng Effect, không dùng server function. Bản server Node build qua Nitro (`.output/`); bản SPA build bằng `KD_BUILD_TARGET=spa` (`dist/client/`) |
 | Mobile | Capacitor bọc bản build SPA của web. Dùng chung một bộ UI với web, không dùng Expo |
 | UI | [Astryx](https://astryx.atmeta.com) (MIT, React 19, đang beta) với theme riêng dựng từ `DESIGN.md`. Component riêng của kd-learn viết bằng StyleX dùng token có kiểu, qua plugin Vite của `@astryxdesign/build`; nếu không chạy được thì lùi về CSS Modules + `var(--...)`. Không dùng Tailwind và shadcn. Hạn chế `swizzle` |

@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint .",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test e2e/hydration.e2e.ts e2e/learn.e2e.ts e2e/practice.e2e.ts e2e/accounts.e2e.ts --project=chromium",
     "shots": "playwright test --config playwright.shots.config.ts",
     "check:server-bundle": "node scripts/check-server-bundle.mjs"
   },
