@@ -103,3 +103,11 @@
 - Ranh giới lint: `agent` không import được `@kd-learn/ai/image` (có test).
 - Chưa nối vào server: vai `illustrator`, khách và demo làm ở 9b, 9c.
 
+## Bước 9b: vai `illustrator` cho tài khoản (2026-11-22)
+
+- `ModelRole` thêm `illustrator`, không có trong `roleFallback`: không đặt là không có ảnh. `setRoles` chỉ nhận Gemini hoặc endpoint tương thích OpenAI có `images: true` (cờ mới trong `KD_OPENAI_COMPATIBLE_ENDPOINTS`, hiện ở `GET /api/endpoints`); Anthropic, ACP và endpoint chỉ có chữ bị từ chối `409 RoleNotSupported`. `resolveImageModel` kiểm lại mỗi lượt (operator có thể bỏ `images` sau).
+- Sửa kèm: `modelRoles` của server trước đây thiếu `researcher`, nên vai này bị bỏ khi lưu và luôn dùng model của Teacher. Nay lấy từ `ModelRole.literals`.
+- Runner: mỗi lượt chính dựng `FigureOptions.image` từ illustrator của người dùng và `ImagePort` (mặc định adapter HTTP). Key ảnh là bí mật của lượt: `redact`, `scrubDeep`, `scrubFrame`, bộ lọc rò rỉ nay nhận nhiều key.
+- UI: vai "Hình ảnh" trong cài đặt, chỉ liệt kê kết nối tạo được ảnh, có gợi ý chi phí; nút "dùng lựa chọn của Prober cho mọi vai" không chép sang illustrator. Ảnh trong bài có nút phóng to (A8).
+- Test: settings (từ chối, không fallback, operator tắt `images`), lượt dạy tạo ảnh qua HTTP (byte, `UsageRecorded` của model ảnh, key ảnh không có trong log và event), e2e tài khoản với endpoint ảnh giả (PNG 16x16), tải lại vẫn còn.
+

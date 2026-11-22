@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Effect, Schema } from 'effect';
 import type { Layer } from 'effect';
-import type { AiPort } from '@kd-learn/ai/port';
+import type { AiPort, ImagePort } from '@kd-learn/ai/port';
 import {
   AuthResponse,
   CreateInviteRequest,
@@ -82,6 +82,8 @@ export const initAccounts = async (
   options: {
     readonly endpoints: () => ReadonlyArray<Endpoint>;
     readonly ai: Layer.Layer<AiPort>;
+    /** Image generation for the illustrator role (phase 5 A6). Absent: no images. */
+    readonly images?: ImagePort['Service'];
     /** The ACP adapter; tests pass a fake. */
     readonly acp?: Layer.Layer<AiPort>;
     readonly turnTimeoutMs?: number;
@@ -179,6 +181,7 @@ export const initAccounts = async (
     log: options.log,
     onSessionCompleted: extractions.sessionCompleted,
     figures: () => ({ cdn: admin.switches().figureCdn }),
+    ...(options.images === undefined ? {} : { images: options.images }),
     ...(options.turnTimeoutMs === undefined ? {} : { turnTimeoutMs: options.turnTimeoutMs }),
   });
   late.sessions = sessions;

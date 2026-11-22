@@ -17,7 +17,7 @@ import { runSideChat, runTurn } from '@kd-learn/agent';
 import { activeProfile } from '../profile.ts';
 import type { AgentOutput, FigureOptions, InvalidTurn } from '@kd-learn/agent';
 import { shouldAutoStart } from '@kd-learn/agent/client';
-import type { AiPort, ModelRef } from '@kd-learn/ai/port';
+import type { AiPort, ImagePort, ModelRef } from '@kd-learn/ai/port';
 import type { Failure, ModelRole, RunningTurn, StartTurnRequest } from '@kd-learn/api';
 import { ErrorCode } from '@kd-learn/api';
 import {
@@ -31,7 +31,7 @@ import type { DomainEvent, EventLog, FigureBody, Session, SourceSlice } from '@k
 import type { SessionSummary, StorageService } from '@kd-learn/storage/port';
 import type { ServerStorage } from '@kd-learn/storage/sqlite-node';
 import type { Logger } from '../handler.ts';
-import { redact, scrubDeep } from '../safety.ts';
+import { redact, scrubDeep, type Secrets } from '../safety.ts';
 import type { ResolveResult, SettingsService } from '../settings/service.ts';
 
 export type TurnKind = 'main' | 'side';
@@ -119,6 +119,8 @@ export interface RunnerDeps {
   readonly onSessionCompleted?: (userId: string, sessionId: string) => void;
   /** Figure tools of teaching turns (phase 5). Absent: none. */
   readonly figures?: () => FigureOptions;
+  /** Makes images when the user set an illustrator (phase 5 A6). Absent: no images. */
+  readonly images?: ImagePort['Service'];
 }
 
 interface Live {
@@ -219,7 +221,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     outputs: Stream.Stream<AgentOutput, InvalidTurn, AiPort>,
     live: Live,
     entry: Entry,
-    key: string | undefined,
+    key: Secrets,
   ): Effect.Effect<Collected> => {
     const events: DomainEvent[] = [];
     const figures: FigureBody[] = [];
@@ -304,7 +306,7 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     sessionId: string,
     collected: Collected,
     closing: (failure: Failure) => DomainEvent,
-    key: string | undefined,
+    key: Secrets,
   ): Failure | undefined => {
     let batch = scrubDeep([...collected.events], key);
     let error = collected.error === undefined ? undefined : scrubDeep(collected.error, key);
@@ -387,6 +389,30 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
 
   const keyOfModel = (model: ModelRef) => ('apiKey' in model ? model.apiKey : undefined);
 
+  /**
+   * Figure options of a main turn, with the user's illustrator when there is one (phase 5 A6), and
+   * the image key so it can be kept out of what leaves the server.
+   */
+  const figuresOf = (
+    userId: string,
+  ): { readonly figures?: FigureOptions; readonly imageKey?: string } => {
+    if (deps.figures === undefined) return {};
+    const base = deps.figures();
+    const images = deps.images;
+    const model = images === undefined ? undefined : deps.settings.resolveImageModel(userId);
+    if (images === undefined || model === undefined) return { figures: base };
+    return {
+      imageKey: model.apiKey,
+      figures: {
+        ...base,
+        image: {
+          model: model.model,
+          generate: (prompt, aspect) => images.generate({ model, prompt, aspect }),
+        },
+      },
+    };
+  };
+
   /** `SourceAttached` for each id, or undefined when one is not a source of this user. */
   const attachEvents = (
     storage: StorageService,
@@ -438,14 +464,16 @@ export const makeSessionRunner = (deps: RunnerDeps): SessionRunner => {
     const program = Effect.gen(function* () {
       let current = { turnId: opened.turnId, log: opened.log, model: opened.model };
       for (;;) {
-        const key = keyOfModel(current.model);
+        const { figures, imageKey } = figuresOf(userId);
+        // The image key is a secret of the turn too (risk 19).
+        const key = [keyOfModel(current.model), imageKey];
         const collected = yield* consume(
           runTurn({
             log: current.log,
             model: current.model,
             newId,
             sourceSlice: sourceSliceOf(storage, current.log),
-            ...(deps.figures === undefined ? {} : { figures: deps.figures() }),
+            ...(figures === undefined ? {} : { figures }),
           }),
           live,
           entry,

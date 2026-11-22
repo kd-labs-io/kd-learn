@@ -2,14 +2,13 @@
 // role → (connection, model) map. Every query filters by owner. A key is decrypted only in
 // `resolveModel`, for a turn, and never returned by any other function.
 import { randomUUID } from 'node:crypto';
-import type { ModelRef } from '@kd-learn/ai/port';
-import { roleFallback } from '@kd-learn/api';
+import type { ImageModelRef, ModelRef } from '@kd-learn/ai/port';
+import { ModelRole, roleFallback } from '@kd-learn/api';
 import type {
   AcpAgent,
   AcpModels,
   ConnectionInfo,
   CreateConnectionRequest,
-  ModelRole,
   RoleModel,
   RoleModels,
 } from '@kd-learn/api';
@@ -17,13 +16,7 @@ import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import type { Endpoint } from '../config.ts';
 import type { SecretBox } from './secret-box.ts';
 
-export const modelRoles: ReadonlyArray<ModelRole> = [
-  'prober',
-  'teacher',
-  'sideChat',
-  'practitioner',
-  'extractor',
-];
+export const modelRoles: ReadonlyArray<ModelRole> = ModelRole.literals;
 
 export type CreateConnectionResult =
   | { readonly _tag: 'Ok'; readonly connection: ConnectionInfo }
@@ -34,7 +27,9 @@ export type SetRolesResult =
   | { readonly _tag: 'Ok' }
   | { readonly _tag: 'UnknownConnection' }
   /** An ACP role names a model the admin does not allow for that agent (risk 30). */
-  | { readonly _tag: 'ModelNotAllowed'; readonly role: ModelRole };
+  | { readonly _tag: 'ModelNotAllowed'; readonly role: ModelRole }
+  /** The illustrator needs Gemini or an endpoint with images (phase 5 A6). */
+  | { readonly _tag: 'RoleNotSupported'; readonly role: ModelRole };
 
 export type ResolveResult =
   | { readonly _tag: 'Ok'; readonly model: ModelRef }
@@ -69,6 +64,11 @@ export interface SettingsService {
    * the role that was asked for.
    */
   readonly resolveModel: (userId: string, role: ModelRole) => ResolveResult;
+  /**
+   * The illustrator's image model with its key (phase 5 A6), or undefined when the role is unset or
+   * its connection cannot make images (any more). Only for running a turn; never log it.
+   */
+  readonly resolveImageModel: (userId: string) => ImageModelRef | undefined;
 }
 
 interface ConnectionRow {
@@ -109,6 +109,11 @@ export const makeSettings = (
   now: () => number = Date.now,
 ): SettingsService => {
   const { db } = database;
+  /** Gemini, or an OpenAI-compatible endpoint the operator marked as serving images. */
+  const makesImages = (row: ConnectionRow) =>
+    row.provider === 'gemini' ||
+    (row.provider === 'openai-compatible' &&
+      endpoints().some((e) => e.id === row.endpoint_id && e.images));
   const q = {
     connections: db.prepare(
       `SELECT id, label, provider, endpoint_id, agent, key_sealed, key_version, key_last4, created_at
@@ -150,7 +155,7 @@ export const makeSettings = (
     return map;
   };
 
-  return {
+  const settings: SettingsService = {
     get: (userId) => ({
       connections: (q.connections.all(userId) as unknown as ConnectionRow[]).map(toInfo),
       roles: rolesOf(userId),
@@ -206,6 +211,7 @@ export const makeSettings = (
               if (row.provider === 'acp' && !modelAllowed(row.agent as AcpAgent, choice.model)) {
                 throw new ModelNotAllowed(role);
               }
+              if (role === 'illustrator' && !makesImages(row)) throw new RoleNotSupported(role);
               q.putRole.run(userId, role, choice.connectionId, choice.model);
             }
             return { _tag: 'Ok' };
@@ -214,6 +220,9 @@ export const makeSettings = (
           if (error instanceof UnknownConnection) return { _tag: 'UnknownConnection' } as const;
           if (error instanceof ModelNotAllowed) {
             return { _tag: 'ModelNotAllowed', role: error.role } as const;
+          }
+          if (error instanceof RoleNotSupported) {
+            return { _tag: 'RoleNotSupported', role: error.role } as const;
           }
           throw error;
         }
@@ -263,10 +272,34 @@ export const makeSettings = (
         }
       }
     },
+
+    resolveImageModel: (userId) => {
+      // No fallback: `roleFallback` has no illustrator, so an unset role resolves to nothing.
+      const choice = q.role.get(userId, 'illustrator') as { connection_id: string } | undefined;
+      const row =
+        choice === undefined
+          ? undefined
+          : (q.connection.get(userId, choice.connection_id) as unknown as
+              ConnectionRow | undefined);
+      // Checked per turn: the operator may take `images` off an endpoint later.
+      if (row === undefined || !makesImages(row)) return undefined;
+      const resolved = settings.resolveModel(userId, 'illustrator');
+      if (resolved._tag !== 'Ok') return undefined;
+      const model = resolved.model;
+      return model.provider === 'gemini' || model.provider === 'openai-compatible'
+        ? model
+        : undefined;
+    },
   };
+  return settings;
 };
 
 class UnknownConnection extends Error {}
+class RoleNotSupported extends Error {
+  constructor(readonly role: ModelRole) {
+    super('role not supported');
+  }
+}
 class ModelNotAllowed extends Error {
   constructor(readonly role: ModelRole) {
     super('model not allowed');

@@ -59,6 +59,12 @@ export default defineConfig({
         KD_LEARN_TRUST_PROXY: '1',
         KD_OPENAI_COMPATIBLE_ENDPOINTS: JSON.stringify([
           { id: 'fake', label: 'Fake model', baseURL: `http://localhost:${fakeModelPort}/v1` },
+          {
+            id: 'fake-images',
+            label: 'Fake images',
+            baseURL: `http://localhost:${fakeModelPort}/v1`,
+            images: true,
+          },
         ]),
         KD_LEARN_DEMO_MODE: 'on',
         KD_LEARN_DEMO_PROVIDER: 'openai-compatible',

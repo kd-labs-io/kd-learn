@@ -3,12 +3,20 @@
 import type { Schema, SchemaIssue } from 'effect';
 import type { Frame } from '@kd-learn/api';
 
-/** Replaces every occurrence of `secret` in `text`. Short strings are not treated as secrets. */
-export const redact = (text: string, secret: string | undefined): string =>
-  secret !== undefined && secret.length >= 8 ? text.split(secret).join('[redacted]') : text;
+/** One key, or several (a turn's model key and its image key, phase 5 A6). */
+export type Secrets = string | undefined | ReadonlyArray<string | undefined>;
+
+const secretsOf = (secret: Secrets): ReadonlyArray<string> =>
+  (typeof secret === 'string' || secret === undefined ? [secret] : secret).filter(
+    (one): one is string => one !== undefined && one.length >= 8,
+  );
+
+/** Replaces every occurrence of each secret in `text`. Short strings are not treated as secrets. */
+export const redact = (text: string, secret: Secrets): string =>
+  secretsOf(secret).reduce((out, one) => out.split(one).join('[redacted]'), text);
 
 /** Scrubs the text fields that carry error messages. Other frames pass through unchanged. */
-export const scrubFrame = (frame: Frame, secret: string | undefined): Frame => {
+export const scrubFrame = (frame: Frame, secret: Secrets): Frame => {
   switch (frame._tag) {
     case 'error':
       return { ...frame, error: { ...frame.error, message: redact(frame.error.message, secret) } };
@@ -26,7 +34,7 @@ export const scrubFrame = (frame: Frame, secret: string | undefined): Frame => {
  * body instead would break its byte count, and the client would refuse the whole batch. Bodies come
  * before events, so one pass is enough. Stateful: one per stream.
  */
-export const makeFigureLeakFilter = (secret: string | undefined) => {
+export const makeFigureLeakFilter = (secret: Secrets) => {
   const dropped = new Set<string>();
   return (frame: Frame): boolean => {
     if (frame._tag === 'figure' && frame.encoding === 'text') {
@@ -79,8 +87,8 @@ export const asRecord = (value: unknown): Record<string, unknown> | undefined =>
     : undefined;
 
 /** Redacts `secret` in every string of a value (events are plain JSON data). */
-export const scrubDeep = <T>(value: T, secret: string | undefined): T => {
-  if (secret === undefined || secret.length < 8) return value;
+export const scrubDeep = <T>(value: T, secret: Secrets): T => {
+  if (secretsOf(secret).length === 0) return value;
   const walk = (inner: unknown): unknown => {
     if (typeof inner === 'string') return redact(inner, secret);
     if (Array.isArray(inner)) return inner.map(walk);

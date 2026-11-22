@@ -15,13 +15,16 @@
 // - `#cite`, with source excerpts in the system prompt: an answer citing [S1];
 // - `#diagram`, `#mermaid`, `#demo`, `#hostile` with the figure tools offered (phase 5): an SVG
 //   diagram, a Mermaid flowchart, a small demo, or a demo that tries every way out of its frame
-//   (`HOSTILE_DEMO`), then "Noted." after the tool result;
+//   (`HOSTILE_DEMO`), then "Noted." after the tool result; `#image` with `generate_image` offered:
+//   an image;
 // - `hold`: streams a first chunk and waits until `POST /release/<apiKey>` (the key of the test's
 //   own connection, so parallel tests do not release each other's turns);
 // - otherwise it repeats the message.
-// `GET /calls/<apiKey>` counts the requests made with that key. With `slow-extract` in the key, the
+// `POST .../images/generations` answers with a small PNG (phase 5 A6).
+// `GET /calls/<apiKey>` counts the requests made with that key, images included. With `slow-extract` in the key, the
 // first structured request waits for `POST /release/<apiKey>` too (an extraction still running).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { deflateSync } from 'node:zlib';
 
 const port = Number(process.env['FAKE_OPENAI_PORT'] ?? 4175);
 
@@ -177,7 +180,46 @@ const FIGURES: Record<string, { tool: string; input: unknown }> = {
     },
   },
   '#hostile': { tool: 'show_demo', input: { title: 'Hostile', html: HOSTILE_DEMO } },
+  '#image': {
+    tool: 'generate_image',
+    input: { title: 'A red square', prompt: 'A plain red square', aspect: 'square' },
+  },
 };
+
+/** A 16x16 red PNG, built once (no image library needed). */
+const RED_PNG = (() => {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (bytes: Buffer) => {
+    let c = 0xffffffff;
+    for (const byte of bytes) c = crcTable[(c ^ byte) & 0xff]! ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const part = (type: string, data: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([length, body, sum]);
+  };
+  const size = 16;
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(size * 3, Buffer.from([220, 40, 40]))]);
+  const pixels = deflateSync(Buffer.concat(Array.from({ length: size }, () => row)));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    part('IHDR', header),
+    part('IDAT', pixels),
+    part('IEND', Buffer.alloc(0)),
+  ]);
+})();
 
 const toolCall = (response: ServerResponse, name: string, input: unknown) => {
   chunk(
@@ -265,6 +307,19 @@ const server = createServer((request, response) => {
     }
     if (request.method === 'GET' && url.pathname === '/') {
       response.writeHead(200).end('ok');
+      return;
+    }
+    if (request.method === 'POST' && url.pathname.endsWith('/images/generations')) {
+      await readBody(request);
+      const key = (request.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+      calls.set(key, (calls.get(key) ?? 0) + 1);
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          data: [{ b64_json: RED_PNG.toString('base64') }],
+          usage: { input_tokens: 12, output_tokens: 256 },
+        }),
+      );
       return;
     }
     if (request.method !== 'POST' || !url.pathname.endsWith('/chat/completions')) {

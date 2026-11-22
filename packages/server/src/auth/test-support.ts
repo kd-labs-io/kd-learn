@@ -1,7 +1,7 @@
 // Handlers over an in-memory database, for the route tests. Not a test file itself.
 import { Effect } from 'effect';
 import type { Layer } from 'effect';
-import type { AiPort } from '@kd-learn/ai/port';
+import type { AiPort, ImagePort } from '@kd-learn/ai/port';
 import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { createHandlers } from '../index.ts';
 import type { LogEntry } from '../index.ts';
@@ -14,6 +14,7 @@ export const USER = { email: 'learner@kd.test', password: 'learner-password-1' }
 
 export interface MakeOptions {
   readonly ai?: Layer.Layer<AiPort>;
+  readonly images?: ImagePort['Service'];
   readonly turnTimeoutMs?: number;
   readonly acp?: Layer.Layer<AiPort>;
   /** A database file instead of memory, to reopen it like a restart. */
@@ -42,6 +43,7 @@ export const make = (env: Record<string, string> = {}, options: MakeOptions = {}
         options.database ??
         Effect.runSync(openServerDatabase({ path: options.dbPath ?? ':memory:' })),
       ...(options.ai ? { ai: options.ai } : {}),
+      ...(options.images ? { images: options.images } : {}),
       ...(options.acp ? { acp: options.acp } : {}),
       ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
       ...(options.searchAdapters ? { searchAdapters: options.searchAdapters } : {}),

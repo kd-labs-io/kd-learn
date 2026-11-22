@@ -32,7 +32,12 @@ describe('settings service', () => {
   });
 
   it('resolves the model of each role with the decrypted key', async () => {
-    const endpoint = { id: 'acme', label: 'Acme', baseURL: 'https://llm.acme.test/v1' };
+    const endpoint = {
+      id: 'acme',
+      label: 'Acme',
+      baseURL: 'https://llm.acme.test/v1',
+      images: false,
+    };
     const { settings, user } = await setup([endpoint]);
     const id = await user('a@x.io');
     const result = settings.createConnection(id, {
@@ -83,6 +88,56 @@ describe('settings service', () => {
     const extractor = settings.resolveModel(id, 'extractor');
     expect(extractor._tag === 'Ok' && extractor.model.model).toBe('cheap-model');
     expect(settings.get(id).roles.extractor).toEqual({ connectionId, model: 'cheap-model' });
+  });
+
+  it('keeps every role, and lets only an image API be the illustrator, with no fallback', async () => {
+    const endpoints: Endpoint[] = [
+      { id: 'text', label: 'Text', baseURL: 'https://text.test/v1', images: false },
+      { id: 'img', label: 'Img', baseURL: 'https://img.test/v1', images: true },
+    ];
+    const { settings, user } = await setup(endpoints);
+    const id = await user('a@x.io');
+    const connect = (input: Parameters<typeof settings.createConnection>[1]) => {
+      const made = settings.createConnection(id, input);
+      if (made._tag !== 'Ok') throw new Error(made._tag);
+      return made.connection.id;
+    };
+    const anthropic = connect({ label: 'A', provider: 'anthropic', apiKey: KEY });
+    const text = connect({
+      label: 'T',
+      provider: 'openai-compatible',
+      endpointId: 'text',
+      apiKey: KEY,
+    });
+    const img = connect({
+      label: 'I',
+      provider: 'openai-compatible',
+      endpointId: 'img',
+      apiKey: KEY,
+    });
+    const teacher = { connectionId: anthropic, model: 'claude-haiku-5-5' };
+    expect(settings.setRoles(id, { teacher, researcher: teacher })).toEqual({ _tag: 'Ok' });
+    expect(settings.get(id).roles.researcher).toEqual(teacher);
+    // Unset: no images, even though the teacher is set.
+    expect(settings.resolveImageModel(id)).toBeUndefined();
+    for (const connectionId of [anthropic, text]) {
+      expect(settings.setRoles(id, { teacher, illustrator: { connectionId, model: 'm' } })).toEqual(
+        { _tag: 'RoleNotSupported', role: 'illustrator' },
+      );
+    }
+    expect(settings.get(id).roles.researcher).toEqual(teacher);
+    expect(
+      settings.setRoles(id, { teacher, illustrator: { connectionId: img, model: 'gpt-image-2' } }),
+    ).toEqual({ _tag: 'Ok' });
+    expect(settings.resolveImageModel(id)).toEqual({
+      provider: 'openai-compatible',
+      model: 'gpt-image-2',
+      apiKey: KEY,
+      baseURL: 'https://img.test/v1',
+    });
+    // The operator takes images off the endpoint: no images from the next turn on.
+    endpoints[1] = { ...endpoints[1]!, images: false };
+    expect(settings.resolveImageModel(id)).toBeUndefined();
   });
 
   it('unsets the roles of a deleted connection', async () => {

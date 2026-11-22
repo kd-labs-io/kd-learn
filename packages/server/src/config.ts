@@ -12,6 +12,8 @@ export interface Endpoint {
   readonly id: string;
   readonly label: string;
   readonly baseURL: string;
+  /** Serves `/images/generations`: connections to it may be the illustrator (phase 5 A6). */
+  readonly images: boolean;
 }
 
 export interface ServerConfig {
@@ -29,6 +31,7 @@ const EndpointEntry = Schema.Struct({
   id: EndpointId,
   label: Schema.optionalKey(Schema.NonEmptyString),
   baseURL: Schema.NonEmptyString,
+  images: Schema.optionalKey(Schema.Boolean),
 });
 const EndpointList = Schema.Array(EndpointEntry);
 
@@ -66,7 +69,12 @@ const endpointsFrom = (raw: string): ReadonlyArray<Endpoint> => {
         message: `${name}: baseURL of "${entry.id}" must not embed credentials.`,
       });
     }
-    return { id: entry.id, label: entry.label ?? entry.id, baseURL: entry.baseURL };
+    return {
+      id: entry.id,
+      label: entry.label ?? entry.id,
+      baseURL: entry.baseURL,
+      images: entry.images ?? false,
+    };
   });
 };
 
@@ -78,7 +86,7 @@ const originsFrom = (raw: string): ReadonlyArray<string> =>
 
 /**
  * Reads the configuration:
- * - `KD_OPENAI_COMPATIBLE_ENDPOINTS`: JSON array of `{"id", "baseURL", "label"?}`. Default none.
+ * - `KD_OPENAI_COMPATIBLE_ENDPOINTS`: JSON array of `{"id", "baseURL", "label"?, "images"?}`. Default none.
  * - `KD_MAX_REQUEST_BYTES`: request size limit. Default 1 MiB.
  * - `KD_CORS_ORIGINS`: comma-separated origins allowed cross-origin. Default none (same origin only).
  * - `KD_SEARXNG_URL`: base URL of the server's SearXNG (http or https). Default none.

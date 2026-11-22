@@ -405,5 +405,9 @@
   "profile_figures_demos": "Demo tương tác (chạy trong khung cách ly)",
   "profile_figures_images": "Ảnh sinh bằng AI",
   "admin_figure_cdn": "Thư viện trong demo",
-  "admin_figure_cdn_hint": "Demo được nạp D3, Chart.js và Matter.js từ jsDelivr (ghim phiên bản, kiểm bằng hash). Tắt: chỉ JavaScript thuần."
+  "admin_figure_cdn_hint": "Demo được nạp D3, Chart.js và Matter.js từ jsDelivr (ghim phiên bản, kiểm bằng hash). Tắt: chỉ JavaScript thuần.",
+  "role_illustrator": "Hình ảnh",
+  "roles_illustrator_hint": "Vẽ hình cho bài học khi Teacher cần. Không đặt: không có hình. Cần Gemini hoặc một endpoint tạo được ảnh; mỗi hình tốn vài cent trên key đó.",
+  "roles_illustrator_none": "Thêm một kết nối Gemini, hoặc một kết nối tới endpoint tạo được ảnh, để dùng vai này.",
+  "error_RoleNotSupported": "Kết nối này không tạo được ảnh. Hãy chọn Gemini hoặc một endpoint tạo được ảnh."
 }

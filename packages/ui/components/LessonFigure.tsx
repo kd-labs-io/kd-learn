@@ -1,3 +1,6 @@
+import { Button } from '@astryxdesign/core/Button';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
+import { HStack } from '@astryxdesign/core/HStack';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
 import { splitFigureMarkers, type FigureInfo } from '@kd-learn/core';
@@ -62,12 +65,20 @@ function ImageFigure({ info, bytes }: { info: FigureInfo; bytes: Uint8Array }) {
     () => new Blob([bytes as Uint8Array<ArrayBuffer>], { type: info.mime }),
     [bytes, info.mime],
   );
+  const [isZoomed, setZoomed] = useState(false);
   return url === undefined ? null : (
     <VStack gap={1}>
       <FigureImage src={url} alt={info.title} />
-      <Text type="supporting" color="secondary">
-        {info.title}
-      </Text>
+      <HStack gap={1}>
+        <Text type="supporting" color="secondary">
+          {info.title}
+        </Text>
+        <Button size="sm" variant="ghost" label={m.figure_zoom()} onClick={() => setZoomed(true)} />
+      </HStack>
+      <Dialog isOpen={isZoomed} onOpenChange={setZoomed} width="90vw" maxHeight="90dvh">
+        <DialogHeader title={info.title} />
+        {isZoomed ? <FigureImage src={url} alt={info.title} isLarge /> : null}
+      </Dialog>
     </VStack>
   );
 }
