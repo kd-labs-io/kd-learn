@@ -32,6 +32,11 @@ import { makeLazyAcp, routedAi } from '../acp/router.ts';
 import { demoGate, resolveDemoModel, type DemoGate } from '../demo/service.ts';
 import type { Endpoint, ServerConfig } from '../config.ts';
 import { makeSecretBox } from '../settings/secret-box.ts';
+import {
+  makeSearchConfig,
+  type SearchAdapters,
+  type SearchConfigService,
+} from '../search/config.ts';
 import { makeSettings, type SettingsService } from '../settings/service.ts';
 import type { Handler, Logger } from '../handler.ts';
 import { SECURITY_HEADERS } from '../http.ts';
@@ -57,6 +62,8 @@ export interface Accounts {
   /** Learning sources and their `ingest` jobs (phase 4 A2, A4). */
   readonly sources: SourceService;
   readonly admin: AdminService;
+  /** The server's search sources (phase 4 A6). */
+  readonly search: SearchConfigService;
   /** Checked on every demo request: the admin may change the switch or the budget. */
   readonly demo: () => DemoGate;
   /** Whether this build can load the ACP adapter. */
@@ -78,6 +85,10 @@ export const initAccounts = async (
     readonly database?: ServerDatabase;
     /** PDF extraction; tests pass a fake. Default: pdfjs in a worker thread. */
     readonly extractPdf?: PdfExtractor;
+    /** `KD_SEARXNG_URL`. */
+    readonly searxngUrl?: string | undefined;
+    /** Search adapters; tests pass fakes. */
+    readonly searchAdapters?: SearchAdapters;
     readonly auth?: AuthOptions;
     readonly log: Logger;
   },
@@ -110,6 +121,12 @@ export const initAccounts = async (
   const demo = () => demoGate(admin.switches().demoMode, demoModel(), budget);
   const box = makeSecretBox(new Map([[1, config.masterKey]]), 1);
   const settings = makeSettings(database, box, options.endpoints, admin.acpAgents, admin.acpModels);
+  const search = makeSearchConfig({
+    database,
+    box,
+    searxngUrl: options.searxngUrl,
+    ...(options.searchAdapters === undefined ? {} : { adapters: options.searchAdapters }),
+  });
   const lazyAcp = options.acp === undefined ? makeLazyAcp(options.log) : undefined;
   const storage = makeServerStorage(database);
   // One routed layer for turns, extraction and practice, so the ACP slot count covers all.
@@ -157,6 +174,7 @@ export const initAccounts = async (
     practice,
     sources,
     admin,
+    search,
     demo,
     acpAvailable,
   };

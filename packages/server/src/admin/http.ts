@@ -3,11 +3,13 @@
 import { Schema } from 'effect';
 import {
   AdminConfig,
+  AdminSearchConfig,
   AdminUser,
   AdminUserList,
   ErrorCode,
   PublicConfig,
   UpdateAdminConfigRequest,
+  UpdateAdminSearchRequest,
   UpdateUserRequest,
 } from '@kd-learn/api';
 import type { Handler, Logger } from '../handler.ts';
@@ -60,6 +62,29 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
     }),
   );
 
+  // Search sources (phase 4 A6). The Exa key goes in, never out; the log says only what changed.
+  const search = route('admin.search', ['GET', 'PUT'], (ctx) =>
+    asAdmin(ctx, async () => {
+      if (ctx.request.method === 'GET') {
+        return json(ctx, Schema.encodeSync(AdminSearchConfig)(ctx.accounts.search.config()));
+      }
+      const change = await decode(ctx, UpdateAdminSearchRequest);
+      if (change instanceof Response) return change;
+      const next = ctx.accounts.search.update(change);
+      log({
+        event: 'admin.search',
+        fields: {
+          searxng: next.searxng.enabled,
+          exa: next.exa.enabled,
+          exaKey: change.exaKey === undefined ? 'kept' : change.exaKey === null ? 'removed' : 'set',
+          guest: next.guest,
+          demo: next.demo,
+        },
+      });
+      return json(ctx, Schema.encodeSync(AdminSearchConfig)(next));
+    }),
+  );
+
   const users = route('admin.users', ['GET'], (ctx) =>
     asAdmin(ctx, () =>
       json(ctx, Schema.encodeSync(AdminUserList)({ users: ctx.accounts.admin.users() })),
@@ -97,6 +122,7 @@ export const makeAdminHandlers = (kit: Kit, log: Logger): { admin: Handler; conf
     const path = new URL(request.url).pathname.slice(ADMIN_PREFIX.length).replace(/\/+$/, '');
     if (path === 'config') return config(request, context);
     if (path === 'users') return users(request, context);
+    if (path === 'search') return search(request, context);
     const one = /^users\/([A-Za-z0-9-]{1,64})$/.exec(path);
     if (one?.[1] !== undefined) return user(one[1])(request, context);
     return fallback(request, context);

@@ -21,6 +21,8 @@ export interface ServerConfig {
   readonly endpoints: ReadonlyArray<Endpoint>;
   /** Origins allowed to call the API from another origin (Capacitor, a separate SPA host). */
   readonly corsOrigins: ReadonlyArray<string>;
+  /** `KD_SEARXNG_URL`: the server's SearXNG (phase 4 A6). Only from the env, never a client. */
+  readonly searxngUrl: string | undefined;
 }
 
 const EndpointEntry = Schema.Struct({
@@ -79,6 +81,7 @@ const originsFrom = (raw: string): ReadonlyArray<string> =>
  * - `KD_OPENAI_COMPATIBLE_ENDPOINTS`: JSON array of `{"id", "baseURL", "label"?}`. Default none.
  * - `KD_MAX_REQUEST_BYTES`: request size limit. Default 1 MiB.
  * - `KD_CORS_ORIGINS`: comma-separated origins allowed cross-origin. Default none (same origin only).
+ * - `KD_SEARXNG_URL`: base URL of the server's SearXNG (http or https). Default none.
  * Throws `ConfigError` when a variable is set but invalid.
  */
 export const loadConfig = (env: Readonly<Record<string, string | undefined>>): ServerConfig => {
@@ -98,5 +101,22 @@ export const loadConfig = (env: Readonly<Record<string, string | undefined>>): S
     maxRequestBytes,
     endpoints: endpointsRaw ? endpointsFrom(endpointsRaw) : [],
     corsOrigins: originsFrom(env.KD_CORS_ORIGINS ?? ''),
+    searxngUrl: searxngFrom(env.KD_SEARXNG_URL?.trim() ?? ''),
   };
+};
+
+const searxngFrom = (raw: string): string | undefined => {
+  if (raw === '') return undefined;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new ConfigError({ message: 'KD_SEARXNG_URL is not a URL.' });
+  }
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) {
+    throw new ConfigError({
+      message: 'KD_SEARXNG_URL must be http or https, without credentials.',
+    });
+  }
+  return raw.replace(/\/+$/, '');
 };

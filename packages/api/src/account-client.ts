@@ -5,6 +5,11 @@ import { Data, Effect, Schema, Stream } from 'effect';
 import {
   ACCOUNT_SETTINGS_PATH,
   ADMIN_CONFIG_PATH,
+  ADMIN_SEARCH_PATH,
+  AdminSearchConfig,
+  SEARCH_OPTIONS_PATH,
+  SearchOptions,
+  UpdateAdminSearchRequest,
   ADMIN_USERS_PATH,
   AccountFrame,
   AccountSettings,
@@ -404,6 +409,18 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         body: bodyOf(UpdateAdminConfigRequest, change),
         response: codec(AdminConfig),
       }),
+    adminSearch: () =>
+      go({ method: 'GET', path: ADMIN_SEARCH_PATH, response: codec(AdminSearchConfig) }),
+    updateAdminSearch: (change: UpdateAdminSearchRequest) =>
+      go({
+        method: 'PUT',
+        path: ADMIN_SEARCH_PATH,
+        body: bodyOf(UpdateAdminSearchRequest, change),
+        response: codec(AdminSearchConfig),
+      }),
+    /** Search sources this account may use for research (phase 4 A6). */
+    searchOptions: () =>
+      go({ method: 'GET', path: SEARCH_OPTIONS_PATH, response: codec(SearchOptions) }),
     adminUsers: () => go({ method: 'GET', path: ADMIN_USERS_PATH, response: codec(AdminUserList) }),
     updateUser: (userId: string, change: UpdateUserRequest) =>
       go({

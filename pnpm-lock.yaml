@@ -545,6 +545,9 @@ importers:
       '@kd-learn/core':
         specifier: workspace:*
         version: link:../core
+      '@kd-learn/search':
+        specifier: workspace:*
+        version: link:../search
       '@kd-learn/storage':
         specifier: workspace:*
         version: link:../storage

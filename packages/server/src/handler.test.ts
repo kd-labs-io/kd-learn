@@ -29,6 +29,7 @@ const config = (over: Partial<ServerConfig> = {}): ServerConfig => ({
   maxRequestBytes: DEFAULT_MAX_REQUEST_BYTES,
   endpoints: [{ id: 'acme', label: 'Acme AI', baseURL: 'https://llm.acme.test/v1' }],
   corsOrigins: [],
+  searxngUrl: undefined,
   ...over,
 });
 

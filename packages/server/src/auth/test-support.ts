@@ -6,6 +6,7 @@ import { openServerDatabase, type ServerDatabase } from '@kd-learn/storage/sqlit
 import { createHandlers } from '../index.ts';
 import type { LogEntry } from '../index.ts';
 import type { PdfExtractor } from '../sources/pdf.ts';
+import type { SearchAdapters } from '../search/config.ts';
 
 export const ADMIN = { email: 'root@kd.test', password: 'admin-password-1' };
 export const USER = { email: 'learner@kd.test', password: 'learner-password-1' };
@@ -19,6 +20,7 @@ export interface MakeOptions {
   /** A database the test keeps a handle on (to seed it). */
   readonly database?: ServerDatabase;
   readonly extractPdf?: PdfExtractor;
+  readonly searchAdapters?: SearchAdapters;
 }
 
 export const make = (env: Record<string, string> = {}, options: MakeOptions = {}) => {
@@ -40,6 +42,7 @@ export const make = (env: Record<string, string> = {}, options: MakeOptions = {}
       ...(options.ai ? { ai: options.ai } : {}),
       ...(options.acp ? { acp: options.acp } : {}),
       ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
+      ...(options.searchAdapters ? { searchAdapters: options.searchAdapters } : {}),
       ...(options.turnTimeoutMs ? { turnTimeoutMs: options.turnTimeoutMs } : {}),
     },
   );

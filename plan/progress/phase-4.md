@@ -12,7 +12,7 @@
 | Bước 2: spike dạy dựa trên nguồn (C3) | Xong (2026-11-22), chạy trên code bước 7: giữ cỡ đoạn 1.500 ký tự, K = 8, 24 KiB; nhãn `[S<n>]` theo lượt, nhãn cũ thành tiêu đề nguồn. Xem ghi chú bước 2 |
 | Bước 3: job bền | Xong (2026-11-22). Bảng `jobs` (migration server v8), runner trong `packages/server/src/jobs/runner.ts`, job extraction chạy qua runner; chạy lại sau khởi động lại tối đa 3 lần. Xem ghi chú bước 3 bên dưới |
 | Bước 4: nguồn trong core và storage | Xong (2026-11-22). Schema và hàm cắt đoạn, chọn lát trong `core`; bảng nguồn ở cả ba driver (khách v4, server v9). Xem ghi chú bước 4 bên dưới |
-| Bước 5: `packages/search` | Đang làm. Xong phần package (port, SearXNG kèm bộ tải trang, Exa), lint, service SearXNG trong compose (2026-11-22); còn cấu hình admin và key Exa mã hoá |
+| Bước 5: `packages/search` | Xong (2026-11-22): port, SearXNG kèm bộ tải trang, Exa, lint, service SearXNG trong compose; cấu hình admin (`/api/admin/search`, key Exa mã hoá), `/api/search/options` |
 | Bước 6: ingest PDF và ghi chú | Xong (2026-11-22). Tài khoản: route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker. Khách / demo: `apps/web/src/sources/` (ghi chú cắt ở client, PDF qua pdfjs trong trình duyệt, "bị ngắt" theo Web Lock). Test trình duyệt thật ở bước 9–10 |
 | Bước 7: dạy dựa trên nguồn | Xong (2026-11-22). Lát trong prompt (khối `<source>` không thoát được), `citations`, `sourceRefs`, `documents` của mệnh đề, `sourceSlice` / `documentSlice` của khách, gắn / gỡ nguồn của tài khoản |
 | Bước 8: research | Chưa bắt đầu |
@@ -102,3 +102,11 @@
 - **Khách / demo:** `TurnRequest.sourceSlice` (tối đa 32 KiB, quá thì 413) do runner của trình duyệt chọn trên DB local; `ExtractRequest.documentSlice` (tối đa 64 KiB; demo gửi tối đa 32 KiB). Giới hạn cả request (1 MiB / 256 KiB) không đổi.
 - **Tài khoản:** runner chọn lát trên DB mỗi lượt (kể cả lượt tự chạy tiếp); job extraction đọc đoạn đã dùng. `CreateSessionRequest.sourceIds` (gắn trong lô tạo buổi) và `POST /api/account/sessions/:id/sources` `{attach, detach}`. Đang có lượt chính chạy thì 409 `TurnInProgress` (như bỏ qua bước), không xếp hàng sau lô của lượt (lệch plan A2, đơn giản hơn, client thử lại). Nguồn của người khác hoặc không có: 404.
 - **Test:** agent (khối nguồn, nhãn, lượt có lát, lịch sử), extraction (`documents` chỉ trong lát, tách đôi), server (gắn lúc tạo và giữa buổi, cross-user, prompt có lát từ DB, `citations` lưu đúng, khách có `sourceSlice` và 413 khi quá trần).
+## Bước 5: cấu hình nguồn tìm kiếm của server (2026-11-22)
+
+- `KD_SEARXNG_URL` đọc trong `loadConfig` (http hoặc https, không kèm thông tin đăng nhập; sai thì mọi route trả 500 như các biến khác).
+- `packages/server/src/search/config.ts`: công tắc trong `server_config` (`search.searxng`, `search.exa`, `search.guest`, `search.demo`); key Exa niêm phong bằng secret box với ngữ cảnh `server:search:exa`, chỉ trả `hasKey` và 4 ký tự cuối. Mặc định: SearXNG bật (nếu có URL), Exa bật khi có key, khách dùng SearXNG, demo tắt.
+- `providers(mode)`: tài khoản dùng mọi nguồn đang bật; khách chỉ SearXNG khi admin cho; demo đúng một nguồn admin chọn, và chỉ khi demo đang chạy được. `service(mode, provider)` là chỗ duy nhất trao adapter cho research (bước 8).
+- Không có tài khoản (thiếu `KD_LEARN_SECRET_KEY`): khách dùng SearXNG nếu đã cấu hình URL, demo và Exa không có.
+- Route: `GET` / `PUT /api/admin/search` (chỉ admin; log chỉ ghi `exaKey: set|removed|kept`), `GET /api/search/options` (có token: của tài khoản, token sai thì 401; `?mode=demo`; còn lại: khách). Client tài khoản: `adminSearch`, `updateAdminSearch`, `searchOptions`.
+- Lệch plan A6: chưa có lựa chọn nguồn của người dùng lưu ở server; request research (bước 8) mang nguồn được chọn và server kiểm theo `providers(mode)`. Màn cài đặt (bước 10) nhớ lựa chọn ở client.

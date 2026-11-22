@@ -15,6 +15,7 @@
   "dependencies": {
     "@kd-learn/agent": "workspace:*",
     "@kd-learn/ai": "workspace:*",
+    "@kd-learn/search": "workspace:*",
     "@kd-learn/api": "workspace:*",
     "@kd-learn/core": "workspace:*",
     "@kd-learn/storage": "workspace:*",
