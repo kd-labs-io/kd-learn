@@ -3,6 +3,7 @@
 import { Schema } from 'effect';
 import {
   CreateNoteSourceRequest,
+  CreateResearchRequest,
   ErrorCode,
   MAX_PDF_BYTES,
   SourceDetail,
@@ -120,9 +121,27 @@ export const makeSourcesHandler = (kit: Kit, log: Logger) => {
       }),
     );
 
+  // Web research (phase 4 A5): a `pending` web source and a job.
+  const research = route('research', ['POST'], (ctx) =>
+    signedIn(ctx, async (user) => {
+      const input = await decode(ctx, CreateResearchRequest);
+      if (input instanceof Response) return input;
+      const result = ctx.accounts.research.create(user.id, input);
+      switch (result._tag) {
+        case 'Ok':
+          return json(ctx, encodeSource({ source: result.value }), 202);
+        case 'NotFound':
+          return notFound(ctx);
+        case 'Conflict':
+          return ctx.reject(403, ErrorCode.SearchUnavailable, result.message);
+      }
+    }),
+  );
+
   /** The handler for `path` (below `/api/account/`), or undefined when it is not a source path. */
   return (path: string): Handler | undefined => {
     if (path === 'sources') return root;
+    if (path === 'research') return research;
     const retried = new RegExp(`^sources/(${ID})/retry$`).exec(path);
     if (retried?.[1] !== undefined) return retry(retried[1]);
     const got = new RegExp(`^sources/(${ID})$`).exec(path);

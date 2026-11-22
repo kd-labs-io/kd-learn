@@ -7,6 +7,7 @@ import { createHandlers } from '../index.ts';
 import type { LogEntry } from '../index.ts';
 import type { PdfExtractor } from '../sources/pdf.ts';
 import type { SearchAdapters } from '../search/config.ts';
+import type { RateLimiter } from './rate-limit.ts';
 
 export const ADMIN = { email: 'root@kd.test', password: 'admin-password-1' };
 export const USER = { email: 'learner@kd.test', password: 'learner-password-1' };
@@ -21,6 +22,7 @@ export interface MakeOptions {
   readonly database?: ServerDatabase;
   readonly extractPdf?: PdfExtractor;
   readonly searchAdapters?: SearchAdapters;
+  readonly researchLimit?: RateLimiter;
 }
 
 export const make = (env: Record<string, string> = {}, options: MakeOptions = {}) => {
@@ -43,6 +45,7 @@ export const make = (env: Record<string, string> = {}, options: MakeOptions = {}
       ...(options.acp ? { acp: options.acp } : {}),
       ...(options.extractPdf ? { extractPdf: options.extractPdf } : {}),
       ...(options.searchAdapters ? { searchAdapters: options.searchAdapters } : {}),
+      ...(options.researchLimit ? { researchLimit: options.researchLimit } : {}),
       ...(options.turnTimeoutMs ? { turnTimeoutMs: options.turnTimeoutMs } : {}),
     },
   );

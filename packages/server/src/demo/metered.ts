@@ -6,6 +6,7 @@
 import { Effect, Layer, Stream } from 'effect';
 import { AiPort } from '@kd-learn/ai/port';
 import type { TurnEvent, TurnRequest } from '@kd-learn/ai/port';
+import { SearchError, type SearchService } from '@kd-learn/search/port';
 
 /**
  * Output cap per call of the roles whose calls need more than a turn's (phase 3 A8); the
@@ -71,3 +72,24 @@ export const meteredAi = (
       return { runTurn: runTurn as AiPort['Service']['runTurn'] };
     }),
   ).pipe(Layer.provide(inner));
+
+/**
+ * A search service that charges each search to the same meter as the model calls (phase 4 A9):
+ * past the reservation it refuses, without calling the source.
+ */
+export const meteredSearch = (
+  inner: SearchService,
+  limits: { readonly calls: number },
+  meter: Meter,
+): SearchService => ({
+  search: (request) =>
+    Effect.suspend(() => {
+      if (meter.calls >= limits.calls) {
+        return Effect.fail(
+          new SearchError({ reason: 'RateLimited', message: 'The demo reservation is used up.' }),
+        );
+      }
+      meter.calls += 1;
+      return inner.search(request);
+    }),
+});

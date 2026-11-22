@@ -1,5 +1,6 @@
 // Guest sources against the memory storage, with pdfjs and the Web Locks replaced.
 import { describe, expect, it } from 'vitest';
+import type { ResearchOutcome, WebOrigin } from '@kd-learn/api';
 import type { SourceChunk } from '@kd-learn/core';
 import { makeMemoryStorage } from '@kd-learn/storage/memory';
 import type { WithLock } from '../learn/locks';
@@ -9,7 +10,10 @@ import type { PdfChunks } from './pdf';
 
 const chunk: SourceChunk = { ordinal: 0, text: 'Tìm kiếm nhị phân.', locator: { page: 1 } };
 
-const setup = (extract: (data: Uint8Array) => Promise<PdfChunks>) => {
+const setup = (
+  extract: (data: Uint8Array) => Promise<PdfChunks>,
+  research?: (origin: WebOrigin) => Promise<ResearchOutcome>,
+) => {
   const storage = makeMemoryStorage();
   const held = new Set<string>();
   const lock: WithLock = async (name, run) => {
@@ -29,6 +33,7 @@ const setup = (extract: (data: Uint8Array) => Promise<PdfChunks>) => {
     isHeld: async (name) => held.has(name),
     newId: () => `src-${++id}`,
     now: () => 1000,
+    ...(research === undefined ? {} : { research }),
   });
   return { sources, storage, held };
 };
@@ -104,5 +109,61 @@ describe('noteChunks', () => {
       title: 'a',
       chunks: [{ text: 'Nội dung liên kết.', locator: { heading: 'Phần 1' } }],
     });
+  });
+});
+describe('guest research', () => {
+  const origin: WebOrigin = { question: 'Binary search', language: 'en', provider: 'searxng' };
+  const noPdf = async (): Promise<PdfChunks> => ({ ok: true, chunks: [chunk] });
+
+  it('stores a web source pending with its question, then ready from the server answer', async () => {
+    const asked: WebOrigin[] = [];
+    const { sources } = setup(noPdf, async (o) => {
+      asked.push(o);
+      return {
+        _tag: 'Researched',
+        title: 'x',
+        chunks: [{ ordinal: 0, text: 'Sum.', locator: {} }],
+      };
+    });
+    const added = await sources.addResearch(origin);
+    expect(added).toMatchObject({
+      _tag: 'Added',
+      source: { kind: 'web', title: 'Binary search', state: 'ready', chunkCount: 1 },
+    });
+    expect(asked).toEqual([origin]);
+  });
+
+  it('fails with the server code, and runs again from the kept question', async () => {
+    let calls = 0;
+    const { sources } = setup(noPdf, async () =>
+      ++calls === 1
+        ? { _tag: 'Failed', error: { code: 'SearchUnavailable', message: 'Off.', retryable: true } }
+        : { _tag: 'Researched', title: 'x', chunks: [{ ordinal: 0, text: 'Sum.', locator: {} }] },
+    );
+    const added = await sources.addResearch(origin);
+    expect(added._tag === 'Added' && added.source).toMatchObject({
+      state: 'failed',
+      failure: { code: 'SearchUnavailable' },
+    });
+    const id = added._tag === 'Added' ? added.source.sourceId : '';
+    expect(await sources.retry(id)).toBe('started');
+    expect((await sources.list())[0]).toMatchObject({ state: 'ready' });
+  });
+
+  it('shows a pending research no tab runs as interrupted', async () => {
+    let release: () => void = () => {};
+    const { sources } = setup(
+      noPdf,
+      () =>
+        new Promise<ResearchOutcome>((resolve) => {
+          release = () =>
+            resolve({ _tag: 'Failed', error: { code: 'x', message: 'x', retryable: true } });
+        }),
+    );
+    const running = sources.addResearch(origin);
+    await new Promise((r) => setTimeout(r, 0));
+    expect((await sources.list())[0]).toMatchObject({ state: 'pending', interrupted: false });
+    release();
+    await running;
   });
 });

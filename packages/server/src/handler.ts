@@ -44,6 +44,8 @@ import { bearerToken, makeRouteKit } from './routes.ts';
 import { makeSettingsHandler } from './settings/http.ts';
 import { handleExtract } from './knowledge/extract-route.ts';
 import { makePracticeHandler } from './practice/guest.ts';
+import { handleResearch } from './sources/research-route.ts';
+import { makeRateLimiter, type RateLimiter } from './auth/rate-limit.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
 export type LogFields = Readonly<Record<string, string | number | boolean>>;
@@ -69,6 +71,10 @@ export interface HandlerDeps {
   readonly demo?: () => Promise<DemoGate>;
   /** The server's search sources (phase 4 A6). Absent: none. */
   readonly search?: () => Promise<SearchSources>;
+  /** `KD_LEARN_TRUST_PROXY`: read the client address from `X-Forwarded-For`. */
+  readonly trustProxy?: boolean;
+  /** Researches per client address (phase 4 A6, risk 40). Absent: not limited. */
+  readonly researchLimit?: RateLimiter;
   /** The signed-in user of a bearer token: `undefined` no token, `null` a bad one. */
   readonly accountOf?: (request: Request) => Promise<{ readonly id: string } | null | undefined>;
 }
@@ -456,6 +462,8 @@ export interface Handlers extends AccountHandlers {
   readonly config: Handler;
   /** `GET /api/search/options`, public (phase 4 A6). */
   readonly searchOptions: Handler;
+  /** `POST /api/research` (guest and demo, phase 4 A5). */
+  readonly research: Handler;
 }
 
 export interface CreateHandlersOptions extends Omit<HandlerDeps, 'config'> {
@@ -529,6 +537,7 @@ export const createHandlers = (
       endpoints: broken,
       config: broken,
       searchOptions: broken,
+      research: broken,
       ...accountsBroken,
     };
   }
@@ -538,7 +547,7 @@ export const createHandlers = (
   // that needs it.
   let accountRoutes: Omit<
     Handlers,
-    'turns' | 'extract' | 'practice' | 'endpoints' | 'config' | 'searchOptions'
+    'turns' | 'extract' | 'practice' | 'endpoints' | 'config' | 'searchOptions' | 'research'
   > = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
@@ -617,6 +626,9 @@ export const createHandlers = (
     log,
     guestAllowed,
     search,
+    trustProxy: ['1', 'true'].includes(env.KD_LEARN_TRUST_PROXY?.trim().toLowerCase() ?? ''),
+    // 20 researches per hour per address, guest and demo together.
+    researchLimit: options.researchLimit ?? makeRateLimiter({ limit: 20, windowMs: 60 * 60_000 }),
     ...(demo === undefined ? {} : { demo }),
     ...(accountOf === undefined ? {} : { accountOf }),
   };
@@ -629,6 +641,7 @@ export const createHandlers = (
     endpoints: wrap((request) => handleEndpoints(request, deps)),
     config: wrap(publicConfig),
     searchOptions: wrap((request) => handleSearchOptions(request, deps)),
+    research: wrap((request, context) => handleResearch(request, deps, context)),
     register: wrap(accountRoutes.register),
     login: wrap(accountRoutes.login),
     logout: wrap(accountRoutes.logout),

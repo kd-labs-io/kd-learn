@@ -11,9 +11,12 @@ import {
   ExtractFrame,
   ExtractRequest,
   Frame,
+  SEARCH_OPTIONS_PATH,
+  SearchOptions,
   TURNS_PATH,
   TurnRequest,
 } from './contract.ts';
+import { RESEARCH_PATH, ResearchFrame, ResearchRequest, ResearchResultFrame } from './research.ts';
 import type { EndpointInfo, Failure } from './contract.ts';
 import type { KnowledgeEvent } from '@kd-learn/core';
 import { makeSseParser } from './sse.ts';
@@ -223,4 +226,82 @@ export const listEndpoints = (
       Effect.mapError(() => protocol('Response does not match the contract.')),
     );
     return decoded.endpoints;
+  });
+
+export type ResearchOutcome =
+  | {
+      readonly _tag: 'Researched';
+      readonly title: string;
+      readonly chunks: (typeof ResearchResultFrame.Type)['chunks'];
+    }
+  | { readonly _tag: 'Failed'; readonly error: Failure };
+
+/**
+ * `POST /api/research` (guest, demo; phase 4 A5). Like `extractSession`: waits for the whole
+ * result; an HTTP error or an `error` frame is `Failed`, transport problems fail the effect.
+ */
+export const researchWeb = (
+  request: ResearchRequest,
+  options: ClientOptions = {},
+): Effect.Effect<ResearchOutcome, ClientError> =>
+  Effect.tryPromise({
+    try: async (signal): Promise<ResearchOutcome | ClientError> => {
+      const doFetch = options.fetch ?? globalThis.fetch;
+      const response = await doFetch(urlOf(options, RESEARCH_PATH), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+        body: JSON.stringify(Schema.encodeSync(ResearchRequest)(request)),
+        signal,
+      });
+      if (!response.ok) {
+        const [first] = await Effect.runPromise(errorFrames(response));
+        return {
+          _tag: 'Failed',
+          error: first?._tag === 'error' ? first.error : unexpected(response.status),
+        };
+      }
+      if (response.body === null) return protocol('The response has no body.');
+      let outcome: ResearchOutcome | undefined;
+      for await (const message of messages(response.body)) {
+        let frame: ResearchFrame;
+        try {
+          frame = Schema.decodeUnknownSync(ResearchFrame)(JSON.parse(message.data));
+        } catch {
+          return protocol('Frame does not match the contract.');
+        }
+        if (frame._tag === 'result') {
+          outcome = { _tag: 'Researched', title: frame.title, chunks: frame.chunks };
+        } else if (frame._tag === 'error') outcome = { _tag: 'Failed', error: frame.error };
+        else return outcome ?? protocol('The stream ended without a result.');
+      }
+      return protocol('The stream ended before `done`.');
+    },
+    catch: network,
+  }).pipe(
+    Effect.flatMap((result) =>
+      result instanceof ClientError ? Effect.fail(result) : Effect.succeed(result),
+    ),
+  );
+
+/** `GET /api/search/options` for a guest (or `demo`): the search sources offered. */
+export const searchOptions = (
+  mode: 'guest' | 'demo',
+  options: ClientOptions = {},
+): Effect.Effect<SearchOptions['providers'], ClientError> =>
+  Effect.gen(function* () {
+    const doFetch = options.fetch ?? globalThis.fetch;
+    const path = mode === 'demo' ? `${SEARCH_OPTIONS_PATH}?mode=demo` : SEARCH_OPTIONS_PATH;
+    const response = yield* Effect.tryPromise({
+      try: (signal) => doFetch(urlOf(options, path), { signal }),
+      catch: network,
+    });
+    if (!response.ok) return yield* Effect.fail(protocol(`HTTP ${response.status}.`));
+    const json = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: network,
+    });
+    const decoded = yield* Schema.decodeUnknownEffect(SearchOptions)(json).pipe(
+      Effect.mapError(() => protocol('Response does not match the contract.')),
+    );
+    return decoded.providers;
   });
