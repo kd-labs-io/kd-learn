@@ -9,7 +9,7 @@
 | Plan phần chính | Xong (2026-11-22). Chốt: demo không sinh ảnh trừ khi admin bật (mỗi ảnh tính N lần gọi); khách sinh ảnh được qua vai `illustrator` riêng, không fallback; hình chỉ ở luồng chính của Teacher; demo HTML được nạp thư viện CDN trong danh sách cho phép (ghim bản, SRI), admin tắt được |
 | Bước 0: spike khung sandbox (C1) | Xong (2026-11-22). `srcdoc` + `sandbox="allow-scripts"` chặn mọi đường đọc dữ liệu app trên Chromium, Firefox, WebKit; CSP của khung chỉ dùng hash (không `'unsafe-inline'`, không URL), buộc được SRI và chặn query string; `frame-src` trên trang cha chặn khung tự điều hướng; vòng lặp vô hạn đơ cả trang ở cả ba. Xem ghi chú bước 0 |
 | Bước 1: spike SVG / Mermaid (C2) | Xong (2026-11-22). SVG qua `<img src=blob:>` không chạy script, không request ra ngoài; Mermaid 12.3.0 render trong app với `htmlLabels: false`, `layout: 'dagre'`, kết quả hiện bằng `<img>`; không kiểm Mermaid trên server (cần jsdom, 200 MB). Xem ghi chú bước 1 |
-| Bước 2: spike Teacher vẽ hình với Haiku (C3) | Chưa làm |
+| Bước 2: spike Teacher vẽ hình với Haiku (C3) | Xong (2026-11-22), làm sau bước 8 trên tool thật. Haiku tự gọi `show_diagram` (SVG) và `show_demo` đúng lúc, đúng nội dung bước; cả hai hiện và chạy được trên ba trình duyệt dưới CSP chỉ hash. Xem ghi chú bước 2 |
 | Bước 3: spike sinh ảnh (C4) | Xong (2026-11-22). Adapter gọi thẳng HTTP (không dùng `generateImage` của TanStack AI 1.4); Gemini `gemini-3.1-flash-lite-image` (JPEG, 6 s, 0,4 MB, $0,034) và endpoint tương thích OpenAI `/images/generations`. Xem ghi chú bước 3 |
 | Bước 4: hình trong `core` và `storage` | Xong (2026-11-22). `figure.ts` trong `core`, `FigureAdded`, `Session.figures`; bảng `figures` (khách v5, server v10), `appendEvents(..., figures)` kiểm lô, `readFigure`. Xem ghi chú bước 4 |
 | Bước 5: tool hình trong `agent`, hợp đồng, route | Xong (2026-11-22). Tool `show_diagram` (svg, mermaid) và `show_demo` chỉ ở pha dạy; frame `figure` trước các frame `event`; công tắc admin `figureCdn`; `GET /api/account/figures/:id`. Xem ghi chú bước 5 |
@@ -88,4 +88,11 @@
 - **Test:** `e2e/lesson-figures.e2e.ts`: khách (chạy thật agent qua endpoint giả) ra sơ đồ, còn sau khi tải lại, demo thù địch bị chặn mọi đường và không có request ra ngoài; tài khoản ra Mermaid và demo bấm được, còn sau khi tải lại. `profile.e2e.ts` kiểm `figures` vào `SessionCreated`. Toàn bộ e2e: qua trên Chromium, Firefox, WebKit trừ lỗi đã biết `practice.e2e.ts` khách trên WebKit.
 - **Ghi nhận:** WebKit trả `document.cookie` rỗng trong khung origin mờ (không ném lỗi như Chromium, Firefox); vẫn không đọc được cookie của app.
 - **CI:** test ranh giới ESLint (`packages/config`) có `beforeAll` làm nóng ESLint (lần lint đầu trên runner lạnh vượt 5 s).
+
+## Bước 2: Teacher vẽ hình với Haiku (C3, 2026-11-22)
+
+- Làm sau bước 8, trên tool thật (theo tiền lệ phase 4): `runTurn` của `agent` với adapter TanStack, `claude-haiku-5-5`, hồ sơ mặc định, CDN bật. Chủ đề "How a binary search works", bước 1 "Halving the range". Hai lượt, khoảng 14.600 token vào, 4.850 token ra.
+- Lượt 1 ("I learn best with pictures..."): một `show_diagram` SVG 2,4 KB (mảng 8 ô, ô giữa tô `--kd-accent`, nửa trái "discarded"), chữ giải thích bám hình, kết thúc bằng câu hỏi cho người học. Không cần sửa lần nào.
+- Lượt 2 ("Could I try it myself, interactively?"): một `show_demo` 3,5 KB, không thư viện (chọn đích, Start, Next step, Reset). Hiện trong `/dev/figures` trên Chromium, Firefox, WebKit: không lỗi CSP, không request ra ngoài; bấm thử đi đúng từng bước tìm kiếm.
+- Kết luận: mô tả tool hiện tại đủ; không đổi trần (3 hình mỗi lượt, 64 / 128 KiB). Mermaid và thư viện CDN chưa được Haiku chọn trong hai lượt này; e2e đã phủ cả hai.
 
