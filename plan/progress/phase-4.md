@@ -13,7 +13,7 @@
 | Bước 3: job bền | Xong (2026-11-22). Bảng `jobs` (migration server v8), runner trong `packages/server/src/jobs/runner.ts`, job extraction chạy qua runner; chạy lại sau khởi động lại tối đa 3 lần. Xem ghi chú bước 3 bên dưới |
 | Bước 4: nguồn trong core và storage | Xong (2026-11-22). Schema và hàm cắt đoạn, chọn lát trong `core`; bảng nguồn ở cả ba driver (khách v4, server v9). Xem ghi chú bước 4 bên dưới |
 | Bước 5: `packages/search` | Đang làm. Xong phần package (port, SearXNG kèm bộ tải trang, Exa), lint, service SearXNG trong compose (2026-11-22); còn cấu hình admin và key Exa mã hoá |
-| Bước 6: ingest PDF và ghi chú | Đang làm. Xong phần tài khoản (route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker) (2026-11-22); còn khách / demo (Worker trình duyệt, ghi chú ở client, "bị ngắt") |
+| Bước 6: ingest PDF và ghi chú | Xong (2026-11-22). Tài khoản: route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker. Khách / demo: `apps/web/src/sources/` (ghi chú cắt ở client, PDF qua pdfjs trong trình duyệt, "bị ngắt" theo Web Lock). Test trình duyệt thật ở bước 9–10 |
 | Bước 7: dạy dựa trên nguồn | Chưa bắt đầu |
 | Bước 8: research | Chưa bắt đầu |
 | Bước 9: model và nguồn tìm kiếm giả cho e2e | Chưa bắt đầu |
@@ -79,3 +79,9 @@
 - **Route:** `GET` / `POST /api/account/sources` (JSON = ghi chú đã cắt, `ready` ngay; multipart = PDF, `pending` 202), `GET` / `DELETE /sources/:id`, `POST /sources/:id/retry` (chỉ PDF, giữ file). Đọc thân theo luồng có trần (`readLimitedBytes`, 20 MiB + 64 KiB) rồi mới parse multipart; kiểm `%PDF-`. Nguồn của người khác: 404 (xoá: 204 không làm gì).
 - **Proxy:** nginx mặc định chặn thân quá 1 MiB: `docs/deploy.md` thêm `client_max_body_size 21m`.
 - **Test:** worker thật trên fixture (tiếng Việt 5 trang có đầu trang, NFD, mã hoá, không phải PDF, quá số trang, bom Flate 400 MB bị dừng theo RSS, timeout, ngắt); route (PDF thành `ready` với số trang, scan thành `NoText`, thân vô hạn bị cắt 413, ghi chú, cross-user, khởi động lại giữa ingest trên cùng file DB rồi xong, chạy lại PDF lỗi). `compose-smoke.sh` tải PDF lên image và chờ `ready`. Fixture ở `packages/server/test/fixtures/pdf/`.
+## Bước 6: ingest (2026-11-22, phần khách / demo)
+
+- **`apps/web/src/sources/`**, TypeScript thường, chưa có UI (bước 10): `notes.ts` (đọc `.md` / `.txt`, tối đa 2 MiB, phải là UTF-8, `chunkNote`; tài khoản cũng dùng để gửi đoạn lên server), `pdf.ts` (nạp lười `pdfjs-dist`, `workerPort` là Worker từ `pdf.worker.min.mjs`, thời hạn 60 s, cùng `readPdfPages` và `pdfSourceChunks` với server), `guest-ingest.ts` (`makeGuestSources`: `list`, `addNotes`, `addPdf`, `retry`, `remove`).
+- **PDF của khách:** tạo nguồn `pending` kèm file trong DB local, đọc dưới Web Lock `kd-learn:ingest:<sourceId>`, ghi `ready` / `failed` trong một lô. Nguồn `pending` không ai giữ lock thì `interrupted` (tab đóng, tải lại); `retry` đọc lại file đã giữ. Tab cũ đọc xong sau khi tab khác đã chạy lại thì `SourceConflict`, bỏ qua.
+- **Cùng đoạn ở hai chế độ:** test server so `pdfSourceChunks` của worker với `readPdfPages` gọi thẳng (đường của trình duyệt) trên fixture tiếng Việt: bằng nhau. Trình duyệt dùng bản `build` (không phải `legacy`): kiểm bằng Playwright ở bước 9–10.
+- **Còn mở:** trình duyệt chưa có `cMapUrl` (PDF font CID không nhúng CMap, chủ yếu CJK, có thể thiếu chữ ở khách; server có). Driver WASM chưa có test riêng cho nguồn (file 20 MiB qua protocol Worker): để e2e bước 9–10 phủ.

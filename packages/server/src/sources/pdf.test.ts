@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { Effect, Exit, Fiber } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { chunkPages, pdfHasText, pdfPagesText } from '@kd-learn/core';
+import {
+  chunkPages,
+  pdfHasText,
+  pdfPagesText,
+  pdfSourceChunks,
+  readPdfPages,
+  type PdfGetDocument,
+} from '@kd-learn/core';
 import { extractPdf } from './pdf.ts';
 
 const fixture = (name: string) =>
@@ -36,6 +43,22 @@ const run = (data: Uint8Array, maxPages = 500) =>
   Effect.runPromise(extractPdf(data, { maxPages, timeoutMs: 20_000 }));
 
 describe('extractPdf (worker_threads)', () => {
+  it('gives the same chunks as readPdfPages called directly (the browser path)', async () => {
+    // The worker module has no types: import it through a variable.
+    const workerModule = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
+    (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = await import(workerModule);
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const direct = await readPdfPages(
+      pdfjs.getDocument as unknown as PdfGetDocument,
+      fixture('vi-5pages.pdf'),
+      500,
+    );
+    const inWorker = await run(fixture('vi-5pages.pdf'));
+    const chunks = pdfSourceChunks(inWorker);
+    expect(chunks.ok).toBe(true);
+    expect(chunks).toEqual(pdfSourceChunks(direct));
+  });
+
   it('reads Vietnamese text with page numbers and drops running heads', async () => {
     const result = await run(fixture('vi-5pages.pdf'));
     if (!result.ok) throw new Error(result.code);
