@@ -94,3 +94,4 @@
 - **Cập nhật:** 2026-11-22: xong bước 5 phase 6 (giả lập iPhone / Pixel trong e2e, `pixel` chạy cả trong CI; sửa header màn học bị cắt trên điện thoại; sửa React #418 bằng strategy `custom-ssr` của Paraglide; `practice.e2e.ts` khách bỏ qua trên WebKit vì không có OPFS); bỏ hai việc này khỏi mục 6; cập nhật rủi ro 5 (progress phase 6)
 - **Cập nhật:** 2026-11-22: xong bước 6 phase 6 (`scripts/phone-check.sh`: bản build qua Cloudflare quick tunnel, đã kiểm HTTPS từ ngoài máy; một buổi Haiku thật ở dark mode hiện đúng, Haiku không vẽ sơ đồ trong lượt đó; danh sách kiểm cho bước 7) (progress phase 6)
 - **Cập nhật:** 2026-11-22: mở lại phase 6 (hoàn tác lần đóng: bước 7 kiểm trên máy thật chưa làm, không chuyển sang phase 7); giữ hai việc mở (hình Haiku ở dark, header ba dòng)
+- **Cập nhật:** 2026-11-22: xong bước 7 phase 6 (người dùng báo ổn trên điện thoại thật) và đóng phase 6 (progress và plan chủ đề sang `archive/`); mục 7 sang phase 7
