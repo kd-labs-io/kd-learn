@@ -67,5 +67,7 @@
 - **Hợp đồng:** frame `figure {figureId, encoding: text|base64, body}`, gửi trước các frame `event` của lượt. `PublicConfig.figureCdn`, `AdminConfig.figureCdn`, `UpdateAdminConfigRequest.figureCdn` (mặc định bật). Không làm `GET /api/figures/options` riêng: `GET /api/config` đã đủ cho công tắc CDN; cờ ảnh thêm ở bước 9.
 - **Server:** khách / demo nhận `figures: { cdn }` từ công tắc admin (đọc lỗi thì tắt CDN). Runner tài khoản gom body và ghi cùng lô qua `appendEvents(..., figures)`; body chữ chứa khoá bị bỏ cùng event của nó (rủi ro 19); frame `figure` của khách được redact như event. `GET /api/account/figures/:id`: chỉ chủ sở hữu (người khác 404), `text/plain` hoặc `application/octet-stream`, CSP `sandbox; default-src 'none'`, cache immutable.
 - **Web (khách):** `runner.ts` gom frame `figure` (base64 → bytes) và ghi cùng lô event.
-- **Test:** agent 46; server thêm test frame `figure` trước event, CDN tắt thì demo có thư viện bị từ chối, tài khoản lưu hình và chỉ chủ đọc được.
+- **Lọt khoá (rủi ro 19):** body chữ chứa khoá bị bỏ cùng `FigureAdded` của nó, ở cả runner tài khoản và luồng frame của khách (`makeFigureLeakFilter`). Không redact: đổi body làm sai `bytes`, client sẽ từ chối cả lô.
+- **ACP:** tool hình là `tool()` thường; adapter ACP chạy mọi tool trong tiến trình và phát `ToolCall` / `ToolResult` (test `runs kd-learn tools in-process` trong `packages/ai`), nên dấu hình chèn như với TanStack. Không có `ToolResult` thì dấu được nối vào cuối lượt.
+- **Test:** agent 46; server: frame `figure` trước event, CDN tắt thì demo có thư viện bị từ chối, tài khoản lưu hình và chỉ chủ đọc được, hình chứa khoá không được ghi, bộ lọc frame; web: runner khách ghi body chữ và base64 cùng lô.
 

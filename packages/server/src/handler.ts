@@ -28,7 +28,7 @@ import { envOnlySearch, type SearchAdapters, type SearchConfigService } from './
 import { loadConfig } from './config.ts';
 import type { ServerConfig } from './config.ts';
 import { SECURITY_HEADERS, corsHeaders, failureResponse, readLimited } from './http.ts';
-import { asRecord, describeIssue, redact, scrubFrame } from './safety.ts';
+import { asRecord, describeIssue, makeFigureLeakFilter, redact, scrubFrame } from './safety.ts';
 import type { PdfExtractor } from './sources/pdf.ts';
 import type { ServerDatabase } from '@kd-learn/storage/sqlite-node';
 import { loadAccountConfig, switchFrom } from './auth/config.ts';
@@ -404,6 +404,7 @@ export const handleTurns = async (request: Request, deps: HandlerDeps): Promise<
     stats.code = code;
   }).pipe(
     Stream.map((frame) => scrubFrame(frame, key)),
+    Stream.filter(makeFigureLeakFilter(key)),
     Stream.tap((frame) =>
       Effect.sync(() => {
         if (frame._tag === 'event') stats.events += 1;

@@ -16,11 +16,30 @@ export const scrubFrame = (frame: Frame, secret: string | undefined): Frame => {
       return frame.event._tag === 'TurnFailed' || frame.event._tag === 'SideTurnFailed'
         ? { ...frame, event: { ...frame.event, message: redact(frame.event.message, secret) } }
         : frame;
-    case 'figure':
-      return frame.encoding === 'text' ? { ...frame, body: redact(frame.body, secret) } : frame;
     default:
       return frame;
   }
+};
+
+/**
+ * Drops figures whose text body holds `secret`, with their `FigureAdded` (risk 19). Redacting the
+ * body instead would break its byte count, and the client would refuse the whole batch. Bodies come
+ * before events, so one pass is enough. Stateful: one per stream.
+ */
+export const makeFigureLeakFilter = (secret: string | undefined) => {
+  const dropped = new Set<string>();
+  return (frame: Frame): boolean => {
+    if (frame._tag === 'figure' && frame.encoding === 'text') {
+      if (redact(frame.body, secret) === frame.body) return true;
+      dropped.add(frame.figureId);
+      return false;
+    }
+    return !(
+      frame._tag === 'event' &&
+      frame.event._tag === 'FigureAdded' &&
+      dropped.has(frame.event.figureId)
+    );
+  };
 };
 
 /**

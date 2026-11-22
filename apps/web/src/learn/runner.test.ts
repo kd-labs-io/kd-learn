@@ -332,6 +332,52 @@ describe('main turn', () => {
     expect((await h.session()).turns).toHaveLength(2);
   });
 
+  it('writes figure bodies with the batch: text as is, base64 as bytes', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"/>';
+    const png = new Uint8Array([137, 80, 78, 71]);
+    const h = await setup({
+      serve: (request) => {
+        const turnId = projectSession(request.log).pipe(Result.getOrThrow).turns.at(-1)!.turnId;
+        const added = (figureId: string, kind: 'svg' | 'image', bytes: number) =>
+          ({
+            _tag: 'event',
+            event: {
+              _tag: 'FigureAdded',
+              ...ev(turnId),
+              figureId,
+              kind,
+              title: figureId,
+              mime: kind === 'svg' ? 'image/svg+xml' : 'image/png',
+              bytes,
+            },
+          }) as const;
+        return body([
+          { _tag: 'figure', figureId: 'f1', encoding: 'text', body: svg },
+          {
+            _tag: 'figure',
+            figureId: 'f2',
+            encoding: 'base64',
+            body: btoa(String.fromCharCode(...png)),
+          },
+          added('f1', 'svg', svg.length),
+          added('f2', 'image', png.length),
+          { _tag: 'event', event: { _tag: 'TurnCompleted', ...ev(turnId), reason: 'stop' } },
+          { _tag: 'done', outcome: 'completed' },
+        ]);
+      },
+    });
+    await h.runner.autoStart();
+    expect(tags(await h.log())).toContain('FigureAdded');
+    expect(await Effect.runPromise(h.storage.readFigure('f1'))).toEqual({
+      figureId: 'f1',
+      body: svg,
+    });
+    expect(await Effect.runPromise(h.storage.readFigure('f2'))).toEqual({
+      figureId: 'f2',
+      body: png,
+    });
+  });
+
   it('drops a batch that breaks the projection and leaves the turn open', async () => {
     const h = await setup({
       serve: (request) => {

@@ -280,6 +280,18 @@ describe('account turns', () => {
       other,
     );
     expect(foreign.status).toBe(404);
+
+    // A body that holds the key is never written, nor its FigureAdded (risk 19).
+    const leak = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><text>${KEY}</text></svg>`;
+    t.fake.programs.push(
+      callTool('show_diagram', { kind: 'svg', title: 'Leak', source: leak }, 'Done.'),
+    );
+    await t.account('POST', `sessions/${t.sessionId}/turns`, { kind: 'send', input: 'more' });
+    await t.idle();
+    const after = (await t.snapshot()).events.map((e) => e.event);
+    expect(after.filter((e) => e._tag === 'FigureAdded')).toHaveLength(1);
+    expect(JSON.stringify(after)).toContain('Done.');
+    expect(JSON.stringify(after)).not.toContain(KEY);
     expect((await t.account('GET', 'figures/nope')).status).toBe(404);
     expect(
       (await request(t.handlers.account, 'GET', `/api/account/figures/x`, undefined)).status,
