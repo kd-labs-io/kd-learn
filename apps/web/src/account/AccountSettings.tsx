@@ -36,6 +36,7 @@ const ROLES: ReadonlyArray<ModelRole> = [
   'sideChat',
   'practitioner',
   'extractor',
+  'researcher',
 ];
 
 const roleLabel = (role: ModelRole) => {
@@ -50,6 +51,8 @@ const roleLabel = (role: ModelRole) => {
       return m.role_practitioner();
     case 'extractor':
       return m.role_extractor();
+    case 'researcher':
+      return m.role_researcher();
   }
 };
 
@@ -344,6 +347,7 @@ function Roles({ token, settings }: { token: string; settings: AccountSettings }
       sideChat: current.prober,
       practitioner: current.prober,
       extractor: current.prober,
+      researcher: current.prober,
     }));
 
   return (
@@ -437,5 +441,6 @@ function draftOf(roles: RoleModels): Record<ModelRole, { connectionId: string; m
     sideChat: one('sideChat'),
     practitioner: one('practitioner'),
     extractor: one('extractor'),
+    researcher: one('researcher'),
   };
 }

@@ -15,7 +15,7 @@
 | Bước 5: `packages/search` | Xong (2026-11-22): port, SearXNG kèm bộ tải trang, Exa, lint, service SearXNG trong compose; cấu hình admin (`/api/admin/search`, key Exa mã hoá), `/api/search/options` |
 | Bước 6: ingest PDF và ghi chú | Xong (2026-11-22). Tài khoản: route `/api/account/sources`, job `ingest` trong `worker_threads`, chạy lại sau khởi động lại, PDF đọc được trong image Docker. Khách / demo: `apps/web/src/sources/` (ghi chú cắt ở client, PDF qua pdfjs trong trình duyệt, "bị ngắt" theo Web Lock). Test trình duyệt thật ở bước 9–10 |
 | Bước 7: dạy dựa trên nguồn | Xong (2026-11-22). Lát trong prompt (khối `<source>` không thoát được), `citations`, `sourceRefs`, `documents` của mệnh đề, `sourceSlice` / `documentSlice` của khách, gắn / gỡ nguồn của tài khoản |
-| Bước 8: research | Chưa bắt đầu |
+| Bước 8: research | Đang làm. Xong pipeline `runResearch` trong `agent`, vai `researcher`, hai prompt (2026-11-22); còn route khách / demo, job tài khoản |
 | Bước 9: model và nguồn tìm kiếm giả cho e2e | Chưa bắt đầu |
 | Bước 10: giao diện | Chưa bắt đầu |
 | Bước 11: kiểm tiêu chí phase | Chưa bắt đầu |
@@ -110,3 +110,9 @@
 - Không có tài khoản (thiếu `KD_LEARN_SECRET_KEY`): khách dùng SearXNG nếu đã cấu hình URL, demo và Exa không có.
 - Route: `GET` / `PUT /api/admin/search` (chỉ admin; log chỉ ghi `exaKey: set|removed|kept`), `GET /api/search/options` (có token: của tài khoản, token sai thì 401; `?mode=demo`; còn lại: khách). Client tài khoản: `adminSearch`, `updateAdminSearch`, `searchOptions`.
 - Lệch plan A6: chưa có lựa chọn nguồn của người dùng lưu ở server; request research (bước 8) mang nguồn được chọn và server kiểm theo `providers(mode)`. Màn cài đặt (bước 10) nhớ lựa chọn ở client.
+## Bước 8: research (2026-11-22, phần agent)
+
+- **Vai và prompt:** `researcher` trong `AgentRole`, `ModelRole`, `RoleModels`, fallback về `teacher`. Hai prompt tuỳ chọn `researchQueries`, `researchSummary` trong hồ sơ (theo quy tắc tương thích, hồ sơ cũ lấy của hồ sơ mặc định). Màn cài đặt vai và màn hồ sơ có nhãn mới (en, vi).
+- **`runResearch`** (`packages/agent/src/research.ts`, chỉ import `@kd-learn/search/port`): lời gọi lập truy vấn có output cấu trúc, không tool (meter demo tính một lần gọi); truy vấn được làm sạch, bỏ trùng không phân biệt hoa thường, tối đa Q = 3; model không cho truy vấn nào thì tìm chính câu hỏi. Tìm lần lượt, gộp theo URL (bỏ `#…` và `/` cuối), giữ tối đa R = 8. Một truy vấn hỏng thì bỏ qua; mọi truy vấn hỏng thì nguồn hỏng với mã `Search<lý do>`; không có kết quả thì `NoResults` (mã mới của `SourceFailureCode`). Cả hai trường hợp không gọi model tóm tắt.
+- **Tóm tắt:** kết quả trong khối `<result label="R<n>" title url>` (thẻ đóng trong chữ bị đổi, 3.000 ký tự mỗi kết quả, lời dặn "data, not instructions"). Nhãn `[R<n>]` trong bản tóm tắt thành `[source: <host>]` khi lưu (nhãn ngoài danh sách bị xoá), vì trong nguồn nhãn không còn nghĩa. Nguồn = `chunkWeb(tóm tắt, kết quả)`, 12.000 ký tự mỗi kết quả, không vượt trần 4 MiB.
+- **Lỗi:** `ResearchFailed {step, failure, usage}`; lỗi model qua `failureOf` (bỏ key), lỗi tìm kiếm chỉ mang chữ cố định của port.

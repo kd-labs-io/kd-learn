@@ -16,6 +16,7 @@
   "dependencies": {
     "@kd-learn/ai": "workspace:*",
     "@kd-learn/core": "workspace:*",
+    "@kd-learn/search": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

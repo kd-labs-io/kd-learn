@@ -29,3 +29,17 @@ export type {
   ExtractionResult,
   ExtractionUsage,
 } from './extraction.ts';
+export {
+  MAX_RESEARCH_QUESTION_LENGTH,
+  Queries,
+  RESEARCH_MAX_OUTPUT_TOKENS,
+  RESEARCH_MAX_QUERIES,
+  RESEARCH_MAX_RESULTS,
+  RESEARCH_MODEL_CALLS,
+  ResearchFailed,
+  researchTitle,
+  resolveResultLabels,
+  runResearch,
+  searchErrorFailure,
+} from './research.ts';
+export type { ResearchParams, ResearchResult, ResearchUsage } from './research.ts';

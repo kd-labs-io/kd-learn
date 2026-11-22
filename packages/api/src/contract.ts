@@ -256,6 +256,8 @@ export const ModelRole = Schema.Literals([
   'sideChat',
   'practitioner',
   'extractor',
+  /** Web research (phase 4 A5). */
+  'researcher',
 ]);
 export type ModelRole = typeof ModelRole.Type;
 
@@ -266,6 +268,7 @@ export type ModelRole = typeof ModelRole.Type;
 export const roleFallback: Readonly<Partial<Record<ModelRole, ModelRole>>> = {
   practitioner: 'teacher',
   extractor: 'teacher',
+  researcher: 'teacher',
 };
 
 const Label = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80));
@@ -324,6 +327,7 @@ export const RoleModels = Schema.Struct({
   sideChat: Schema.optionalKey(RoleModel),
   practitioner: Schema.optionalKey(RoleModel),
   extractor: Schema.optionalKey(RoleModel),
+  researcher: Schema.optionalKey(RoleModel),
 });
 export type RoleModels = typeof RoleModels.Type;
 

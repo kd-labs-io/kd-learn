@@ -18,6 +18,8 @@ export const AgentRole = Schema.Literals([
   'practitioner',
   /** Extraction: extractor, auditor and merge share this role's model (phase 3 A3, A5). */
   'extractor',
+  /** Web research: queries and summary share this role's model (phase 4 A5). */
+  'researcher',
 ]);
 export type AgentRole = typeof AgentRole.Type;
 
@@ -30,6 +32,8 @@ export const PromptKey = Schema.Literals([
   'extractor',
   'auditor',
   'merge',
+  'researchQueries',
+  'researchSummary',
 ]);
 export type PromptKey = typeof PromptKey.Type;
 
@@ -53,6 +57,8 @@ export const TeachingProfile = Schema.Struct({
     extractor: Schema.optionalKey(Schema.NonEmptyString),
     auditor: Schema.optionalKey(Schema.NonEmptyString),
     merge: Schema.optionalKey(Schema.NonEmptyString),
+    researchQueries: Schema.optionalKey(Schema.NonEmptyString),
+    researchSummary: Schema.optionalKey(Schema.NonEmptyString),
   }),
 });
 export type TeachingProfile = typeof TeachingProfile.Type;
@@ -93,6 +99,8 @@ export const SavedProfile = Schema.Struct({
     extractor: Schema.optionalKey(Prompt),
     auditor: Schema.optionalKey(Prompt),
     merge: Schema.optionalKey(Prompt),
+    researchQueries: Schema.optionalKey(Prompt),
+    researchSummary: Schema.optionalKey(Prompt),
   }),
 });
 export type SavedProfile = typeof SavedProfile.Type;
