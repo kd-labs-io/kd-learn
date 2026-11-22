@@ -19,6 +19,7 @@ import { ProfileLink } from '../profile/ProfileLink';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { useEndpoints, useStoragePersistent } from '../learn/hooks';
 import { runStorage, useGuestSettings } from '../storage';
+import { pageWidth } from './page';
 
 const DEFAULT_MODEL: Partial<Record<GuestProvider, string>> = { anthropic: 'claude-haiku-5-5' };
 
@@ -105,6 +106,7 @@ export function GuestSettings() {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

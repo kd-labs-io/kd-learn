@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { ExerciseBody, ExerciseSolution, exerciseRenderers, renderedTypes } from './renderers';
 import type { PracticeSource } from './source';
+import { pageWidth } from '../app/page';
 
 const formatDay = (epochMs: number) =>
   new Intl.DateTimeFormat(getLocaleTag(), { dateStyle: 'medium' }).format(epochMs);
@@ -264,9 +265,10 @@ export function PracticeScreen({ source }: { readonly source: PracticeSource }) 
     );
   } else {
     body = (
-      <VStack gap={3}>
+      <VStack gap={3} hAlign="start">
         <Button
           label={m.practice_start()}
+          size="lg"
           variant="primary"
           isLoading={starting}
           onClick={() => void start()}
@@ -285,6 +287,7 @@ export function PracticeScreen({ source }: { readonly source: PracticeSource }) 
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

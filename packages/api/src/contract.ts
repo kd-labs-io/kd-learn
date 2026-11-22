@@ -465,6 +465,9 @@ export const SessionSummaryInfo = Schema.Struct({
   createdAt: Schema.Number,
   updatedAt: Schema.Number,
   eventCount: Schema.Number,
+  stepsTotal: Schema.optionalKey(Schema.Number),
+  stepsResolved: Schema.Number,
+  completed: Schema.Boolean,
 });
 export const SessionList = Schema.Struct({ sessions: Schema.Array(SessionSummaryInfo) });
 export type SessionList = typeof SessionList.Type;

@@ -12,11 +12,13 @@ import { m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { chooseLocalMode } from '../account/auth';
 import { AppHeader } from './AppHeader';
+import { pageWidth } from './page';
 
 export function Welcome({ config }: { config: PublicConfig }) {
   const navigate = useNavigate();
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>

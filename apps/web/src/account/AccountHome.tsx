@@ -2,11 +2,9 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
-import { Item } from '@astryxdesign/core/Item';
+import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { Spinner } from '@astryxdesign/core/Spinner';
-import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { getLocale, m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,10 +12,11 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { PracticeLink } from '../practice/PracticeLink';
-import { formatDate } from '../app/GuestHome';
+import { homeColumn, SessionRows, StartTopic } from '../app/HomeParts';
 import { preferredProvider, useAccountSourceLibrary } from '../sources/library';
 import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { errorText, keys, useAccountApi } from './api';
+import { pageWidth } from '../app/page';
 
 export function AccountHome({ token }: { token: string }) {
   const navigate = useNavigate();
@@ -71,14 +70,11 @@ export function AccountHome({ token }: { token: string }) {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
-          <VStack gap={6} maxWidth="68ch">
-            <Text type="large" color="secondary">
-              {m.app_tagline()}
-            </Text>
-
+          <VStack gap={6}>
             {needsRoles ? (
               <Banner
                 status="info"
@@ -94,77 +90,47 @@ export function AccountHome({ token }: { token: string }) {
                 data-testid="need-roles"
               />
             ) : null}
-
-            <PracticeLink />
-
-            <VStack gap={3}>
-              <Heading level={2}>{m.home_new_title()}</Heading>
-              <TextInput
-                label={m.home_topic_label()}
-                placeholder={m.home_topic_placeholder()}
-                value={topic}
-                onChange={setTopic}
-                onEnter={start}
-                data-testid="topic-input"
-              />
-              <SourcePicker library={library} value={picked} onChange={setPicked} />
-              <Button
-                label={m.home_start()}
-                variant="primary"
-                isLoading={create.isPending}
-                isDisabled={topic.trim() === ''}
-                onClick={start}
-                data-testid="start-session"
-              />
-              {create.isError ? (
-                <Banner
-                  status="error"
-                  title={m.home_create_failed({ reason: errorText(create.error) })}
-                />
-              ) : null}
-            </VStack>
-
-            <VStack gap={2}>
-              <Heading level={2}>{m.home_sessions_title()}</Heading>
-              {sessions.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
-              {sessions.isError ? (
-                <Banner
-                  status="error"
-                  title={m.account_load_failed({ reason: errorText(sessions.error) })}
-                  endContent={
-                    <Button label={m.turn_retry()} onClick={() => void sessions.refetch()} />
+            <HStack gap={10} vAlign="start" wrap="wrap">
+              <VStack gap={6} width={homeColumn}>
+                <StartTopic
+                  topic={topic}
+                  onTopic={setTopic}
+                  onStart={start}
+                  isStarting={create.isPending}
+                  sources={<SourcePicker library={library} value={picked} onChange={setPicked} />}
+                  error={
+                    create.isError ? (
+                      <Banner
+                        status="error"
+                        title={m.home_create_failed({ reason: errorText(create.error) })}
+                      />
+                    ) : null
                   }
                 />
-              ) : null}
-              {sessions.data?.sessions.length === 0 ? (
-                <Text type="supporting" data-testid="no-sessions">
-                  {m.home_sessions_empty()}
-                </Text>
-              ) : null}
-              {sessions.data !== undefined && sessions.data.sessions.length > 0 ? (
-                <VStack gap={1} as="ul" data-testid="session-list">
-                  {[...sessions.data.sessions]
-                    .sort((a, b) => b.updatedAt - a.updatedAt)
-                    .map((session) => (
-                      <Item
-                        as="li"
-                        key={session.sessionId}
-                        label={session.topic === '' ? session.sessionId : session.topic}
-                        description={m.home_session_updated({
-                          date: formatDate(session.updatedAt),
-                        })}
-                        onClick={() =>
-                          void navigate({
-                            to: '/a/$sessionId',
-                            params: { sessionId: session.sessionId },
-                          })
-                        }
-                        data-testid="session-item"
-                      />
-                    ))}
-                </VStack>
-              ) : null}
-            </VStack>
+                <PracticeLink />
+              </VStack>
+              <VStack gap={2} width={homeColumn}>
+                <Heading level={2}>{m.home_sessions_title()}</Heading>
+                {sessions.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+                {sessions.isError ? (
+                  <Banner
+                    status="error"
+                    title={m.account_load_failed({ reason: errorText(sessions.error) })}
+                    endContent={
+                      <Button label={m.turn_retry()} onClick={() => void sessions.refetch()} />
+                    }
+                  />
+                ) : null}
+                {sessions.data === undefined ? null : (
+                  <SessionRows
+                    sessions={[...sessions.data.sessions].sort((a, b) => b.updatedAt - a.updatedAt)}
+                    onOpen={(sessionId) =>
+                      void navigate({ to: '/a/$sessionId', params: { sessionId } })
+                    }
+                  />
+                )}
+              </VStack>
+            </HStack>
           </VStack>
         </LayoutContent>
       }

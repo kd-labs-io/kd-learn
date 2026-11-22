@@ -24,6 +24,7 @@ import { relationText } from './relation';
 import { ChunksDrawer } from '../sources/ChunksDrawer';
 import type { SourceLibrary } from '../sources/library';
 import type { KnowledgeSource, PendingExtraction } from './source';
+import { pageWidth } from '../app/page';
 
 const GraphFigure = lazy(() => import('./GraphFigure'));
 
@@ -60,6 +61,7 @@ export function GraphScreen({
   }
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
@@ -236,6 +238,7 @@ function ReadyGraph({
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       end={
         wide ? (

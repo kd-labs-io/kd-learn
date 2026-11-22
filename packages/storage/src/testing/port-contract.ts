@@ -171,6 +171,30 @@ export const portContract = (name: string, make: () => StorageService) =>
       ]);
     });
 
+    it('lists the plan progress and whether the lesson ended', async () => {
+      const storage = make();
+      await Effect.runPromise(storage.appendEvents('s', [sessionCreated('s', 'Graphs', 1)]));
+      let [row] = await Effect.runPromise(storage.listSessions);
+      expect([row?.stepsTotal, row?.stepsResolved, row?.completed]).toEqual([undefined, 0, false]);
+      const step = (id: string) => ({ id, title: id, goal: id, dependsOn: [] });
+      await Effect.runPromise(
+        storage.appendEvents('s', [
+          {
+            _tag: 'PlanCreated',
+            id: 'p',
+            at: 2,
+            turnId: 't',
+            plan: { nodes: [step('a'), step('b')] },
+          },
+          { _tag: 'StepCompleted', id: 'c', at: 3, turnId: 't', stepId: 'a' },
+          { _tag: 'StepSkipped', id: 'k', at: 4, stepId: 'b' },
+          { _tag: 'SessionCompleted', id: 'd', at: 4 },
+        ]),
+      );
+      [row] = await Effect.runPromise(storage.listSessions);
+      expect([row?.stepsTotal, row?.stepsResolved, row?.completed]).toEqual([2, 2, true]);
+    });
+
     it('saves, replaces and resets the teaching profile', async () => {
       const storage = make();
       expect(await Effect.runPromise(storage.getProfile)).toBeUndefined();

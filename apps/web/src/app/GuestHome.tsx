@@ -1,29 +1,24 @@
 import { Banner } from '@astryxdesign/core/Banner';
 import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
-import { Item } from '@astryxdesign/core/Item';
+import { HStack } from '@astryxdesign/core/HStack';
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout';
 import { Spinner } from '@astryxdesign/core/Spinner';
-import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { defaultProfile, resolveProfile } from '@kd-learn/agent/client';
 import { Effect } from 'effect';
-import { getLocale, getLocaleTag, m } from '@kd-learn/i18n';
+import { getLocale, m } from '@kd-learn/i18n';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import type { LocalMode } from '../account/auth';
 import { useStoragePersistent } from '../learn/hooks';
 import { AppHeader } from './AppHeader';
+import { homeColumn, SessionRows, StartTopic } from './HomeParts';
 import { PracticeLink } from '../practice/PracticeLink';
 import { useGuestSourceLibrary, preferredProvider } from '../sources/library';
 import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { runStorage, useGuestSettings, useSessionList } from '../storage';
-
-export const formatDate = (epochMs: number) =>
-  new Intl.DateTimeFormat(getLocaleTag(), { dateStyle: 'medium', timeStyle: 'short' }).format(
-    epochMs,
-  );
+import { pageWidth } from './page';
 
 /** Home in guest and demo mode: sessions in the local DB (plan 2.2). */
 export function GuestHome({ mode }: { mode: LocalMode }) {
@@ -97,14 +92,11 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
 
   return (
     <Layout
+      contentWidth={pageWidth}
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
-          <VStack gap={6} maxWidth="68ch">
-            <Text type="large" color="secondary">
-              {m.app_tagline()}
-            </Text>
-
+          <VStack gap={6}>
             {persistent === false ? (
               <Banner
                 status="warning"
@@ -113,7 +105,6 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 data-testid="not-persistent"
               />
             ) : null}
-
             {mode === 'demo' ? (
               <Banner
                 status="info"
@@ -122,7 +113,6 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 data-testid="demo-banner"
               />
             ) : null}
-
             {needsKey ? (
               <Banner
                 status="info"
@@ -138,69 +128,43 @@ export function GuestHome({ mode }: { mode: LocalMode }) {
                 data-testid="need-key"
               />
             ) : null}
-
-            <PracticeLink />
-
-            <VStack gap={3}>
-              <Heading level={2}>{m.home_new_title()}</Heading>
-              <TextInput
-                label={m.home_topic_label()}
-                placeholder={m.home_topic_placeholder()}
-                value={topic}
-                onChange={setTopic}
-                onEnter={() => void start()}
-                data-testid="topic-input"
-              />
-              <SourcePicker library={library} value={picked} onChange={setPicked} />
-              <Button
-                label={m.home_start()}
-                variant="primary"
-                isLoading={creating}
-                isDisabled={topic.trim() === ''}
-                onClick={() => void start()}
-                data-testid="start-session"
-              />
-              {error === undefined ? null : (
-                <Banner status="error" title={m.home_create_failed({ reason: error })} />
-              )}
-            </VStack>
-
-            <VStack gap={2}>
-              <Heading level={2}>{m.home_sessions_title()}</Heading>
-              {sessions.status === 'loading' ? (
-                <Spinner size="sm" label={m.learn_loading()} />
-              ) : null}
-              {sessions.status === 'error' ? (
-                <Banner
-                  status="error"
-                  title={m.storage_error({ reason: sessions.error.message })}
+            <HStack gap={10} vAlign="start" wrap="wrap">
+              <VStack gap={6} width={homeColumn}>
+                <StartTopic
+                  topic={topic}
+                  onTopic={setTopic}
+                  onStart={() => void start()}
+                  isStarting={creating}
+                  sources={<SourcePicker library={library} value={picked} onChange={setPicked} />}
+                  error={
+                    error === undefined ? null : (
+                      <Banner status="error" title={m.home_create_failed({ reason: error })} />
+                    )
+                  }
                 />
-              ) : null}
-              {sessions.status === 'ready' && sessions.data.length === 0 ? (
-                <Text type="supporting" data-testid="no-sessions">
-                  {m.home_sessions_empty()}
-                </Text>
-              ) : null}
-              {sessions.status === 'ready' && sessions.data.length > 0 ? (
-                <VStack gap={1} as="ul" data-testid="session-list">
-                  {sessions.data.map((session) => (
-                    <Item
-                      as="li"
-                      key={session.sessionId}
-                      label={session.topic === '' ? session.sessionId : session.topic}
-                      description={m.home_session_updated({ date: formatDate(session.updatedAt) })}
-                      onClick={() =>
-                        void navigate({
-                          to: '/s/$sessionId',
-                          params: { sessionId: session.sessionId },
-                        })
-                      }
-                      data-testid="session-item"
-                    />
-                  ))}
-                </VStack>
-              ) : null}
-            </VStack>
+                <PracticeLink />
+              </VStack>
+              <VStack gap={2} width={homeColumn}>
+                <Heading level={2}>{m.home_sessions_title()}</Heading>
+                {sessions.status === 'loading' ? (
+                  <Spinner size="sm" label={m.learn_loading()} />
+                ) : null}
+                {sessions.status === 'error' ? (
+                  <Banner
+                    status="error"
+                    title={m.storage_error({ reason: sessions.error.message })}
+                  />
+                ) : null}
+                {sessions.status === 'ready' ? (
+                  <SessionRows
+                    sessions={sessions.data}
+                    onOpen={(sessionId) =>
+                      void navigate({ to: '/s/$sessionId', params: { sessionId } })
+                    }
+                  />
+                ) : null}
+              </VStack>
+            </HStack>
           </VStack>
         </LayoutContent>
       }

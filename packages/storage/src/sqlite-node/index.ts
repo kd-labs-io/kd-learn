@@ -90,7 +90,10 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
   );
   const list = db.prepare(
     `SELECT e.session_id, MIN(e.at) AS created_at, MAX(e.at) AS updated_at, COUNT(*) AS event_count,
-            MAX(CASE WHEN e.tag = 'SessionCreated' THEN e.payload END) AS created
+            MAX(CASE WHEN e.tag = 'SessionCreated' THEN e.payload END) AS created,
+            MAX(CASE WHEN e.tag = 'PlanCreated' THEN e.payload END) AS plan,
+            SUM(CASE WHEN e.tag IN ('StepCompleted', 'StepSkipped') THEN 1 ELSE 0 END) AS resolved,
+            MAX(CASE WHEN e.tag = 'SessionCompleted' THEN 1 ELSE 0 END) AS completed
        FROM events e JOIN sessions s ON s.session_id = e.session_id
       WHERE s.user_id = ?
       GROUP BY e.session_id
@@ -210,6 +213,9 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
           updated_at: number;
           event_count: number;
           created: string | null;
+          plan: string | null;
+          resolved: number;
+          completed: number;
         }>
       ).map((row) => {
         const session: SessionRow = {
@@ -218,6 +224,9 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
           updatedAt: Number(row.updated_at),
           eventCount: Number(row.event_count),
           created: row.created ?? undefined,
+          plan: row.plan ?? undefined,
+          resolved: Number(row.resolved),
+          completed: Number(row.completed) === 1,
         };
         return summarize(session);
       }),

@@ -96,3 +96,5 @@
 - **Cập nhật:** 2026-11-22: mở lại phase 6 (hoàn tác lần đóng: bước 7 kiểm trên máy thật chưa làm, không chuyển sang phase 7); giữ hai việc mở (hình Haiku ở dark, header ba dòng)
 - **Cập nhật:** 2026-11-22: xong bước 7 phase 6 (người dùng báo ổn trên điện thoại thật) và đóng phase 6 (progress và plan chủ đề sang `archive/`); mục 7 sang phase 7
 - **Cập nhật:** 2026-11-22: phase 7 thành cải thiện UI / UX (phạm vi chốt khi lên plan); app mobile (Capacitor) sang phase 8; sửa tham chiếu trong rủi ro 5, kiến trúc, sản phẩm, mục 6–7
+- **Cập nhật:** 2026-11-22: plan nháp phase 7 (`cai-thien-ux.md`: phát hiện từ ảnh chụp trang chủ và màn học, đề xuất B1–B4 chờ xác nhận, bước 0–9; `progress/phase-7.md`); dòng phase 7 ở mục 4 có phạm vi và tiêu chí xong; mục 7 sang bước xác nhận
+- **Cập nhật:** 2026-11-22: phase 7 bước 0–6, một phần 7–8 (khung trang chung, header mới, trang chủ hai cột có trạng thái buổi học, màn học một cột, side chat đóng mặc định và đọc lại luồng cũ, nạp trước KaTeX, script `shots`, mục "UX" trong `DESIGN.md`, skill `ux-check`); B chốt theo đề xuất, B3 chưa làm xoá; mục 6 bỏ ba việc đã xong, thêm xoá buổi học và phần còn lại phase 7
