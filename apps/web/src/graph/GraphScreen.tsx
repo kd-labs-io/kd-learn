@@ -21,6 +21,8 @@ import { m } from '@kd-learn/i18n';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { relationText } from './relation';
+import { ChunksDrawer } from '../sources/ChunksDrawer';
+import type { SourceLibrary } from '../sources/library';
 import type { KnowledgeSource, PendingExtraction } from './source';
 
 const GraphFigure = lazy(() => import('./GraphFigure'));
@@ -36,11 +38,24 @@ const masteryText = (p: PropositionView) =>
 
 const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
-export function GraphScreen({ source }: { readonly source: KnowledgeSource }) {
+export function GraphScreen({
+  source,
+  library,
+}: {
+  readonly source: KnowledgeSource;
+  /** The documents a proposition comes from open from here (phase 4 A3). */
+  readonly library?: SourceLibrary;
+}) {
   const view = source.view;
   if (view.status === 'ready') {
     return (
-      <ReadyGraph source={source} graph={view.graph} topics={view.topics} pending={view.pending} />
+      <ReadyGraph
+        source={source}
+        graph={view.graph}
+        topics={view.topics}
+        pending={view.pending}
+        library={library}
+      />
     );
   }
   return (
@@ -64,11 +79,13 @@ function ReadyGraph({
   graph,
   topics,
   pending,
+  library,
 }: {
   readonly source: KnowledgeSource;
   readonly graph: GraphView;
   readonly topics: ReadonlyMap<string, string>;
   readonly pending: ReadonlyArray<PendingExtraction>;
+  readonly library: SourceLibrary | undefined;
 }) {
   const wide = useMediaQuery('(min-width: 980px)');
   const [query, setQuery] = useState('');
@@ -118,6 +135,7 @@ function ReadyGraph({
       graph={graph}
       byId={byId}
       topics={topics}
+      library={library}
       onSelect={setSelectedId}
       onRetire={async (id) => {
         await source.retire(id);
@@ -303,6 +321,7 @@ function PropositionDetail({
   graph,
   byId,
   topics,
+  library,
   onSelect,
   onRetire,
 }: {
@@ -310,12 +329,17 @@ function PropositionDetail({
   readonly graph: GraphView;
   readonly byId: ReadonlyMap<string, PropositionView>;
   readonly topics: ReadonlyMap<string, string>;
+  readonly library: SourceLibrary | undefined;
   readonly onSelect: (id: string) => void;
   readonly onRetire: (id: string) => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [document, setDocument] = useState<{ sourceId: string; ordinal: number } | undefined>();
+  const titles = new Map(
+    library?.view.status === 'ready' ? library.view.sources.map((s) => [s.sourceId, s.title]) : [],
+  );
   if (proposition === undefined) {
     return <Text type="supporting">{m.graph_detail_none()}</Text>;
   }
@@ -358,7 +382,33 @@ function PropositionDetail({
             />
           ))}
         </List>
+        {library === undefined ||
+        !proposition.sources.some((s) => (s.documents?.length ?? 0) > 0) ? null : (
+          <HStack gap={1} wrap="wrap" data-testid="graph-documents">
+            {proposition.sources.flatMap((s) =>
+              (s.documents ?? []).map((d) => (
+                <Button
+                  key={`${s.sessionId}/${d.sourceId}/${d.ordinal}`}
+                  size="sm"
+                  variant="secondary"
+                  label={titles.get(d.sourceId) ?? m.sources_detached()}
+                  isDisabled={!titles.has(d.sourceId)}
+                  onClick={() => setDocument(d)}
+                  data-testid="graph-document"
+                />
+              )),
+            )}
+          </HStack>
+        )}
       </VStack>
+      {library === undefined ? null : (
+        <ChunksDrawer
+          title={document === undefined ? undefined : titles.get(document.sourceId)}
+          focus={document?.ordinal}
+          load={() => library.chunks(document?.sourceId ?? '')}
+          onClose={() => setDocument(undefined)}
+        />
+      )}
       <VStack gap={2}>
         <Text type="label">{m.graph_edges_out()}</Text>
         {edgeItems(out, (e) => e.to)}

@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useSyncExternalStore } from 'react';
 import { clientOptions } from '../account/api';
 import { signOut } from '../account/auth';
+import { useAccountLessonSources } from '../sources/library';
 import { getAccountLesson } from './account-lesson';
 import { LearnScreen } from './LearnScreen';
 
@@ -12,6 +13,7 @@ export function AccountLessonScreen({ token, sessionId }: { token: string; sessi
     options: clientOptions(token),
     onUnauthorized: signOut,
   });
+  const sources = useAccountLessonSources(token, sessionId);
   const { view, runner } = useSyncExternalStore(
     lesson.subscribe,
     lesson.getSnapshot,
@@ -19,7 +21,14 @@ export function AccountLessonScreen({ token, sessionId }: { token: string; sessi
   );
   return (
     <LearnScreen
-      source={{ view, state: runner, actions: lesson, elsewhere: false, persistent: true }}
+      source={{
+        view,
+        state: runner,
+        actions: lesson,
+        elsewhere: false,
+        persistent: true,
+        sources,
+      }}
       onHome={() => void navigate({ to: '/' })}
       onSettings={() => void navigate({ to: '/settings' })}
     />

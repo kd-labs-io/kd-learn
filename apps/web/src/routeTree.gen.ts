@@ -17,6 +17,7 @@ import { Route as PracticeRouteImport } from './routes/practice'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SourcesRouteImport } from './routes/sources'
 import { Route as ASessionIdRouteImport } from './routes/a.$sessionId'
 import { Route as ApiConfigRouteImport } from './routes/api.config'
 import { Route as ApiEndpointsRouteImport } from './routes/api.endpoints'
@@ -70,6 +71,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SourcesRoute = SourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ASessionIdRoute = ASessionIdRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/sources': typeof SourcesRoute
   '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/sources': typeof SourcesRoute
   '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/sources': typeof SourcesRoute
   '/a/$sessionId': typeof ASessionIdRoute
   '/api/config': typeof ApiConfigRoute
   '/api/endpoints': typeof ApiEndpointsRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/register'
     | '/settings'
+    | '/sources'
     | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/register'
     | '/settings'
+    | '/sources'
     | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/register'
     | '/settings'
+    | '/sources'
     | '/a/$sessionId'
     | '/api/config'
     | '/api/endpoints'
@@ -300,6 +312,7 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
+  SourcesRoute: typeof SourcesRoute
   ASessionIdRoute: typeof ASessionIdRoute
   ApiConfigRoute: typeof ApiConfigRoute
   ApiEndpointsRoute: typeof ApiEndpointsRoute
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sources': {
+      id: '/sources'
+      path: '/sources'
+      fullPath: '/sources'
+      preLoaderRoute: typeof SourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/a/$sessionId': {
@@ -484,6 +504,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
+  SourcesRoute: SourcesRoute,
   ASessionIdRoute: ASessionIdRoute,
   ApiConfigRoute: ApiConfigRoute,
   ApiEndpointsRoute: ApiEndpointsRoute,

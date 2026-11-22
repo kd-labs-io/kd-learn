@@ -18,10 +18,12 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
-import { canSkipStep, type EventLog, type Session } from '@kd-learn/core';
+import { canSkipStep, type Citation, type EventLog, type Session } from '@kd-learn/core';
 import { LessonMarkdown } from '@kd-learn/ui/components/LessonMarkdown';
 import { Result } from 'effect';
 import { useEffect, useRef, useState } from 'react';
+import { ChunksDrawer } from '../sources/ChunksDrawer';
+import { LessonSourcesPanel } from '../sources/LessonSourcesPanel';
 import { PlanPanel } from './PlanPanel';
 import { shouldAutoStart, type RunnerState } from './runner';
 import { SideChat } from './SideChat';
@@ -50,6 +52,8 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
   const showPlanColumn = useMediaQuery('(min-width: 768px)');
   const showSideColumn = useMediaQuery('(min-width: 1180px)');
   const [sideOpen, setSideOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [cited, setCited] = useState<Citation | undefined>(undefined);
 
   const projected = view.status === 'ready' ? view.session : undefined;
   const session =
@@ -148,6 +152,15 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                 </Heading>
               </HStack>
               <HStack gap={2} vAlign="center">
+                {source.sources === undefined ? null : (
+                  <Button
+                    label={m.lesson_sources({ count: session.sources.length })}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSourcesOpen(true)}
+                    data-testid="lesson-sources-open"
+                  />
+                )}
                 {showSideColumn ? null : (
                   <Button
                     label={m.side_open()}
@@ -187,7 +200,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                   {planPanel}
                 </Collapsible>
               )}
-              <Conversation session={session} state={state} />
+              <Conversation session={session} state={state} onCite={setCited} />
             </VStack>
           </LayoutContent>
         }
@@ -217,6 +230,29 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
           </LayoutFooter>
         }
       />
+      {source.sources === undefined ? null : (
+        <>
+          <Drawer
+            isOpen={sourcesOpen}
+            onOpenChange={setSourcesOpen}
+            label={m.lesson_sources_title()}
+            padding={4}
+          >
+            <LessonSourcesPanel session={session} sources={source.sources} />
+          </Drawer>
+          <ChunksDrawer
+            title={
+              cited === undefined
+                ? undefined
+                : (session.sources.find((s) => s.sourceId === cited.sourceId)?.title ??
+                  m.sources_detached())
+            }
+            focus={cited?.ordinal}
+            load={() => source.sources!.library.chunks(cited?.sourceId ?? '')}
+            onClose={() => setCited(undefined)}
+          />
+        </>
+      )}
       {showSideColumn ? null : (
         <Drawer isOpen={sideOpen} onOpenChange={setSideOpen} label={m.side_title()} padding={4}>
           {sideChat}
@@ -226,7 +262,16 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
   );
 }
 
-function Conversation({ session, state }: { session: Session; state: RunnerState }) {
+function Conversation({
+  session,
+  state,
+  onCite,
+}: {
+  session: Session;
+  state: RunnerState;
+  onCite: (citation: Citation) => void;
+}) {
+  const titles = new Map(session.sources.map((s) => [s.sourceId, s.title]));
   const items = conversationOf(session);
   const endRef = useRef<HTMLElement>(null);
   const { live } = state.main;
@@ -254,6 +299,20 @@ function Conversation({ session, state }: { session: Session; state: RunnerState
           <VStack key={item.key} gap={1} data-testid="msg-tutor">
             <Text type="supporting">{m.conv_tutor()}</Text>
             <LessonMarkdown>{item.content}</LessonMarkdown>
+            {item.citations === undefined ? null : (
+              <HStack gap={1} wrap="wrap" data-testid="citations">
+                {item.citations.map((citation) => (
+                  <Button
+                    key={citation.label}
+                    size="sm"
+                    variant="secondary"
+                    label={`S${citation.label} · ${titles.get(citation.sourceId) ?? m.sources_detached()}`}
+                    onClick={() => onCite(citation)}
+                    data-testid="citation"
+                  />
+                ))}
+              </HStack>
+            )}
           </VStack>
         ),
       )}

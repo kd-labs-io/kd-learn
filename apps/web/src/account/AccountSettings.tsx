@@ -24,6 +24,8 @@ import { roleFallback } from '@kd-learn/api';
 import { m } from '@kd-learn/i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useAccountSourceLibrary } from '../sources/library';
+import { SearchPreference } from '../sources/SearchPreference';
 import { AppHeader } from '../app/AppHeader';
 import { ProfileLink } from '../profile/ProfileLink';
 import { errorCode, errorText, keys, useAccountApi } from './api';
@@ -82,6 +84,7 @@ const settingsErrorText = (error: unknown) => {
 };
 
 export function AccountSettingsScreen({ token }: { token: string }) {
+  const library = useAccountSourceLibrary(token);
   const { call } = useAccountApi();
   const settings = useQuery({
     queryKey: keys.settings(token),
@@ -114,6 +117,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
                   endpoints={endpoints.data ?? []}
                 />
                 <Roles token={token} settings={settings.data} />
+                <SearchPreference providers={library.providers} />
                 <ProfileLink />
               </>
             )}
