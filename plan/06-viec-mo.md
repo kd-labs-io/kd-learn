@@ -12,7 +12,6 @@
 - Marketplace theme: chạy riêng trên từng server hay dùng một registry chung, cách kiểm duyệt, và theme dùng chung giấy phép nào.
 - Adapter ảnh tương thích OpenAI (`/images/generations`) chưa gọi thật tới endpoint nào; tham số khớp danh sách của OpenRouter (phase 5).
 - Với yêu cầu mơ hồ ("something interactive"), Haiku đôi khi vẽ sơ đồ thay vì làm demo (bước 10 phase 5). Cân nhắc chỉnh mô tả tool nếu người dùng gặp nhiều.
-
 - Hình do Haiku vẽ ở dark mode chưa thấy với model thật (bước 6 phase 6: Haiku để hình cho bước sau). Kiểm khi kiểm máy thật.
 - Header chung (`AppHeader`) xuống ba dòng ở 393 px, chiếm khoảng một phần tư màn hình (bước 5 phase 6): xem lại sau khi người dùng kiểm trên máy thật.
 
