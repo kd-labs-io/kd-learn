@@ -457,5 +457,6 @@
   "composer_waiting": "Wait for the tutor to finish",
   "side_hide": "Hide side chat",
   "side_thread_label": "Ask about",
-  "side_history": "Earlier questions"
+  "side_history": "Earlier questions",
+  "settings_learning": "Learning"
 }

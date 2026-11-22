@@ -50,6 +50,23 @@ const shadow = (s: Theme['shadow']['sm'], text: string) =>
 
 const px = (n: number) => `${n / 16}rem`;
 
+/** Relative luminance (WCAG) of a hex color. */
+const luminance = (hex: string) => {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/**
+ * Background of a raised block (Card): lighter than the page in both modes, so a block stands
+ * out (DESIGN.md "UX"). A light set takes its `bg` (lighter than `surface`); a dark set lifts
+ * `surface` a little toward `text`.
+ */
+const raised = (c: ColorTokens) =>
+  luminance(c.bg) > 0.5 ? c.bg : `color-mix(in srgb, ${c.text} 6%, ${c.surface})`;
+
 /** The color variables of one color set. */
 const colorVars = (c: ColorTokens): CssVars => {
   const status = (name: 'success' | 'warning' | 'error' | 'info', color: string) => ({
@@ -66,7 +83,7 @@ const colorVars = (c: ColorTokens): CssVars => {
     // Surfaces
     '--color-background-body': c.bg,
     '--color-background-surface': c.surface,
-    '--color-background-card': c.surface,
+    '--color-background-card': raised(c),
     '--color-background-muted': c.surface,
     '--color-background-popover': c.bg,
     '--color-border': c.border,

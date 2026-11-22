@@ -16,6 +16,7 @@ import { homeColumn, SessionRows, StartTopic } from '../app/HomeParts';
 import { preferredProvider, useAccountSourceLibrary } from '../sources/library';
 import { noSources, SourcePicker, type PickedSources } from '../sources/SourcePicker';
 import { errorText, keys, useAccountApi } from './api';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 export function AccountHome({ token }: { token: string }) {
@@ -107,28 +108,34 @@ export function AccountHome({ token }: { token: string }) {
                     ) : null
                   }
                 />
-                <PracticeLink />
+                <Block gap={0}>
+                  <PracticeLink />
+                </Block>
               </VStack>
-              <VStack gap={2} width={homeColumn}>
-                <Heading level={2}>{m.home_sessions_title()}</Heading>
-                {sessions.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
-                {sessions.isError ? (
-                  <Banner
-                    status="error"
-                    title={m.account_load_failed({ reason: errorText(sessions.error) })}
-                    endContent={
-                      <Button label={m.turn_retry()} onClick={() => void sessions.refetch()} />
-                    }
-                  />
-                ) : null}
-                {sessions.data === undefined ? null : (
-                  <SessionRows
-                    sessions={[...sessions.data.sessions].sort((a, b) => b.updatedAt - a.updatedAt)}
-                    onOpen={(sessionId) =>
-                      void navigate({ to: '/a/$sessionId', params: { sessionId } })
-                    }
-                  />
-                )}
+              <VStack width={homeColumn}>
+                <Block gap={3}>
+                  <Heading level={2}>{m.home_sessions_title()}</Heading>
+                  {sessions.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
+                  {sessions.isError ? (
+                    <Banner
+                      status="error"
+                      title={m.account_load_failed({ reason: errorText(sessions.error) })}
+                      endContent={
+                        <Button label={m.turn_retry()} onClick={() => void sessions.refetch()} />
+                      }
+                    />
+                  ) : null}
+                  {sessions.data === undefined ? null : (
+                    <SessionRows
+                      sessions={[...sessions.data.sessions].sort(
+                        (a, b) => b.updatedAt - a.updatedAt,
+                      )}
+                      onOpen={(sessionId) =>
+                        void navigate({ to: '/a/$sessionId', params: { sessionId } })
+                      }
+                    />
+                  )}
+                </Block>
               </VStack>
             </HStack>
           </VStack>

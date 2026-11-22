@@ -90,6 +90,7 @@ The same AA rule holds in both sets. Dark shadows are black at twice the light o
 Rules every screen follows (phase 7, `plan/cai-thien-ux.md`). Check them with the `ux-check` skill before delivering UI work.
 
 - **One frame.** Every page `Layout` sets `contentWidth={pageWidth}` (`apps/web/src/app/page.ts`, 1120 px): header, content and footer align to one centred column. No content stuck to the left edge of a wide screen.
+- **Sections are raised blocks.** Each section of a page is a `Block` (`apps/web/src/app/Block.tsx`): a `Card` with `elevation="low"`, padding 24 px (16 px under 640 px), 24 px between blocks. The card color (`--color-background-card`) is lighter than the page in both modes: `bg` in a light set, `surface` lifted 6% toward `text` in a dark one. In the lesson, tutor messages and the answer box are raised cards; learner messages stay bubbles.
 - **One main action per screen.** It is the only `primary` button and the largest control; the rest are `secondary` or `ghost`.
 - **Navigation says where you are.** The current place is marked (`aria-current="page"`, filled button). Account actions (language, admin, sign out) live in the account menu, not beside the places.
 - **A box sits under what it answers.** A composer shares the column of its conversation (the lesson uses a nested `Layout` with `contentWidth="72ch"`).

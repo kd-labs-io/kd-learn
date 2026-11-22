@@ -31,6 +31,7 @@ import { useState } from 'react';
 import { errorText } from '../account/api';
 import { AppHeader } from '../app/AppHeader';
 import type { ProfileSource } from './source';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 const PROMPT_KEYS: ReadonlyArray<PromptKey> = [
@@ -191,34 +192,38 @@ export function ProfileScreen({ source }: { source: ProfileSource }) {
                     data-testid="profile-duplicate"
                   />
                 </HStack>
-                <ProfileFields value={toForm(view.profile)} isReadOnly />
+                <Block>
+                  <ProfileFields value={toForm(view.profile)} isReadOnly />
+                </Block>
               </>
             ) : (
               <>
                 <Text>{m.profile_custom_intro()}</Text>
-                <ProfileEditor
-                  // A new copy, a save from elsewhere or a reset starts the form again.
-                  key={editing?.id ?? view.profile.id}
-                  initial={editing ?? toForm(view.profile)}
-                  isNew={editing !== undefined}
-                  onSave={async (value) => {
-                    try {
-                      // The draft stays until the store shows it saved, so nothing flickers.
-                      await source.save(toSaved(value));
-                      setMessage({ status: 'success', text: m.profile_saved() });
-                    } catch (cause) {
-                      setMessage({
-                        status: 'error',
-                        text: m.profile_save_failed({ reason: errorText(cause) }),
-                      });
-                    }
-                  }}
-                  onCancel={() => {
-                    setDraft(undefined);
-                    setMessage(undefined);
-                  }}
-                  onReset={view.saved ? () => void reset() : undefined}
-                />
+                <Block>
+                  <ProfileEditor
+                    // A new copy, a save from elsewhere or a reset starts the form again.
+                    key={editing?.id ?? view.profile.id}
+                    initial={editing ?? toForm(view.profile)}
+                    isNew={editing !== undefined}
+                    onSave={async (value) => {
+                      try {
+                        // The draft stays until the store shows it saved, so nothing flickers.
+                        await source.save(toSaved(value));
+                        setMessage({ status: 'success', text: m.profile_saved() });
+                      } catch (cause) {
+                        setMessage({
+                          status: 'error',
+                          text: m.profile_save_failed({ reason: errorText(cause) }),
+                        });
+                      }
+                    }}
+                    onCancel={() => {
+                      setDraft(undefined);
+                      setMessage(undefined);
+                    }}
+                    onReset={view.saved ? () => void reset() : undefined}
+                  />
+                </Block>
               </>
             )}
           </VStack>

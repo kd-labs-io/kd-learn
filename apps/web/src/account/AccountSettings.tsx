@@ -32,6 +32,7 @@ import { ProfileLink } from '../profile/ProfileLink';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { errorCode, errorText, keys, useAccountApi } from './api';
 import { pageWidth } from '../app/page';
+import { Block } from '../app/Block';
 
 type Provider = ConnectionInfo['provider'];
 
@@ -109,7 +110,7 @@ export function AccountSettingsScreen({ token }: { token: string }) {
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
-          <VStack gap={6} maxWidth="60ch">
+          <VStack gap={6} maxWidth="720px">
             <Heading level={2}>{m.settings_title()}</Heading>
             {settings.isPending ? <Spinner size="sm" label={m.learn_loading()} /> : null}
             {settings.isError ? (
@@ -126,8 +127,11 @@ export function AccountSettingsScreen({ token }: { token: string }) {
                   endpoints={endpoints.data ?? []}
                 />
                 <Roles token={token} settings={settings.data} endpoints={endpoints.data ?? []} />
-                <SearchPreference providers={library.providers} />
-                <ProfileLink />
+                <Block gap={3}>
+                  <Heading level={3}>{m.settings_learning()}</Heading>
+                  <SearchPreference providers={library.providers} />
+                  <ProfileLink />
+                </Block>
                 <AppearanceSettings isSynced />
               </>
             )}
@@ -199,7 +203,7 @@ function Connections({
   };
 
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.connections_title()}</Heading>
       <Text type="supporting">{m.connections_hint()}</Text>
       {settings.connections.length === 0 ? (
@@ -301,7 +305,7 @@ function Connections({
           data-testid="connection-save"
         />
       </HStack>
-    </VStack>
+    </Block>
   );
 }
 
@@ -382,7 +386,7 @@ function Roles({
     }));
 
   return (
-    <VStack gap={3}>
+    <Block gap={3}>
       <Heading level={3}>{m.roles_title()}</Heading>
       <Text type="supporting">{m.roles_hint()}</Text>
       {settings.connections.length === 0 ? (
@@ -465,7 +469,7 @@ function Roles({
           </HStack>
         </>
       )}
-    </VStack>
+    </Block>
   );
 }
 

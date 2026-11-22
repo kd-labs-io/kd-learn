@@ -20,6 +20,7 @@ import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { useEndpoints, useStoragePersistent } from '../learn/hooks';
 import { runStorage, useGuestSettings } from '../storage';
 import { pageWidth } from './page';
+import { Block } from './Block';
 
 const DEFAULT_MODEL: Partial<Record<GuestProvider, string>> = { anthropic: 'claude-haiku-5-5' };
 
@@ -110,7 +111,7 @@ export function GuestSettings() {
       header={<AppHeader />}
       content={
         <LayoutContent padding={6}>
-          <VStack gap={5} maxWidth="56ch">
+          <VStack gap={6} maxWidth="720px">
             <Heading level={2}>{m.settings_title()}</Heading>
 
             {persistent === false ? (
@@ -127,87 +128,107 @@ export function GuestSettings() {
               <Banner status="error" title={m.storage_error({ reason: stored.error.message })} />
             ) : null}
 
-            <Selector
-              label={m.settings_provider()}
-              options={providerOptions}
-              value={provider}
-              onChange={(value) => {
-                const next = value as GuestProvider;
-                setProvider(next);
-                // A model name belongs to a provider: offer the default one when the field is untouched.
-                if (model === '' || model === DEFAULT_MODEL[provider]) {
-                  setModel(DEFAULT_MODEL[next] ?? '');
-                }
-              }}
-              data-testid="provider"
-            />
-
-            {provider === 'openai-compatible' ? (
+            <Block gap={4}>
+              <Heading level={3}>{m.settings_model()}</Heading>
               <Selector
-                label={m.settings_endpoint()}
-                placeholder={m.settings_endpoint_placeholder()}
-                options={offered.map((endpoint) => ({ value: endpoint.id, label: endpoint.label }))}
-                value={endpointGone ? '' : endpointId}
-                onChange={setEndpointId}
-                {...(endpointGone
-                  ? { status: { type: 'error' as const, message: m.settings_endpoint_gone() } }
-                  : endpoints.status === 'error'
-                    ? { status: { type: 'error' as const, message: m.settings_endpoints_failed() } }
-                    : {})}
-                data-testid="endpoint"
+                label={m.settings_provider()}
+                options={providerOptions}
+                value={provider}
+                onChange={(value) => {
+                  const next = value as GuestProvider;
+                  setProvider(next);
+                  // A model name belongs to a provider: offer the default one when the field is untouched.
+                  if (model === '' || model === DEFAULT_MODEL[provider]) {
+                    setModel(DEFAULT_MODEL[next] ?? '');
+                  }
+                }}
+                data-testid="provider"
               />
-            ) : null}
 
-            <TextInput
-              label={m.settings_model()}
-              description={m.settings_model_description()}
-              value={model}
-              onChange={setModel}
-              autoComplete="off"
-              hasSpellCheck={false}
-              data-testid="model"
-            />
+              {provider === 'openai-compatible' ? (
+                <Selector
+                  label={m.settings_endpoint()}
+                  placeholder={m.settings_endpoint_placeholder()}
+                  options={offered.map((endpoint) => ({
+                    value: endpoint.id,
+                    label: endpoint.label,
+                  }))}
+                  value={endpointGone ? '' : endpointId}
+                  onChange={setEndpointId}
+                  {...(endpointGone
+                    ? { status: { type: 'error' as const, message: m.settings_endpoint_gone() } }
+                    : endpoints.status === 'error'
+                      ? {
+                          status: {
+                            type: 'error' as const,
+                            message: m.settings_endpoints_failed(),
+                          },
+                        }
+                      : {})}
+                  data-testid="endpoint"
+                />
+              ) : null}
 
-            <TextInput
-              label={m.settings_key()}
-              description={
-                savedKey === undefined ? m.settings_key_description() : m.settings_key_saved_hint()
-              }
-              type="password"
-              value={apiKey}
-              onChange={setApiKey}
-              autoComplete="off"
-              data-testid="api-key"
-            />
-
-            {message === undefined ? null : (
-              <Banner status={message.status} title={message.text} data-testid="settings-message" />
-            )}
-
-            <HStack gap={2}>
-              <Button
-                label={m.settings_save()}
-                variant="primary"
-                onClick={() => void save()}
-                data-testid="save-settings"
+              <TextInput
+                label={m.settings_model()}
+                description={m.settings_model_description()}
+                value={model}
+                onChange={setModel}
+                autoComplete="off"
+                hasSpellCheck={false}
+                data-testid="model"
               />
-              {savedKey === undefined ? null : (
-                <Button
-                  label={m.settings_delete_key()}
-                  variant="destructive"
-                  onClick={() => void deleteKey()}
-                  data-testid="delete-key"
+
+              <TextInput
+                label={m.settings_key()}
+                description={
+                  savedKey === undefined
+                    ? m.settings_key_description()
+                    : m.settings_key_saved_hint()
+                }
+                type="password"
+                value={apiKey}
+                onChange={setApiKey}
+                autoComplete="off"
+                data-testid="api-key"
+              />
+
+              {message === undefined ? null : (
+                <Banner
+                  status={message.status}
+                  title={message.text}
+                  data-testid="settings-message"
                 />
               )}
-            </HStack>
+
+              <HStack gap={2}>
+                <Button
+                  label={m.settings_save()}
+                  variant="primary"
+                  onClick={() => void save()}
+                  data-testid="save-settings"
+                />
+                {savedKey === undefined ? null : (
+                  <Button
+                    label={m.settings_delete_key()}
+                    variant="destructive"
+                    onClick={() => void deleteKey()}
+                    data-testid="delete-key"
+                  />
+                )}
+              </HStack>
+            </Block>
 
             <ImageSettings
               stored={stored.status === 'ready' ? stored.data : undefined}
               endpoints={offered}
             />
 
-            <SearchPreference providers={library.providers} />
-            <ProfileLink />
+            <Block gap={3}>
+              <Heading level={3}>{m.settings_learning()}</Heading>
+              <SearchPreference providers={library.providers} />
+              <ProfileLink />
+            </Block>
             <AppearanceSettings isSynced={false} />
           </VStack>
         </LayoutContent>
@@ -317,7 +338,7 @@ function ImageSettings({
   };
 
   return (
-    <VStack gap={3} data-testid="image-settings">
+    <Block gap={3} data-testid="image-settings">
       <Heading level={3}>{m.image_settings_title()}</Heading>
       <Text type="supporting">{m.image_settings_hint()}</Text>
       <Selector
@@ -393,6 +414,6 @@ function ImageSettings({
           />
         )}
       </HStack>
-    </VStack>
+    </Block>
   );
 }

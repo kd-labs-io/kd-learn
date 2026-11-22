@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { AppHeader } from '../app/AppHeader';
 import { ExerciseBody, ExerciseSolution, exerciseRenderers, renderedTypes } from './renderers';
 import type { PracticeSource } from './source';
+import { Block } from '../app/Block';
 import { pageWidth } from '../app/page';
 
 const formatDay = (epochMs: number) =>
@@ -296,7 +297,7 @@ export function PracticeScreen({ source }: { readonly source: PracticeSource }) 
               <Heading level={2}>{m.practice_title()}</Heading>
               <Text color="secondary">{m.practice_intro()}</Text>
             </VStack>
-            {body}
+            <Block>{body}</Block>
           </VStack>
         </LayoutContent>
       }
