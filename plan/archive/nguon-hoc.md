@@ -1,14 +1,14 @@
 # Plan phần chính phase 4: nguồn học + việc nền
 
 - **Ngày lập:** 2026-11-22
-- **Phạm vi:** phase 4 ([mục 4](04-phases.md)): PDF, import ghi chú, research web với port tìm kiếm và UI cấu hình
+- **Phạm vi:** phase 4 ([mục 4](../04-phases.md)): PDF, import ghi chú, research web với port tìm kiếm và UI cấu hình
 - **Xong khi:** job của tài khoản sống sót khi server khởi động lại
-- **Trạng thái:** đang làm (đã có plan, chưa xong bước nào), tiến độ ở [progress/phase-4.md](progress/phase-4.md)
-- **Nền đã có:** event log của buổi học ([mục 3.5](03-kien-truc.md)), log kiến thức theo người dùng và extraction ba bước ([archive/luyen-tap-graph.md](archive/luyen-tap-graph.md) A1, A3), hàm chọn lát theo từ vựng trong `core` (A4 phase 3), job extraction của tài khoản chạy trong bộ nhớ, khởi động lại thì thành `Interrupted` (`packages/server/src/knowledge/jobs.ts`), secret box cho key (`packages/server/src/settings/secret-box.ts`), ngân sách demo (A8 phase 2). Migration hiện tại: khách v3, server v7. Chưa có `packages/search`, `docker-compose.yml` chưa có SearXNG
+- **Trạng thái:** xong (2026-11-22), tiến độ và kết quả kiểm ở [phase-4.md](phase-4.md)
+- **Nền đã có:** event log của buổi học ([mục 3.5](../03-kien-truc.md)), log kiến thức theo người dùng và extraction ba bước ([archive/luyen-tap-graph.md](luyen-tap-graph.md) A1, A3), hàm chọn lát theo từ vựng trong `core` (A4 phase 3), job extraction của tài khoản chạy trong bộ nhớ, khởi động lại thì thành `Interrupted` (`packages/server/src/knowledge/jobs.ts`), secret box cho key (`packages/server/src/settings/secret-box.ts`), ngân sách demo (A8 phase 2). Migration hiện tại: khách v3, server v7. Chưa có `packages/search`, `docker-compose.yml` chưa có SearXNG
 
 Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 
-1. Chỉ **việc nền** sống sót khi khởi động lại (extraction, xử lý tài liệu, research). Lượt học chính giữ quy tắc "bị ngắt" của [mục 3.5](03-kien-truc.md) (A1).
+1. Chỉ **việc nền** sống sót khi khởi động lại (extraction, xử lý tài liệu, research). Lượt học chính giữ quy tắc "bị ngắt" của [mục 3.5](../03-kien-truc.md) (A1).
 2. Nguồn dùng **cả hai cách**: Teacher dạy dựa trên đoạn liên quan và trích dẫn; mệnh đề trích ra mang nguồn tài liệu. Research là một job tìm web, kết quả thành một nguồn (A2, A5).
 3. **Demo dùng được cả nguồn lẫn research**, tính chung ngân sách demo (A9).
 4. **Key tìm kiếm:** SearXNG và Exa do admin cấu hình cho cả server; web search của provider dùng key model sẵn có của người dùng. Khách dùng nguồn của server (nếu admin cho) hoặc web search của provider với key của mình (A6).
@@ -18,10 +18,10 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 ### A1. Job bền cho tài khoản
 
 - **Bảng `jobs`** trong DB server (migration v8): `(id, user_id, kind, payload, state, attempts, created_at, updated_at, error)`. `kind` thuộc tập đóng: `extraction`, `ingest` (A4), `research` (A5). `state`: `queued`, `running`, `done`, `failed`. Payload là JSON có Effect Schema theo `kind`.
-- Truy cập qua `forUser(userId)` như mọi dữ liệu tài khoản ([rủi ro 26](05-rui-ro.md)). Riêng runner lúc khởi động cần đọc job của mọi người: một hàm riêng của driver server (`openJobs()`), chỉ runner dùng, không có route nào gọi.
+- Truy cập qua `forUser(userId)` như mọi dữ liệu tài khoản ([rủi ro 26](../05-rui-ro.md)). Riêng runner lúc khởi động cần đọc job của mọi người: một hàm riêng của driver server (`openJobs()`), chỉ runner dùng, không có route nào gọi.
 - **Event vẫn là nguồn chính thức.** Bảng `jobs` chỉ giữ việc còn phải làm và số lần thử; kết quả vẫn ghi vào log kiến thức (extraction) hay bảng nguồn (ingest, research). Job xong thì `done`; xoá job cũ là việc dọn dẹp, không ảnh hưởng dữ liệu.
 - **Khởi động lại:** runner đọc job `queued` và `running`. Job `running` của process trước tăng `attempts`; còn dưới trần (mặc định 3) thì xếp hàng chạy lại, quá trần thì `failed` với `Interrupted` (như phase 3). Vậy một job bị cắt giữa chừng do khởi động lại chạy tiếp được, nhưng server khởi động lại liên tục không lặp vô hạn.
-- **Khác lỗi:** lỗi thật (provider, key sai, output sai schema, hết thời hạn) vẫn `failed` ngay, không tự chạy lại; chỉ có nút thử lại (giữ quy tắc của [mục 3.5](03-kien-truc.md)). Bị ngắt do khởi động lại không phải lỗi của job nên được chạy lại. Ghi rõ ngoại lệ này vào mục 3.5 khi xong bước 3.
+- **Khác lỗi:** lỗi thật (provider, key sai, output sai schema, hết thời hạn) vẫn `failed` ngay, không tự chạy lại; chỉ có nút thử lại (giữ quy tắc của [mục 3.5](../03-kien-truc.md)). Bị ngắt do khởi động lại không phải lỗi của job nên được chạy lại. Ghi rõ ngoại lệ này vào mục 3.5 khi xong bước 3.
 - **Chạy lại phải idempotent.** Mọi job ghi kết quả trong một lô cuối, nên chạy lại từ đầu là an toàn:
   - Extraction giữ `extractionId` cũ khi chạy lại: `ExtractionStarted` vẫn mở, lô kết quả kết thúc bằng `SessionExtracted` như phase 3 (projection đã từ chối lô thứ hai).
   - Ingest và research ghi trạng thái nguồn (`pending` → `ready` / `failed`) cùng lô với các đoạn (A2).
@@ -30,7 +30,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 - **Đồng thời:** extraction vẫn một job mỗi người (log kiến thức chung). Ingest một job toàn server (spike C1: canh bộ nhớ theo RSS của process); research tối đa 2 toàn server; một job mỗi người mỗi loại.
 - **Lượt học chính không vào bảng `jobs`.** Lượt đang chạy khi khởi động lại vẫn thành "bị ngắt" (rủi ro 25). Một instance như phase 2.
 - **Khách:** không có job bền. Việc nền chạy trong tab; đóng tab giữa chừng thì nguồn ở trạng thái `pending` mà không có ai chạy, màn nguồn hiện "bị ngắt" và nút chạy lại (rủi ro 4). Web Lock `kd-learn:source:<sourceId>` để hai tab không cùng chạy.
-- Phần giữ chỗ demo bị mất khi process chết ([mục 6](06-viec-mo.md)) không thuộc phase 4: demo không có job bền.
+- Phần giữ chỗ demo bị mất khi process chết ([mục 6](../06-viec-mo.md)) không thuộc phase 4: demo không có job bền.
 
 ### A2. Nguồn học
 
@@ -51,29 +51,29 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 - **Lát nguồn theo lượt:** mỗi lượt chọn tối đa K đoạn gần nhất với truy vấn của lượt (chủ đề, bước hiện tại, câu trả lời mới nhất) trong các nguồn đang gắn, cắt theo số byte (mặc định 24 KiB). Dùng lại cách đo gần theo từ vựng của A4 phase 3, hàm thuần trong `core`. K và trần byte chốt ở spike C3.
 - **Khách và demo:** client chọn lát trên DB local và gửi kèm request `/api/turns` (trường mới `sourceSlice`, tuỳ chọn). Server decode bằng schema, kiểm trần byte, không kiểm được nội dung (dữ liệu của chính người đó). Giới hạn cả request vẫn là 1 MiB (khách) và 256 KiB (demo), tính cả lát.
 - **Tài khoản:** server chọn lát trên DB.
-- **Prompt:** đoạn nguồn đặt trong khối dữ liệu không thoát được, có nhãn `[S<n>]`; prompt dặn đây là tài liệu tham khảo, không phải chỉ dẫn ([rủi ro 37](05-rui-ro.md)). Prober và lượt lập plan cũng nhận lát, để plan bám tài liệu.
+- **Prompt:** đoạn nguồn đặt trong khối dữ liệu không thoát được, có nhãn `[S<n>]`; prompt dặn đây là tài liệu tham khảo, không phải chỉ dẫn ([rủi ro 37](../05-rui-ro.md)). Prober và lượt lập plan cũng nhận lát, để plan bám tài liệu.
 - **Trích dẫn:** Teacher ghi nhãn `[S<n>]` trong câu trả lời. Nhãn chỉ có nghĩa trong lát của lượt đó: khi dựng lịch sử gửi cho model, nhãn trong các tin cũ được thay bằng tham chiếu tới tiêu đề nguồn và trang (lấy từ `citations`), để không lẫn với số của lát mới. Spike C3 so cách này với đánh số cố định theo buổi. Server đổi nhãn thành tham chiếu `chunkId` trước khi ghi `MessageAppended` (trường mới `citations`, tuỳ chọn); nhãn không có trong lát thì bỏ. UI hiện nhãn thành nút mở đoạn gốc (tiêu đề nguồn, trang). Định dạng nhãn chốt ở spike C3 (model có ghi đúng không).
 - `TurnCompleted` ghi thêm `sourceChunkIds` (tuỳ chọn): các đoạn đã gửi trong lượt, để extraction biết buổi học dựa trên đoạn nào.
-- **Mệnh đề mang nguồn tài liệu:** `PropositionAdded` và `PropositionSourced` thêm trường tuỳ chọn `documents: [{sourceId, chunkId}]`. Extractor nhận thêm các đoạn đã dùng trong buổi (từ `sourceChunkIds`, cắt theo byte, mặc định 48 KiB) và gán đoạn cho mệnh đề; auditor kiểm việc gán; `documents` chỉ được trỏ tới đoạn đã gửi. Khách và demo: client gửi các đoạn này trong trường mới `documentSlice` (tuỳ chọn) của `/api/knowledge/extract`, tính trong giới hạn 256 KiB của demo. Đoạn của nguồn đã xoá thì bỏ qua: extraction vẫn chạy, mệnh đề chỉ thiếu `documents`. Log kiến thức cũ vẫn dựng được (cùng quy tắc với [rủi ro 34](05-rui-ro.md)).
+- **Mệnh đề mang nguồn tài liệu:** `PropositionAdded` và `PropositionSourced` thêm trường tuỳ chọn `documents: [{sourceId, chunkId}]`. Extractor nhận thêm các đoạn đã dùng trong buổi (từ `sourceChunkIds`, cắt theo byte, mặc định 48 KiB) và gán đoạn cho mệnh đề; auditor kiểm việc gán; `documents` chỉ được trỏ tới đoạn đã gửi. Khách và demo: client gửi các đoạn này trong trường mới `documentSlice` (tuỳ chọn) của `/api/knowledge/extract`, tính trong giới hạn 256 KiB của demo. Đoạn của nguồn đã xoá thì bỏ qua: extraction vẫn chạy, mệnh đề chỉ thiếu `documents`. Log kiến thức cũ vẫn dựng được (cùng quy tắc với [rủi ro 34](../05-rui-ro.md)).
 - Graph chỉ nhận mệnh đề **qua buổi học**. Trích thẳng tài liệu vào graph không qua buổi học nằm ngoài phạm vi (D).
 
 ### A4. Ingest: PDF và ghi chú
 
-- **Ghi chú:** file `.md` và `.txt`, chọn nhiều file một lần, mỗi file một nguồn. Bỏ front matter; link wiki `[[x]]` thành chữ; ảnh và HTML trong Markdown bị bỏ ([rủi ro 21](05-rui-ro.md)). Đọc và cắt đoạn ở client cho cả ba chế độ (việc nhẹ, không cần job); tài khoản gửi chữ đã cắt lên server.
+- **Ghi chú:** file `.md` và `.txt`, chọn nhiều file một lần, mỗi file một nguồn. Bỏ front matter; link wiki `[[x]]` thành chữ; ảnh và HTML trong Markdown bị bỏ ([rủi ro 21](../05-rui-ro.md)). Đọc và cắt đoạn ở client cho cả ba chế độ (việc nhẹ, không cần job); tài khoản gửi chữ đã cắt lên server.
 - **PDF:** chỉ lấy lớp chữ, không OCR, bằng `pdfjs-dist` (spike C1). PDF không có chữ (bản scan, trung bình dưới 10 ký tự mỗi trang) thì `failed` với mã `NoText`; có mật khẩu mở thì `Encrypted`; hỏng thì `Invalid`; quá 500 trang thì `TooLarge`.
   - **Khách và demo:** tách chữ trong Worker ở trình duyệt. File không rời thiết bị, server không tốn gì.
   - **Tài khoản:** tải file lên (`POST /api/account/sources`, multipart, giới hạn kích thước đọc theo luồng như `HistoryTooLarge`), server tạo nguồn `pending` kèm file gốc và job `ingest`. Job tách chữ, cắt đoạn, ghi `ready` trong một lô. Đóng tab vẫn chạy; khởi động lại thì chạy lại (A1).
   - Cùng một thư viện tách chữ chạy được ở cả trình duyệt (Worker) và Node, để hai chế độ cho cùng kết quả. Thư viện chốt ở spike C1.
-  - Tách chữ trên server chạy trong `worker_threads`; luồng chính canh RSS và dừng worker khi vượt nền + 512 MiB, thời hạn 60 s; **một job `ingest` mỗi process** vì RSS tính chung ([rủi ro 39](05-rui-ro.md), spike C1).
+  - Tách chữ trên server chạy trong `worker_threads`; luồng chính canh RSS và dừng worker khi vượt nền + 512 MiB, thời hạn 60 s; **một job `ingest` mỗi process** vì RSS tính chung ([rủi ro 39](../05-rui-ro.md), spike C1).
 
 ### A5. Research web
 
 - Một **lượt research** nhận một câu hỏi (mặc định là chủ đề buổi học) và cho ra một nguồn `kind: 'web'`. Pipeline trong `agent`:
   1. **Lập truy vấn:** một lần gọi model, output có cấu trúc: tối đa Q truy vấn (mặc định 3).
   2. **Tìm:** gọi port tìm kiếm (A6) cho từng truy vấn, gộp và bỏ kết quả trùng URL, giữ tối đa R kết quả (mặc định 8).
-  3. **Tổng hợp:** một lần gọi model viết bản tóm tắt có trích dẫn kết quả theo số. Kết quả và nội dung trang là dữ liệu không tin cậy trong prompt ([rủi ro 37](05-rui-ro.md)).
+  3. **Tổng hợp:** một lần gọi model viết bản tóm tắt có trích dẫn kết quả theo số. Kết quả và nội dung trang là dữ liệu không tin cậy trong prompt ([rủi ro 37](../05-rui-ro.md)).
 - Nguồn `web` gồm một đoạn tóm tắt và mỗi kết quả một đoạn (tiêu đề, URL, nội dung lấy được). Gắn vào buổi học như mọi nguồn.
-- **Nội dung kết quả:** Exa trả `highlights` đủ dùng. Đoạn trích của SearXNG quá ngắn (spike C2), nên với SearXNG server **tải vài trang đầu** (mặc định 4) bằng bộ tải có chặn SSRF ([rủi ro 38](05-rui-ro.md)): chỉ `http(s)`, chỉ IP công khai (kiểm sau khi phân giải, cả sau mỗi lần chuyển hướng, tối đa 3), trần 2 MiB và 10 s mỗi trang, chỉ `text/html` và `text/plain`, HTML sang chữ. Trang tải hỏng thì giữ đoạn trích. **Chốt ở bước 1 (2026-11-22).**
+- **Nội dung kết quả:** Exa trả `highlights` đủ dùng. Đoạn trích của SearXNG quá ngắn (spike C2), nên với SearXNG server **tải vài trang đầu** (mặc định 4) bằng bộ tải có chặn SSRF ([rủi ro 38](../05-rui-ro.md)): chỉ `http(s)`, chỉ IP công khai (kiểm sau khi phân giải, cả sau mỗi lần chuyển hướng, tối đa 3), trần 2 MiB và 10 s mỗi trang, chỉ `text/html` và `text/plain`, HTML sang chữ. Trang tải hỏng thì giữ đoạn trích. **Chốt ở bước 1 (2026-11-22).**
 - **Vai mới `researcher`** trong `ModelRole` / `AgentRole`, chưa đặt thì dùng model của `teacher` (như A5 phase 3). Prompt lập truy vấn và tổng hợp nằm trong hồ sơ dạy học, trường tuỳ chọn.
 - **Lúc nào chạy:** người học bấm "research" khi tạo buổi (research theo chủ đề và tự gắn nguồn khi xong) hoặc ở màn nguồn (câu hỏi tự do). Buổi học không chờ research: Prober chạy ngay, nguồn có mặt từ lượt sau khi `ready`.
 - **Tài khoản:** job `research` bền (A1). **Khách và demo:** `POST /api/research` không trạng thái, stream SSE như `/api/knowledge/extract`, client ghi nguồn trong một lô. Đóng tab thì nguồn `pending` thành "bị ngắt", có nút chạy lại.
@@ -82,12 +82,12 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 
 - `packages/search` mới. Port ở `@kd-learn/search/port` (chỉ import `effect`): service `SearchPort` với `search({query, limit, language?}): Effect<ReadonlyArray<SearchResult>, SearchError>`; `SearchResult`: `title`, `url`, `snippet`, `content?`, `publishedAt?`. `SearchError` có kiểu (`Unavailable`, `Unauthorized`, `RateLimited`, `Invalid`), không chứa key.
 - Adapter: `searxng` (API JSON) và `exa`, cộng bộ tải trang (`fetchPage`) trong cùng package. **Web search của provider bị cắt (bước 1, 2026-11-22):** kết quả của provider chỉ có tiêu đề, URL và nội dung mã hoá, không vừa `SearchPort`; làm sau thì là biến thể của pipeline research, cần mở rộng `AiPort` (D). `SearchError` thêm `PaymentRequired` (Exa 402).
-- Lint: `agent` chỉ import `@kd-learn/search/port` ([mục 3.2](03-kien-truc.md)); thêm `packages/search` vào rule ranh giới và test của rule.
+- Lint: `agent` chỉ import `@kd-learn/search/port` ([mục 3.2](../03-kien-truc.md)); thêm `packages/search` vào rule ranh giới và test của rule.
 - **Cấu hình server (admin):**
-  - SearXNG: URL chỉ lấy từ env `KD_SEARXNG_URL` (mặc định trỏ tới service trong compose), không sửa từ UI, không nhận từ client ([rủi ro 6](05-rui-ro.md)).
-  - Exa: key do admin nhập trong màn admin, mã hoá bằng secret box như key của tài khoản ([rủi ro 22](05-rui-ro.md)).
+  - SearXNG: URL chỉ lấy từ env `KD_SEARXNG_URL` (mặc định trỏ tới service trong compose), không sửa từ UI, không nhận từ client ([rủi ro 6](../05-rui-ro.md)).
+  - Exa: key do admin nhập trong màn admin, mã hoá bằng secret box như key của tài khoản ([rủi ro 22](../05-rui-ro.md)).
   - Màn admin bật / tắt từng nguồn của server, chọn nguồn của server cho khách và cho demo (hoặc tắt).
-  - **Khách chỉ dùng được SearXNG** của server (tự host, không tốn tiền theo lần gọi), không dùng Exa: khách không có ngân sách như demo. `/api/research` của khách có giới hạn theo IP (cùng cơ chế với giới hạn đăng ký) và tối đa Q truy vấn mỗi lượt ([rủi ro 40](05-rui-ro.md)).
+  - **Khách chỉ dùng được SearXNG** của server (tự host, không tốn tiền theo lần gọi), không dùng Exa: khách không có ngân sách như demo. `/api/research` của khách có giới hạn theo IP (cùng cơ chế với giới hạn đăng ký) và tối đa Q truy vấn mỗi lượt ([rủi ro 40](../05-rui-ro.md)).
 - **Người dùng:** màn cài đặt (tài khoản và khách) chọn một nguồn cho research trong các nguồn của server đang bật cho chế độ đó.
 - **Docker Compose:** thêm service `searxng` (image chính thức, ghim phiên bản, chỉ mạng nội bộ, không mở cổng ra ngoài), cấu hình bật định dạng JSON. Tài liệu triển khai (`docs/deploy.md`) nói cách bật / tắt.
 
@@ -106,7 +106,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 | `GET` / `PUT /api/admin/search` | admin | Cấu hình nguồn tìm kiếm của server (A6) |
 | `GET /api/search/options` | mọi chế độ | Nguồn tìm kiếm dùng được ở chế độ hiện tại (không lộ key) |
 
-Mọi route tài khoản có test cross-user ([rủi ro 26](05-rui-ro.md)); route khách / demo có test key không lộ, cả key model lẫn key Exa của server ([rủi ro 19](05-rui-ro.md)).
+Mọi route tài khoản có test cross-user ([rủi ro 26](../05-rui-ro.md)); route khách / demo có test key không lộ, cả key model lẫn key Exa của server ([rủi ro 19](../05-rui-ro.md)).
 
 ### A8. Giao diện
 
@@ -120,8 +120,8 @@ Mọi route tài khoản có test cross-user ([rủi ro 26](05-rui-ro.md)); rout
 ### A9. Demo
 
 - **Nguồn:** PDF và ghi chú xử lý ở client, không tốn ngân sách. Lát nguồn tính vào giới hạn 256 KiB mỗi request.
-- **Research:** chỉ khi admin chọn một nguồn của server cho demo (A6). Một lượt research giữ chỗ 2 lần gọi model cộng Q lần tìm, mỗi lần tìm tính là một lần gọi trong ngân sách chung (A8 phase 2). Còn ít hơn số cần giữ thì từ chối ngay, không gọi provider hay nguồn tìm kiếm ([rủi ro 40](05-rui-ro.md)).
-- Server dùng hồ sơ của mình cho research như mọi việc khác của demo ([rủi ro 29](05-rui-ro.md)).
+- **Research:** chỉ khi admin chọn một nguồn của server cho demo (A6). Một lượt research giữ chỗ 2 lần gọi model cộng Q lần tìm, mỗi lần tìm tính là một lần gọi trong ngân sách chung (A8 phase 2). Còn ít hơn số cần giữ thì từ chối ngay, không gọi provider hay nguồn tìm kiếm ([rủi ro 40](../05-rui-ro.md)).
+- Server dùng hồ sơ của mình cho research như mọi việc khác của demo ([rủi ro 29](../05-rui-ro.md)).
 
 ## B. Các bước
 
@@ -129,7 +129,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model 
 
 | # | Bước | Package | Xong khi |
 | --- | --- | --- | --- |
-| 0 | Spike tách chữ PDF (C1) | spike | Trả lời đủ C1; chốt thư viện, giới hạn kích thước, chỗ chạy trên server; ghi vào [mục 2.4](02-ky-thuat.md) |
+| 0 | Spike tách chữ PDF (C1) | spike | Trả lời đủ C1; chốt thư viện, giới hạn kích thước, chỗ chạy trên server; ghi vào [mục 2.4](../02-ky-thuat.md) |
 | 1 | Spike tìm kiếm (C2) | spike | Trả lời đủ C2; chốt hình dạng `SearchPort`, cách đưa web search của provider vào, có cần tải trang không. **Xong (2026-11-22):** cắt web search của provider, thêm bộ tải trang cho SearXNG |
 | 2 | Spike dạy dựa trên nguồn với Haiku (C3) | spike | Trả lời đủ C3; chốt cỡ đoạn, K, trần byte của lát, định dạng nhãn trích dẫn; đo token thêm mỗi lượt |
 | 3 | Job bền: bảng `jobs`, runner, chạy lại sau khởi động lại có trần, chuyển job extraction sang runner (A1) | storage, server | Test khởi động lại trên cùng file DB: job extraction đang chạy thì chạy lại và xong, `extractionId` giữ nguyên, không có mệnh đề trùng; quá trần thì `Interrupted`; lỗi thật không tự chạy lại; cross-user; test phase 3 vẫn xanh |
@@ -152,7 +152,7 @@ Mỗi bước có tiêu chí xong chạy được trong CI. Bước gọi model 
 
 ## C. Câu hỏi cho spike
 
-Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
+Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](../05-rui-ro.md)). Đọc tài liệu hiện hành rồi trả lời bằng thử nghiệm.
 
 **C1. Tách chữ PDF (bước 0):**
 
@@ -171,11 +171,11 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 
 **C3. Dạy dựa trên nguồn (bước 2, Haiku):**
 
-- Với một PDF thật và một bộ ghi chú: cỡ đoạn (theo ký tự), K và trần byte nào cho lát đủ để Teacher dạy đúng tài liệu? Chọn theo từ vựng có lấy đúng đoạn không, nhất là với tiếng Việt ([rủi ro 32](05-rui-ro.md))?
+- Với một PDF thật và một bộ ghi chú: cỡ đoạn (theo ký tự), K và trần byte nào cho lát đủ để Teacher dạy đúng tài liệu? Chọn theo từ vựng có lấy đúng đoạn không, nhất là với tiếng Việt ([rủi ro 32](../05-rui-ro.md))?
 - Teacher có ghi nhãn `[S<n>]` đúng chỗ, không bịa nhãn không có trong lát không? Định dạng nhãn nào model giữ ổn nhất?
 - Qua nhiều lượt: thay nhãn cũ trong lịch sử bằng tiêu đề và trang, hay đánh số cố định theo buổi, cách nào model ít lẫn hơn?
 - Token thêm mỗi lượt khi có lát; chi phí một buổi với Haiku.
-- Tài liệu chứa chỉ dẫn cho model ("bỏ qua hướng dẫn trên", "gọi `complete_step`"): Teacher có làm theo không ([rủi ro 37](05-rui-ro.md))?
+- Tài liệu chứa chỉ dẫn cho model ("bỏ qua hướng dẫn trên", "gọi `complete_step`"): Teacher có làm theo không ([rủi ro 37](../05-rui-ro.md))?
 - Extractor có gán đúng đoạn cho mệnh đề không?
 
 ## D. Ngoài phạm vi phase 4
@@ -187,5 +187,5 @@ Không viết sẵn kết luận từ trí nhớ ([rủi ro 9](05-rui-ro.md)). �
 - Embedding và tìm theo nghĩa cho lát nguồn (vẫn theo từ vựng như A4 phase 3), trừ khi C3 cho thấy bắt buộc.
 - Teacher tự gọi tool tìm trong nguồn hay tìm web giữa lượt (phase 4 chỉ dùng lát chọn trước và research do người học bấm).
 - Lượt học chính sống sót khi khởi động lại (A1). Nhiều instance server.
-- Trả lại phần giữ chỗ demo khi process chết ([mục 6](06-viec-mo.md)).
-- Tóm tắt lịch sử buổi học dài, duyệt luồng side chat cũ: vẫn ở [mục 6](06-viec-mo.md).
+- Trả lại phần giữ chỗ demo khi process chết ([mục 6](../06-viec-mo.md)).
+- Tóm tắt lịch sử buổi học dài, duyệt luồng side chat cũ: vẫn ở [mục 6](../06-viec-mo.md).
