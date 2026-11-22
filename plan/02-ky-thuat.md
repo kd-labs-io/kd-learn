@@ -28,7 +28,7 @@
 | ACP | Agent Client Protocol: server điều khiển agent CLI (Claude Code, Antigravity CLI, opencode) làm backend. Admin bật, chỉ cho chế độ tài khoản. Không dùng Gemini CLI (đã bị Antigravity CLI thay thế). Client là `@agentclientprotocol/sdk`; Claude Code chạy qua `@agentclientprotocol/claude-agent-acp`. Output có cấu trúc qua tool `submit_result` ([mục 3.3](03-kien-truc.md)) |
 | PDF | `pdfjs-dist` 6.5 (Apache-2.0), chỉ lớp chữ. Khách: Worker riêng của pdfjs, nạp lười. Server: bản `legacy` trong `worker_threads`, canh RSS. Chọn sau spike bước 0 phase 4 (2026-11-22). Loại: `unpdf` (chỉ bọc pdfjs) |
 | Tìm kiếm | Port `SearchPort` trong `packages/search` với SearXNG (tự host trong compose, kèm bộ tải trang có chặn SSRF) và Exa (key của admin). Có UI cấu hình. Web search của OpenAI, Anthropic, Gemini cắt khỏi phase 4 sau spike bước 1 phase 4 (2026-11-22): kết quả không vừa port, cần mở rộng `AiPort` |
-| Hình minh hoạ | LLM sinh mã (SVG / Mermaid, HTML + JS) chạy trong iframe sandbox, cộng tool sinh ảnh (OpenAI, Gemini) |
+| Hình minh hoạ | LLM sinh mã (SVG / Mermaid, HTML + JS) chạy trong iframe sandbox, cộng tool sinh ảnh (OpenAI qua endpoint tương thích, Gemini). Thiết kế ở [hinh-va-demo.md](hinh-va-demo.md); thư viện và cơ chế khung chốt sau spike bước 0–3 phase 5 |
 | Triển khai | Docker Compose trên VPS hoặc máy ở nhà |
 | Vị trí repo | `kd-learn/`, giữ `probe/` làm ghi chú |
 
