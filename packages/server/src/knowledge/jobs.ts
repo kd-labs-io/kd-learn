@@ -121,8 +121,9 @@ export const makeExtractionJobs = (deps: ExtractionJobDeps): ExtractionJobs => {
       });
     return Effect.gen(function* () {
       // Resumed after a restart: run only while this attempt is still open.
-      const attempt = graphOf(storage)
-        .extractions[sessionId]?.attempts.find((a) => a.extractionId === extractionId);
+      const attempt = graphOf(storage).extractions[sessionId]?.attempts.find(
+        (a) => a.extractionId === extractionId,
+      );
       if (attempt?.status !== 'started') return;
       const resolved = deps.settings.resolveModel(userId, 'extractor');
       if (resolved._tag !== 'Ok') {

@@ -366,10 +366,12 @@ describe('account extraction', () => {
     // Written by phase 3, or just before a crash that left no job row.
     const db = makeServerStorage(Effect.runSync(openServerDatabase({ path: before.dbPath })));
     Effect.runSync(
-      db.forUser(before.userId).appendKnowledge(
-        [{ _tag: 'ExtractionStarted', id: 'x1', at: 9, sessionId: 's1', extractionId: 'old' }],
-        { expectedLastSeq: -1 },
-      ),
+      db
+        .forUser(before.userId)
+        .appendKnowledge(
+          [{ _tag: 'ExtractionStarted', id: 'x1', at: 9, sessionId: 's1', extractionId: 'old' }],
+          { expectedLastSeq: -1 },
+        ),
     );
     const after = await restart(before.dbPath, []);
     expect((await after.list())[0]).toMatchObject({
