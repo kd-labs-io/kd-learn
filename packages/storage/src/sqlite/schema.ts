@@ -135,9 +135,11 @@ export const settingsKeys = [
   'model',
   'endpointId',
   'apiKey',
+  'apiKeySavedAt',
   'imageProvider',
   'imageModel',
   'imageEndpointId',
   'imageApiKey',
+  'imageApiKeySavedAt',
 ] as const;
 export type SettingsKey = (typeof settingsKeys)[number];

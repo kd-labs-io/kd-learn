@@ -224,7 +224,7 @@ export const makeMemoryStorage = (): StorageService => {
 
     deleteApiKey: Effect.sync(() => {
       if (settings) {
-        const { apiKey: _apiKey, ...rest } = settings;
+        const { apiKey: _apiKey, apiKeySavedAt: _savedAt, ...rest } = settings;
         settings = rest;
       }
       emit({ _tag: 'SettingsChanged' });
@@ -232,7 +232,7 @@ export const makeMemoryStorage = (): StorageService => {
 
     deleteImageApiKey: Effect.sync(() => {
       if (settings?.image) {
-        const { apiKey: _apiKey, ...image } = settings.image;
+        const { apiKey: _apiKey, apiKeySavedAt: _savedAt, ...image } = settings.image;
         settings = { ...settings, image };
       }
       emit({ _tag: 'SettingsChanged' });

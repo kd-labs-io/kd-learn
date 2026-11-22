@@ -68,6 +68,8 @@ export interface GuestSettings {
   readonly endpointId?: string;
   /** Absent after `deleteApiKey`. */
   readonly apiKey?: string;
+  /** When `apiKey` was entered (ISO 8601). Absent for keys saved before it was recorded. */
+  readonly apiKeySavedAt?: string;
   /** The image model (phase 5 A6), with its own key. Absent: no images. */
   readonly image?: GuestImageSettings;
 }
@@ -79,6 +81,8 @@ export interface GuestImageSettings {
   readonly endpointId?: string;
   /** Absent after `deleteImageApiKey`. */
   readonly apiKey?: string;
+  /** When `apiKey` was entered (ISO 8601). */
+  readonly apiKeySavedAt?: string;
 }
 
 /** Something changed in the store, possibly written by another tab. Re-read what you show. */

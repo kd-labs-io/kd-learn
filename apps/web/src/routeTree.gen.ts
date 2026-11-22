@@ -31,6 +31,7 @@ import { Route as ApiAdminSplatRouteImport } from './routes/api.admin.$'
 import { Route as ApiAdminInvitesRouteImport } from './routes/api.admin.invites'
 import { Route as ApiAuthActionRouteImport } from './routes/api.auth.$action'
 import { Route as ApiKnowledgeExtractRouteImport } from './routes/api.knowledge.extract'
+import { Route as ApiModelsTestRouteImport } from './routes/api.models.test'
 import { Route as ApiPracticeSplatRouteImport } from './routes/api.practice.$'
 import { Route as ApiSearchOptionsRouteImport } from './routes/api.search.options'
 
@@ -144,6 +145,11 @@ const ApiKnowledgeExtractRoute = ApiKnowledgeExtractRouteImport.update({
   path: '/api/knowledge/extract',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelsTestRoute = ApiModelsTestRouteImport.update({
+  id: '/api/models/test',
+  path: '/api/models/test',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPracticeSplatRoute = ApiPracticeSplatRouteImport.update({
   id: '/api/practice/$',
   path: '/api/practice/$',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/models/test': typeof ApiModelsTestRoute
   '/api/practice/$': typeof ApiPracticeSplatRoute
   '/api/search/options': typeof ApiSearchOptionsRoute
 }
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/models/test': typeof ApiModelsTestRoute
   '/api/practice/$': typeof ApiPracticeSplatRoute
   '/api/search/options': typeof ApiSearchOptionsRoute
 }
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/api/admin/invites': typeof ApiAdminInvitesRoute
   '/api/auth/$action': typeof ApiAuthActionRoute
   '/api/knowledge/extract': typeof ApiKnowledgeExtractRoute
+  '/api/models/test': typeof ApiModelsTestRoute
   '/api/practice/$': typeof ApiPracticeSplatRoute
   '/api/search/options': typeof ApiSearchOptionsRoute
 }
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/models/test'
     | '/api/practice/$'
     | '/api/search/options'
   fileRoutesByTo: FileRoutesByTo
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/models/test'
     | '/api/practice/$'
     | '/api/search/options'
   id:
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/api/admin/invites'
     | '/api/auth/$action'
     | '/api/knowledge/extract'
+    | '/api/models/test'
     | '/api/practice/$'
     | '/api/search/options'
   fileRoutesById: FileRoutesById
@@ -338,6 +350,7 @@ export interface RootRouteChildren {
   ApiAdminInvitesRoute: typeof ApiAdminInvitesRoute
   ApiAuthActionRoute: typeof ApiAuthActionRoute
   ApiKnowledgeExtractRoute: typeof ApiKnowledgeExtractRoute
+  ApiModelsTestRoute: typeof ApiModelsTestRoute
   ApiPracticeSplatRoute: typeof ApiPracticeSplatRoute
   ApiSearchOptionsRoute: typeof ApiSearchOptionsRoute
 }
@@ -498,6 +511,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeExtractRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/models/test': {
+      id: '/api/models/test'
+      path: '/api/models/test'
+      fullPath: '/api/models/test'
+      preLoaderRoute: typeof ApiModelsTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/practice/$': {
       id: '/api/practice/$'
       path: '/api/practice/$'
@@ -538,6 +558,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminInvitesRoute: ApiAdminInvitesRoute,
   ApiAuthActionRoute: ApiAuthActionRoute,
   ApiKnowledgeExtractRoute: ApiKnowledgeExtractRoute,
+  ApiModelsTestRoute: ApiModelsTestRoute,
   ApiPracticeSplatRoute: ApiPracticeSplatRoute,
   ApiSearchOptionsRoute: ApiSearchOptionsRoute,
 }

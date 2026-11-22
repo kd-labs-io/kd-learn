@@ -12,9 +12,11 @@ export {
   researchWeb,
   searchOptions,
   streamTurn,
+  testModel,
 } from './client.ts';
 export type { ResearchOutcome } from './client.ts';
 export type { ClientOptions, ExtractOutcome } from './client.ts';
 export { ApiError, TransportCode, accountClient, streamSession } from './account-client.ts';
 export type { AccountClient, AccountClientOptions } from './account-client.ts';
 export * from './research.ts';
+export * from './model-test.ts';

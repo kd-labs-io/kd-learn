@@ -1,7 +1,7 @@
 // Typed client for the contract: `fetch` plus SSE parsing. Runs in the browser and in Node.
 // Interrupting the returned stream aborts the request, which makes the server cancel the turn
 // and the provider request (plan 3.3).
-import { Data, Effect, Schema, Stream } from 'effect';
+import { Data, Effect, Result, Schema, Stream } from 'effect';
 import {
   ENDPOINTS_PATH,
   EndpointsResponse,
@@ -16,6 +16,7 @@ import {
   TURNS_PATH,
   TurnRequest,
 } from './contract.ts';
+import { MODEL_TEST_PATH, ModelTestRequest, ModelTestResponse } from './model-test.ts';
 import { RESEARCH_PATH, ResearchFrame, ResearchRequest, ResearchResultFrame } from './research.ts';
 import type { EndpointInfo, Failure } from './contract.ts';
 import type { KnowledgeEvent } from '@kd-learn/core';
@@ -282,6 +283,40 @@ export const researchWeb = (
       result instanceof ClientError ? Effect.fail(result) : Effect.succeed(result),
     ),
   );
+
+/**
+ * `POST /api/models/test`: undefined when the model answered, else the failure to show.
+ * Transport problems fail the effect.
+ */
+export const testModel = (
+  request: ModelTestRequest,
+  options: ClientOptions = {},
+): Effect.Effect<Failure | undefined, ClientError> =>
+  Effect.gen(function* () {
+    const doFetch = options.fetch ?? globalThis.fetch;
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        doFetch(urlOf(options, MODEL_TEST_PATH), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(Schema.encodeSync(ModelTestRequest)(request)),
+          signal,
+        }),
+      catch: network,
+    });
+    const json = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: () => protocol(`HTTP ${response.status}.`),
+    });
+    if (response.ok) {
+      yield* Schema.decodeUnknownEffect(ModelTestResponse)(json).pipe(
+        Effect.mapError(() => protocol('Response does not match the contract.')),
+      );
+      return undefined;
+    }
+    const failure = Schema.decodeUnknownResult(ErrorBody)(json);
+    return Result.isSuccess(failure) ? failure.success.error : unexpected(response.status);
+  });
 
 /** `GET /api/search/options` for a guest (or `demo`): the search sources offered. */
 export const searchOptions = (

@@ -204,10 +204,13 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
       model: settings.model,
       endpointId: settings.endpointId,
       apiKey: settings.apiKey,
+      apiKeySavedAt: settings.apiKey === undefined ? undefined : settings.apiKeySavedAt,
       imageProvider: settings.image?.provider,
       imageModel: settings.image?.model,
       imageEndpointId: settings.image?.endpointId,
       imageApiKey: settings.image?.apiKey,
+      imageApiKeySavedAt:
+        settings.image?.apiKey === undefined ? undefined : settings.image.apiKeySavedAt,
     };
     const entries: Partial<Record<SettingsKey, string>> = {};
     const remove: SettingsKey[] = [];
@@ -288,8 +291,9 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
 
     getSettings: call<Record<string, string>>({ op: 'getSettings' }).pipe(
       Effect.flatMap((stored) => {
-        const { provider, model, endpointId, apiKey } = stored;
-        const { imageProvider, imageModel, imageEndpointId, imageApiKey } = stored;
+        const { provider, model, endpointId, apiKey, apiKeySavedAt } = stored;
+        const { imageProvider, imageModel, imageEndpointId, imageApiKey, imageApiKeySavedAt } =
+          stored;
         const image: GuestImageSettings | undefined =
           (imageProvider === 'gemini' || imageProvider === 'openai-compatible') &&
           imageModel !== undefined
@@ -298,6 +302,9 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
                 model: imageModel,
                 ...(imageEndpointId === undefined ? {} : { endpointId: imageEndpointId }),
                 ...(imageApiKey === undefined ? {} : { apiKey: imageApiKey }),
+                ...(imageApiKey === undefined || imageApiKeySavedAt === undefined
+                  ? {}
+                  : { apiKeySavedAt: imageApiKeySavedAt }),
               }
             : undefined;
         if (provider === undefined || model === undefined) return Effect.succeed(undefined);
@@ -311,6 +318,7 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
           model,
           ...(endpointId === undefined ? {} : { endpointId }),
           ...(apiKey === undefined ? {} : { apiKey }),
+          ...(apiKey === undefined || apiKeySavedAt === undefined ? {} : { apiKeySavedAt }),
           ...(image === undefined ? {} : { image }),
         });
       }),
@@ -321,13 +329,17 @@ async function connect(options: WasmStorageOptions): Promise<WasmStorage> {
         Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
       ),
 
-    deleteApiKey: call<void>({ op: 'putSettings', entries: {}, remove: ['apiKey'] }).pipe(
-      Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
-    ),
+    deleteApiKey: call<void>({
+      op: 'putSettings',
+      entries: {},
+      remove: ['apiKey', 'apiKeySavedAt'],
+    }).pipe(Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' })))),
 
-    deleteImageApiKey: call<void>({ op: 'putSettings', entries: {}, remove: ['imageApiKey'] }).pipe(
-      Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' }))),
-    ),
+    deleteImageApiKey: call<void>({
+      op: 'putSettings',
+      entries: {},
+      remove: ['imageApiKey', 'imageApiKeySavedAt'],
+    }).pipe(Effect.tap(() => Effect.sync(() => committed({ _tag: 'SettingsChanged' })))),
 
     getProfile: call<string | undefined>({ op: 'getProfile' }).pipe(
       Effect.flatMap((payload) =>

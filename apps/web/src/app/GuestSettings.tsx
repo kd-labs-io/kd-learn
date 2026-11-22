@@ -9,19 +9,39 @@ import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { m } from '@kd-learn/i18n';
-import type { EndpointInfo } from '@kd-learn/api';
+import { testModel, type EndpointInfo } from '@kd-learn/api';
 import type { GuestImageSettings, GuestProvider, GuestSettings } from '@kd-learn/storage/port';
+import { Effect } from 'effect';
 import { useEffect, useState } from 'react';
 import { useGuestSourceLibrary } from '../sources/library';
 import { SearchPreference } from '../sources/SearchPreference';
 import { ProfileLink } from '../profile/ProfileLink';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
-import { useEndpoints, useStoragePersistent } from '../learn/hooks';
+import { apiBaseUrl, useEndpoints, useStoragePersistent } from '../learn/hooks';
+import { modelChoiceOf } from '../learn/model';
+import { failureText } from '../learn/view';
+import { formatDate } from './format';
 import { runStorage, useGuestSettings } from '../storage';
 import { pageWidth } from './page';
 import { Block } from './Block';
 
 const DEFAULT_MODEL: Partial<Record<GuestProvider, string>> = { anthropic: 'claude-haiku-5-5' };
+
+/** Shown in an empty key field when a key is saved: when it was entered, if known. */
+const savedKeyPlaceholder = (savedAt: string | undefined): string => {
+  const at = savedAt === undefined ? Number.NaN : Date.parse(savedAt);
+  return Number.isNaN(at)
+    ? m.settings_key_configured()
+    : m.settings_key_configured_at({ date: formatDate(at) });
+};
+
+/** The saved-at of a key: now for a key just typed, else what was saved with the old one. */
+const keySavedAt = (typed: string, previous: string | undefined) =>
+  typed.trim() !== ''
+    ? { apiKeySavedAt: new Date().toISOString() }
+    : previous === undefined
+      ? {}
+      : { apiKeySavedAt: previous };
 
 /** Guest settings: provider, model and key, kept on this device only. */
 export function GuestSettings() {
@@ -50,6 +70,8 @@ export function GuestSettings() {
   }, [loaded, stored]);
 
   const savedKey = stored.status === 'ready' ? stored.data?.apiKey : undefined;
+  const savedKeyAt = stored.status === 'ready' ? stored.data?.apiKeySavedAt : undefined;
+  const [testing, setTesting] = useState(false);
   const offered = endpoints.status === 'ready' ? endpoints.endpoints : [];
   // Hide the OpenAI-compatible choice when the server offers no endpoint (and none is selected).
   const providerOptions = [
@@ -75,6 +97,7 @@ export function GuestSettings() {
       provider,
       model: name,
       apiKey: key,
+      ...keySavedAt(apiKey, savedKeyAt),
       ...(provider === 'openai-compatible' ? { endpointId } : {}),
       // The image model is saved on its own; keep it.
       ...(stored.status === 'ready' && stored.data?.image ? { image: stored.data.image } : {}),
@@ -88,6 +111,36 @@ export function GuestSettings() {
         status: 'error',
         text: m.storage_error({ reason: cause instanceof Error ? cause.message : String(cause) }),
       });
+    }
+  };
+
+  // Tries what is in the form (the typed key, else the saved one) without saving it.
+  const test = async () => {
+    const key = apiKey.trim() || savedKey;
+    const choice = modelChoiceOf({
+      provider,
+      model: model.trim(),
+      ...(provider === 'openai-compatible' ? { endpointId } : {}),
+      ...(key ? { apiKey: key } : {}),
+    });
+    if (choice === undefined) {
+      setMessage({ status: 'error', text: m.settings_missing() });
+      return;
+    }
+    setTesting(true);
+    try {
+      const failure = await Effect.runPromise(
+        testModel({ model: choice }, apiBaseUrl === '' ? {} : { baseUrl: apiBaseUrl }),
+      );
+      setMessage(
+        failure === undefined
+          ? { status: 'success', text: m.settings_test_ok() }
+          : { status: 'error', text: m.settings_test_failed({ reason: failureText(failure) }) },
+      );
+    } catch {
+      setMessage({ status: 'error', text: m.settings_test_failed({ reason: m.error_Network() }) });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -187,6 +240,9 @@ export function GuestSettings() {
                 type="password"
                 value={apiKey}
                 onChange={setApiKey}
+                {...(savedKey === undefined
+                  ? {}
+                  : { placeholder: savedKeyPlaceholder(savedKeyAt) })}
                 autoComplete="off"
                 data-testid="api-key"
               />
@@ -205,6 +261,12 @@ export function GuestSettings() {
                   variant="primary"
                   onClick={() => void save()}
                   data-testid="save-settings"
+                />
+                <Button
+                  label={m.settings_test()}
+                  onClick={() => void test()}
+                  isLoading={testing}
+                  data-testid="test-settings"
                 />
                 {savedKey === undefined ? null : (
                   <Button
@@ -306,6 +368,7 @@ function ImageSettings({
           provider,
           model: name,
           apiKey: key,
+          ...keySavedAt(apiKey, saved?.apiKeySavedAt),
           ...(provider === 'openai-compatible' ? { endpointId } : {}),
         },
       },
@@ -381,6 +444,9 @@ function ImageSettings({
             type="password"
             value={apiKey}
             onChange={setApiKey}
+            {...(saved?.apiKey === undefined
+              ? {}
+              : { placeholder: savedKeyPlaceholder(saved.apiKeySavedAt) })}
             autoComplete="off"
             data-testid="image-api-key"
           />

@@ -53,6 +53,7 @@ import { makeSettingsHandler } from './settings/http.ts';
 import { handleExtract } from './knowledge/extract-route.ts';
 import { makePracticeHandler } from './practice/guest.ts';
 import { handleResearch } from './sources/research-route.ts';
+import { handleModelTest } from './settings/model-test-route.ts';
 import { makeRateLimiter, type RateLimiter } from './auth/rate-limit.ts';
 
 /** Scalar fields only: a log entry cannot carry a request body or a header by construction. */
@@ -87,6 +88,8 @@ export interface HandlerDeps {
   readonly trustProxy?: boolean;
   /** Researches per client address (phase 4 A6, risk 40). Absent: not limited. */
   readonly researchLimit?: RateLimiter;
+  /** Model tests per client address (`POST /api/models/test`). Absent: not limited. */
+  readonly modelTestLimit?: RateLimiter;
   /** The signed-in user of a bearer token: `undefined` no token, `null` a bad one. */
   readonly accountOf?: (request: Request) => Promise<{ readonly id: string } | null | undefined>;
 }
@@ -560,6 +563,8 @@ export interface Handlers extends AccountHandlers {
   /** `POST /api/practice/issue` and `POST /api/practice/grade` (guest and demo). */
   readonly practice: Handler;
   readonly endpoints: Handler;
+  /** `POST /api/models/test` (guest): one tiny call to check a model and key. */
+  readonly modelTest: Handler;
   /** Everything under `/api/account/` (settings, connections, roles, sessions). */
   readonly account: Handler;
   /** Everything under `/api/admin/` except invites (config, users). */
@@ -641,6 +646,7 @@ export const createHandlers = (
       extract: broken,
       practice: broken,
       endpoints: broken,
+      modelTest: broken,
       config: broken,
       searchOptions: broken,
       research: broken,
@@ -653,7 +659,14 @@ export const createHandlers = (
   // that needs it.
   let accountRoutes: Omit<
     Handlers,
-    'turns' | 'extract' | 'practice' | 'endpoints' | 'config' | 'searchOptions' | 'research'
+    | 'turns'
+    | 'extract'
+    | 'practice'
+    | 'endpoints'
+    | 'modelTest'
+    | 'config'
+    | 'searchOptions'
+    | 'research'
   > = accountsBroken;
   let publicConfig: Handler;
   let guestAllowed: () => Promise<boolean>;
@@ -746,6 +759,8 @@ export const createHandlers = (
     trustProxy: ['1', 'true'].includes(env.KD_LEARN_TRUST_PROXY?.trim().toLowerCase() ?? ''),
     // 20 researches per hour per address, guest and demo together.
     researchLimit: options.researchLimit ?? makeRateLimiter({ limit: 20, windowMs: 60 * 60_000 }),
+    // 30 model tests per hour per address.
+    modelTestLimit: options.modelTestLimit ?? makeRateLimiter({ limit: 30, windowMs: 60 * 60_000 }),
     ...(demo === undefined ? {} : { demo }),
     ...(accountOf === undefined ? {} : { accountOf }),
   };
@@ -756,6 +771,7 @@ export const createHandlers = (
     extract: wrap((request) => handleExtract(request, deps)),
     practice: wrap(makePracticeHandler(deps)),
     endpoints: wrap((request) => handleEndpoints(request, deps)),
+    modelTest: wrap((request, context) => handleModelTest(request, deps, context)),
     config: wrap(publicConfig),
     searchOptions: wrap((request) => handleSearchOptions(request, deps)),
     research: wrap((request, context) => handleResearch(request, deps, context)),
