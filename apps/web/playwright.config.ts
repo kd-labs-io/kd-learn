@@ -12,6 +12,7 @@ import { E2E_ADMIN, accountsPort, fakeModelPort, fakeSearchPort } from './e2e/ac
 //   (e2e/fake-openai.ts on `fakeModelPort`), so account turns run through the real server.
 // Both use a fake SearXNG (e2e/fake-searxng.ts on `fakeSearchPort`) for research.
 const port = 4173;
+const phoneTests = '**/phone.e2e.ts';
 const dbDir = join(tmpdir(), 'kd-learn-e2e');
 
 export default defineConfig({
@@ -77,8 +78,11 @@ export default defineConfig({
     },
   ],
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: phoneTests },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testIgnore: phoneTests },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: phoneTests },
+    // The app on a phone (phase 6 step 5): device emulation, not a real phone.
+    { name: 'iphone', use: { ...devices['iPhone 15'] }, testMatch: phoneTests },
+    { name: 'pixel', use: { ...devices['Pixel 7'] }, testMatch: phoneTests },
   ],
 });

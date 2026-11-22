@@ -140,7 +140,8 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
       <Layout
         header={
           <LayoutHeader hasDivider padding={3}>
-            <HStack gap={3} vAlign="center" justify="between">
+            {/* Wraps on a phone: the actions go under the topic instead of being cut off. */}
+            <HStack gap={3} vAlign="center" justify="between" wrap="wrap">
               <HStack gap={2} vAlign="center">
                 <Button
                   label={m.nav_home()}
@@ -153,7 +154,7 @@ export function LearnScreen({ source, onHome: home, onSettings: settings }: Lear
                   {session.topic}
                 </Heading>
               </HStack>
-              <HStack gap={2} vAlign="center">
+              <HStack gap={2} vAlign="center" wrap="wrap">
                 {source.sources === undefined ? null : (
                   <Button
                     label={m.lesson_sources({ count: session.sources.length })}

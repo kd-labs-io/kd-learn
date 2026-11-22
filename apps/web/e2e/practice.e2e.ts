@@ -39,7 +39,14 @@ async function answer(page: Page, type: string, text = 'Because it follows.') {
 
 test('guest: practise a set drawn from the graph, mastery follows the grade, a reload keeps it', async ({
   page,
+  browserName,
 }) => {
+  // The seeded graph lives in the guest database; without OPFS (WebKit's test context) it falls
+  // back to memory and is gone after the next navigation (phase 6 step 5). Real Safari has OPFS.
+  test.skip(
+    browserName === 'webkit',
+    'No OPFS in this browser context: storage falls back to memory',
+  );
   await page.addInitScript(() => localStorage.setItem('kd-learn.mode', 'guest'));
   await page.goto('/practice');
   await expect(page.getByTestId('practice-empty')).toBeVisible();

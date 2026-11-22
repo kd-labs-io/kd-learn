@@ -23,7 +23,7 @@ jobs:
       # Browser tests of the local DB against the SSR build above. Chromium only in CI; Firefox
       # runs locally, Playwright's WebKit has no OPFS (see plan/progress/phase-1.md).
       - run: pnpm --filter @kd-learn/web exec playwright install --with-deps chromium
-      - run: pnpm --filter @kd-learn/web exec playwright test --project=chromium
+      - run: pnpm --filter @kd-learn/web exec playwright test --project=chromium --project=pixel
       - uses: actions/upload-artifact@v5
         if: failure()
         with:

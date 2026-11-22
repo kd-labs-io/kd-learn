@@ -9,7 +9,7 @@
     "./server": "./src/paraglide/server.js"
   },
   "scripts": {
-    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --no-emit-readme",
+    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie custom-ssr preferredLanguage baseLocale --no-emit-readme",
     "typecheck": "tsc",
     "test": "vitest run",
     "lint": "eslint ."
