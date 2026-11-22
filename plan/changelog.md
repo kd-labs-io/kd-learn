@@ -84,3 +84,4 @@
 - **Cập nhật:** 2026-11-22: bước 9a, cổng ảnh, adapter HTTP Gemini và tương thích OpenAI, tool `generate_image` (progress phase 5)
 - **Cập nhật:** 2026-11-22: bước 9b, vai `illustrator` cho tài khoản, cờ `images` của endpoint, sửa vai `researcher` không lưu được (progress phase 5)
 - **Cập nhật:** 2026-11-22: bước 9c, model ảnh của khách, ảnh demo theo ngân sách (giá N mỗi ảnh), biến `KD_LEARN_DEMO_IMAGE_MODEL` (hinh-va-demo.md A9, progress phase 5)
+- **Cập nhật:** 2026-11-22: bước 10 và đóng phase 5: kiểm bằng Haiku và một ảnh Gemini thật trên bản build ở khách và tài khoản; sửa sơ đồ Mermaid hiện thành khung trống (`width="100%"`); A6 khớp bản đã làm; rủi ro 45, 46, 48 đã kiểm chứng; thêm 4 việc mở vào mục 6; mục 7 sang phase 6; chuyển `progress/phase-5.md` thành `archive/phase-5.md` và `hinh-va-demo.md` vào `archive/`

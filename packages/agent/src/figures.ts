@@ -221,7 +221,7 @@ const generateImage = (ctx: ToolContext, queue: FigureQueue, image: ImageGenerat
         }
         const usage = (used: { inputTokens: number; outputTokens: number }) =>
           Effect.gen(function* () {
-            if (used.inputTokens === 0 && used.outputTokens === 0) return;
+            // One per answered call, even when the provider reports no tokens (plan A6).
             ctx.pending.push({
               _tag: 'UsageRecorded',
               id: ctx.newId(),

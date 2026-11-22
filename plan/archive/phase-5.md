@@ -1,6 +1,6 @@
 # 8. Tiến độ phase 5
 
-**Trạng thái: đang làm.** Plan phần chính: [hinh-va-demo.md](../hinh-va-demo.md).
+**Trạng thái: xong (2026-11-22).** Plan phần chính: [hinh-va-demo.md](hinh-va-demo.md).
 
 ## Phase 5 (cập nhật 2026-11-22)
 
@@ -17,7 +17,7 @@
 | Bước 7: model giả cho e2e | Xong (2026-11-22). `#diagram`, `#mermaid`, `#demo`, `#hostile` trong `fake-openai.ts`; API ảnh giả để bước 9. Xem ghi chú bước 7–8 |
 | Bước 8: giao diện, demo thù địch | Xong (2026-11-22), trừ phần ảnh (vai `illustrator`, ảnh ở demo, giá N: bước 9). Màn học dùng `LessonFigure` ở cả hai chế độ; hồ sơ bật / tắt từng loại hình; admin bật / tắt CDN; demo thù địch không thoát khỏi khung (e2e). Xem ghi chú bước 7–8 |
 | Bước 9: sinh ảnh | Xong (2026-11-22), ba PR 9a, 9b, 9c. Xem ghi chú bước 9a-9c |
-| Bước 10: kiểm tiêu chí bằng model thật | Chưa làm |
+| Bước 10: kiểm tiêu chí bằng model thật | Xong (2026-11-22). Bản build với Haiku thật ở khách và tài khoản: sơ đồ và demo đúng bước, một ảnh Gemini thật ở khách, còn sau tải lại. Tìm và sửa lỗi Mermaid hiện thành khung trống. Xem ghi chú bước 10 |
 
 ## Điều cần biết khi bắt đầu (từ phase 4)
 
@@ -117,4 +117,31 @@
 - `/api/turns`: `imageModel` chỉ nhận cho lượt chính của khách; `baseURL` trong `imageModel` bị từ chối như ở `model`; endpoint không có `images` thì `400 UnknownEndpoint`; demo kèm `imageModel` thì `400`. Cả hai key bị lọc khỏi frame và log.
 - Demo: `KD_LEARN_DEMO_IMAGE_MODEL` (provider và key của demo). Công tắc `demoImages` (mặc định tắt) và `demoImageCost` (mặc định 10) trong `/api/admin/config`, `demoImages` trong `/api/config` chỉ đúng khi demo chạy được, công tắc bật và có model ảnh. Mỗi ảnh giữ chỗ đủ N lần gọi trước khi gọi nhà cung cấp; thiếu thì trả lại chỗ, không gọi, Teacher viết tiếp; đã gọi thì tính đủ N.
 - Test: handler (key ảnh của khách, endpoint không ảnh, `baseURL`, lượt phụ), demo (tắt mặc định, trừ đúng N, thiếu ngân sách không gọi, không nhận `imageModel` của client, key demo không lộ), storage memory, e2e khách với endpoint ảnh giả (chỉ một lần gọi bằng key ảnh, tải lại vẫn còn). E2E ba trình duyệt: 129 qua, 32 bỏ qua, 1 lỗi đã biết (practice khách trên WebKit, từ phase 4).
+
+## Bước 10: kiểm bằng model thật và đóng phase (2026-11-22)
+
+- **Cách chạy:** bản build (`.output`), env thật, DB tạm, Chromium profile mới; script Playwright đọc key từ env, không trace, không chụp màn cài đặt. Khách: Haiku cho chữ, Gemini `gemini-3.1-flash-lite-image` cho ảnh. Tài khoản: kết nối Anthropic và Gemini, mọi vai Haiku (nút chép), `illustrator` là Gemini. Chủ đề "How the human heart pumps blood". Mỗi chế độ khoảng 8 lượt Haiku, một ảnh thật ($0,034).
+- **Khách:** đủ ba tool (đã đặt model ảnh trước khi hỏi). "Show me a diagram" ra sơ đồ (Mermaid), "something interactive" ra demo (nút Run, chạy được), "a realistic picture" ra ảnh JPEG 1024 px qua adapter thật (`store: false` được nhận) và frame SSE base64 vào OPFS. Haiku không dùng ảnh cho sơ đồ. Tải lại: còn 3 hình và demo.
+- **Tài khoản:** "diagram" ra SVG đúng bước (bốn buồng tim, tô theo token). "Interactive, click through each beat" lần đầu ra sơ đồ Mermaid; hỏi rõ hơn ("interactive demo with Next and Back") ra demo, Back / Next đổi trạng thái, không lỗi. Lưu `illustrator` trên kết nối Gemini được; không ảnh nào bị dùng thay sơ đồ.
+- **Lỗi tìm thấy và đã sửa:** Mermaid ghi `width="100%"`; `prepareSvg` đọc thành `100`, nên sơ đồ Mermaid hiện thành khung trống (ảnh 100 px kéo giãn). Nay chỉ nhận độ dài thuần (số hoặc `px`), còn lại lấy từ viewBox giữ tỷ lệ, bỏ `max-width` nội tuyến; e2e Mermaid kiểm độ rộng thật và có nét vẽ (trước chỉ kiểm `naturalWidth > 0`). Ảnh nhỏ không còn bị kéo giãn theo khung cha.
+- **Bổ sung sau góp ý:** test ảnh gần trần 2 MiB qua SSE và parser của client (đọc từng 16 KiB), và qua lưu trữ tài khoản rồi `GET figures/:id`; parser SSE không có giới hạn dòng. Adapter tương thích OpenAI bỏ `response_format` (OpenRouter không liệt kê, gpt-image luôn trả base64); các tham số còn lại khớp danh sách của OpenRouter cho `openai/gpt-image-2`, **chưa gọi thật tới endpoint tương thích OpenAI nào**. Mỗi lời gọi ảnh có trả lời ghi một `UsageRecorded`, kể cả 0 token. `KD_LEARN_DEMO_IMAGE_MODEL` và cờ `images` có trong `docs/deploy.md` và `.env.example`. A6 khớp với bản đã làm.
+- **Demo thù địch trên bản build:** e2e của bước 8 chạy trên `.output` (Playwright `webServer`), ba trình duyệt.
+
+## Đối chiếu tiêu chí xong
+
+| Tiêu chí ([mục 4](../04-phases.md), A, B) | Bằng chứng |
+| --- | --- |
+| Teacher chèn được sơ đồ vào bước dạy | Haiku thật ở C3 (SVG) và bước 10 (SVG, Mermaid) ở cả hai chế độ; e2e khách và tài khoản |
+| Teacher chèn được demo vào bước dạy | Haiku thật ở C3 và bước 10 (khách, tài khoản), demo chạy được; e2e bộ đếm |
+| Mã sinh ra không đọc được dữ liệu app | Spike C1; e2e demo thù địch (cookie, storage, IndexedDB, OPFS, `parent`, `fetch`, điều hướng, popup, form) trên bản build, không request ra ngoài; SVG chỉ qua `<img>` |
+| Sinh ảnh (không trên đường tiêu chí) | Ảnh Gemini thật ở khách; e2e khách và tài khoản với API ảnh giả; demo tắt mặc định, trừ đúng N |
+| Route mới có test cross-user và key không lộ | `GET /api/account/figures/:id` (người khác 404); key chữ và key ảnh không có trong frame, log, event (khách, demo, tài khoản) |
+
+## Còn mở khi đóng phase (chuyển sang mục 6)
+
+- `practice.e2e.ts` khách lỗi trên WebKit (từ phase 4; CI chỉ chạy Chromium).
+- Lỗi hydrate React #418 (lệch text giữa SSR và client) trên mọi trang của bản build, cả `/login`; không liên quan tới hình.
+- Adapter ảnh tương thích OpenAI chưa gọi thật tới endpoint nào.
+- `PublicConfig.demoImages` có ở API nhưng web chưa dùng (demo không có cài đặt ảnh nên chưa cần).
+- Với yêu cầu mơ hồ ("something interactive"), Haiku đôi khi chọn sơ đồ thay vì demo.
 

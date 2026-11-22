@@ -220,7 +220,8 @@ const openaiCompatible = (
       quality: 'medium',
       output_format: 'jpeg',
       output_compression: 75,
-      response_format: 'b64_json',
+      // No `response_format`: gpt-image models always answer in base64 and may reject it, and
+      // OpenRouter does not list it (checked 2026-11-22).
     },
   ).pipe(
     Effect.flatMap((json) => {

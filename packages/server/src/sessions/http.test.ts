@@ -302,7 +302,10 @@ describe('account turns', () => {
 
   it('makes an image with the illustrator, stores its bytes, and keeps the image key out', async () => {
     const GKEY = 'AIza-image-SECRET-0123456789abcdef';
-    const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+    // Near the 2 MiB cap: the account path stores and serves it whole.
+    const JPEG = new Uint8Array(2 * 1024 * 1024 - 64);
+    JPEG.set([0xff, 0xd8, 0xff, 0xe0]);
+    for (let i = 4; i < JPEG.length; i++) JPEG[i] = (i * 7) & 0xff;
     const asked: Array<{ model: string; apiKey: string; prompt: string }> = [];
     const images: ImagePort['Service'] = {
       generate: (request) =>

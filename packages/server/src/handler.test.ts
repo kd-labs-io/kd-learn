@@ -681,6 +681,41 @@ describe('POST /api/turns: figures (phase 5)', () => {
     });
   });
 
+  it('a near-cap image crosses the SSE stream and the client parser intact', async () => {
+    const big = new Uint8Array(2 * 1024 * 1024 - 64);
+    big.set([0xff, 0xd8, 0xff, 0xe0]);
+    for (let i = 4; i < big.length; i++) big[i] = (i * 31) & 0xff;
+    const d = deps(callTool('generate_image', { title: 'Big', prompt: 'A big one' }), {
+      images: {
+        generate: () =>
+          Effect.succeed({
+            mime: 'image/jpeg' as const,
+            bytes: big,
+            usage: { inputTokens: 1, outputTokens: 1 },
+          }),
+      },
+    });
+    const response = await handleTurns(
+      post({
+        ...mainRequest({ log: teachingLog() }),
+        imageModel: { provider: 'gemini', model: 'img', apiKey: 'AIza-big-image-key-0123456789' },
+      }),
+      d,
+    );
+    // The client reads the stream in small chunks, as a browser would.
+    const text = await response.text();
+    const parser = makeSseParser();
+    const messages = [];
+    for (let i = 0; i < text.length; i += 16 * 1024)
+      messages.push(...parser.push(text.slice(i, i + 16 * 1024)));
+    const frames = messages.map((m) => Schema.decodeUnknownSync(Frame)(JSON.parse(m.data)));
+    const figure = frames.find((f) => f._tag === 'figure');
+    expect(figure?._tag === 'figure' && figure.encoding).toBe('base64');
+    const body = figure?._tag === 'figure' ? Buffer.from(figure.body, 'base64') : Buffer.alloc(0);
+    expect(body.equals(Buffer.from(big))).toBe(true);
+    expect(frames.at(-1)).toEqual({ _tag: 'done', outcome: 'completed' });
+  });
+
   it('refuses demo libraries when the admin turned the CDN off', async () => {
     const d = deps(callTool('show_demo', { title: 'Demo', html: '<p>x</p>', libraries: ['d3'] }), {
       figureCdn: async () => false,

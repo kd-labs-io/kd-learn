@@ -10,7 +10,11 @@
 - Model và key demo chỉ đặt được qua env (phase 2 bước 6). Đặt từ UI admin cần mã hoá key bằng secret box như key của tài khoản. Phần giữ chỗ của một lượt demo không được trả lại nếu process chết giữa lượt, nên bộ đếm có thể cao hơn thực tế tới 4 lần gọi cho mỗi lượt đang chạy.
 - ACP trên bản build: mới kiểm Claude Code (`KD_BUILD_ACP=1`). opencode và Antigravity cần bridge stdio (`packages/ai/src/acp/stdio-bridge.ts`) mà bản build chưa đóng gói; cần đóng gói bridge (hoặc chỉ dùng agent hỗ trợ MCP qua HTTP) trước khi bật hai agent này trên server thật. ACP trong Docker để sau phase 2 (C3). Admin bật được agent cả trên bản build không kèm ACP; lượt khi đó trả `AcpUnavailable` (thông báo cố định, chi tiết chỉ ở log server). Màn admin báo khi `acpAvailable` là `false` (bước 8).
 - Marketplace theme: chạy riêng trên từng server hay dùng một registry chung, cách kiểm duyệt, và theme dùng chung giấy phép nào.
+- `practice.e2e.ts` khách lỗi trên WebKit (từ phase 4; CI chỉ chạy Chromium).
+- Lỗi hydrate React #418 (lệch text giữa SSR và client) trên mọi trang của bản build, cả `/login` (thấy ở bước 10 phase 5).
+- Adapter ảnh tương thích OpenAI (`/images/generations`) chưa gọi thật tới endpoint nào; tham số khớp danh sách của OpenRouter (phase 5).
+- Với yêu cầu mơ hồ ("something interactive"), Haiku đôi khi vẽ sơ đồ thay vì làm demo (bước 10 phase 5). Cân nhắc chỉnh mô tả tool nếu người dùng gặp nhiều.
 
 ## 7. Bước tiếp theo
 
-Phase 5 (hình và demo, [mục 4](04-phases.md)): đang làm, plan phần chính ở [hinh-va-demo.md](hinh-va-demo.md), tiến độ ở [progress/phase-5.md](progress/phase-5.md). Bước hiện tại: bước 0–3 (spike khung sandbox, SVG / Mermaid, Teacher vẽ hình với Haiku, sinh ảnh), làm song song được.
+Phase 6 (mobile + theme, [mục 4](04-phases.md)): chưa bắt đầu. Bước hiện tại: lập plan phần chính phase 6. Phase 5 xong (2026-11-22, [archive/phase-5.md](archive/phase-5.md)).

@@ -22,6 +22,13 @@ export function FigureImage({
 }
 
 const styles = stylex.create({
-  base: { display: 'block', maxWidth: '100%', height: 'auto', maxHeight: '60vh' },
+  // Not stretched by a flex parent: a small diagram stays at its own size.
+  base: {
+    display: 'block',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    height: 'auto',
+    maxHeight: '60vh',
+  },
   large: { maxHeight: '80vh', width: '100%', objectFit: 'contain' },
 });
