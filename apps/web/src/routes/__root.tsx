@@ -59,6 +59,7 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html
       lang={getLocale()}
+      data-ssr-locale={import.meta.env['VITE_KD_SPA'] ? undefined : getLocale()}
       data-theme={htmlThemeAttribute(appearance)}
       data-kd-theme={appearance.theme}
       data-astryx-theme="kd"
