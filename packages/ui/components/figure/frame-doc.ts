@@ -29,6 +29,9 @@ export const FRAME_SCRIPT = `(() => {
         document.documentElement.style.setProperty(name, value);
       }
     }
+    if (e.data.scheme === 'light' || e.data.scheme === 'dark') {
+      document.documentElement.style.colorScheme = e.data.scheme;
+    }
   });
   addEventListener('load', () => { size(); post({ type: 'ready' }); });
 })();`;
@@ -48,12 +51,29 @@ const sha256 = async (text: string) => {
 const escapeAttr = (value: string) =>
   value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 
+/**
+ * The color scheme of a set of figure colors, from the luminance of `--kd-bg` (plan
+ * theme-va-dien-thoai.md A4): the frame's own controls (buttons, inputs, scrollbars) then match.
+ */
+export const schemeOf = (vars: Readonly<Record<string, string>>): 'light' | 'dark' => {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(vars['--kd-bg'] ?? '');
+  if (match === null) return 'light';
+  const digits = match[1]!;
+  const full = digits.length === 3 ? [...digits].map((d) => d + d).join('') : digits;
+  const [r, g, b] = [0, 2, 4].map((i) => Number.parseInt(full.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.5 ? 'dark' : 'light';
+};
+
 /** `:root { --kd-fg: ...; color: ...; background: ... }`. Names and values are checked. */
 export const rootStyle = (vars: Readonly<Record<string, string>>) => {
   const lines = Object.entries(vars)
     .filter(([name, value]) => /^--kd-[a-z0-9-]+$/.test(name) && /^[#\w\s.,()%-]+$/.test(value))
     .map(([name, value]) => `${name}: ${value};`);
-  return `:root { ${lines.join(' ')} color: var(--kd-fg); background: var(--kd-bg); color-scheme: normal; }`;
+  return `:root { ${lines.join(' ')} color: var(--kd-fg); background: var(--kd-bg); color-scheme: ${schemeOf(vars)}; }`;
 };
 
 export interface FrameInput {

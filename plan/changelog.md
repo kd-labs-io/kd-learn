@@ -90,3 +90,4 @@
 - **Cập nhật:** 2026-11-22: xong bước 0 và 1 phase 6 (spike C1: `light-dark()` chạy ở ba trình duyệt, theme lúc chạy đổi sang thẻ `<style>` vì biến inline không tới portal; theme v2 hai bộ màu, ba theme dựng sẵn, bảng dark trong `DESIGN.md`) (theme-va-dien-thoai.md A2, C1; progress phase 6)
 - **Cập nhật:** 2026-11-22: xong bước 2 phase 6 (`Appearance`, bảng `user_appearance` server v11, `GET` / `PUT /api/account/appearance`; A3 đổi từ cột trong bảng người dùng sang bảng riêng và route riêng) (theme-va-dien-thoai.md A3, progress phase 6)
 - **Cập nhật:** 2026-11-22: xong bước 3 phase 6 (cookie `kd_appearance` cho SSR và SPA, CSS theme dựng sẵn gắn với `data-kd-theme`, đồng bộ tài khoản, mục "Giao diện"; A2, A3 khớp cách đã làm: chỉ cookie, không `localStorage`) (theme-va-dien-thoai.md, progress phase 6)
+- **Cập nhật:** 2026-11-22: xong bước 4 phase 6 (hình, demo, graph theo chế độ đã quyết; e2e hình chạy ở bốn kiểu giao diện) (progress phase 6)
