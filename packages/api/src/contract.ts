@@ -23,6 +23,7 @@ export const ACCOUNT_SETTINGS_PATH = '/api/account/settings';
 export const CONNECTIONS_PATH = '/api/account/connections';
 export const ROLES_PATH = '/api/account/roles';
 export const PROFILE_PATH = '/api/account/profile';
+export const APPEARANCE_PATH = '/api/account/appearance';
 export const SESSIONS_PATH = '/api/account/sessions';
 export const EXTRACT_PATH = '/api/knowledge/extract';
 export const EXTRACTIONS_PATH = '/api/account/knowledge/extractions';
@@ -385,6 +386,27 @@ export const AccountSettings = Schema.Struct({
   acpModels: AcpModels,
 });
 export type AccountSettings = typeof AccountSettings.Type;
+
+// Appearance (phase 6 A3): color mode and built-in theme. Guests keep it on the device; an account
+// keeps it on the server so it follows the user. `GET` and `PUT` on `APPEARANCE_PATH`.
+
+export const ColorModeChoice = Schema.Literals(['system', 'light', 'dark']);
+export type ColorModeChoice = typeof ColorModeChoice.Type;
+
+export const Appearance = Schema.Struct({
+  mode: ColorModeChoice,
+  /** A built-in theme id. A client that does not know it falls back to the default theme. */
+  theme: Schema.String.pipe(
+    Schema.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,47}$/, { expected: 'a theme id' })),
+  ),
+});
+export type Appearance = typeof Appearance.Type;
+
+export const defaultAppearance: Appearance = { mode: 'system', theme: 'kd' };
+
+/** `GET` and `PUT` answer: `null` while the account has saved nothing. */
+export const AppearanceResponse = Schema.Struct({ appearance: Schema.NullOr(Appearance) });
+export type AppearanceResponse = typeof AppearanceResponse.Type;
 
 // Teaching profile of an account (phase 3 A2): `GET`, `PUT` (ProfileRequest) and `DELETE` (back to
 // the default) on `PROFILE_PATH`. Each answers with `ProfileResponse`.

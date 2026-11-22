@@ -100,6 +100,23 @@ describe('sqlite-node database', () => {
     upgraded.close();
   });
 
+  it('upgrades a v10 database with users to the appearance table', () => {
+    const path = join(dir, 'v10.db');
+    const old = open(path, serverMigrations.slice(0, 10));
+    old.db.prepare("INSERT INTO users VALUES ('u1', 'a@kd.test', 'h', 'user', 0, 1)").run();
+    old.db.prepare("INSERT INTO users VALUES ('u2', 'b@kd.test', 'h', 'user', 0, 1)").run();
+    old.close();
+    const upgraded = open(path);
+    upgraded.db.prepare("INSERT INTO user_appearance VALUES ('u1', 'dark', 'ocean', 2)").run();
+    expect(
+      upgraded.db.prepare('SELECT mode, theme FROM user_appearance WHERE user_id = ?').get('u1'),
+    ).toEqual({ mode: 'dark', theme: 'ocean' });
+    expect(() =>
+      upgraded.db.prepare("INSERT INTO user_appearance VALUES ('u2', 'dim', 'kd', 2)").run(),
+    ).toThrow();
+    upgraded.close();
+  });
+
   it('rolls back a transaction body that throws, and rejects an async one', () => {
     const database = open();
     database.db.exec('CREATE TABLE t (v INTEGER)');

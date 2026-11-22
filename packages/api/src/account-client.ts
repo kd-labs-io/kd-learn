@@ -37,6 +37,9 @@ import {
   PublicConfig,
   REGISTER_PATH,
   PROFILE_PATH,
+  APPEARANCE_PATH,
+  Appearance,
+  AppearanceResponse,
   EXTRACTIONS_PATH,
   ExtractSessionRequest,
   ExtractionList,
@@ -254,6 +257,15 @@ export const accountClient = (options: AccountClientOptions = {}) => {
         response: codec(AccountSettings),
       }),
 
+    appearance: () =>
+      go({ method: 'GET', path: APPEARANCE_PATH, response: codec(AppearanceResponse) }),
+    saveAppearance: (appearance: Appearance) =>
+      go({
+        method: 'PUT',
+        path: APPEARANCE_PATH,
+        body: bodyOf(Appearance, appearance),
+        response: codec(AppearanceResponse),
+      }),
     profile: () => go({ method: 'GET', path: PROFILE_PATH, response: codec(ProfileResponse) }),
     saveProfile: (profile: SavedProfile) =>
       go({

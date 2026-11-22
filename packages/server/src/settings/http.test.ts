@@ -128,6 +128,43 @@ describe('account settings routes', () => {
     ).toBe(204);
   });
 
+  it('keeps one appearance per account and rejects bad values', async () => {
+    const { handlers } = make();
+    const alice = await signUp(handlers, 'a@kd.test');
+    const bob = await signUp(handlers, 'b@kd.test');
+    const read = async (token: string) =>
+      (await (await call(handlers.account, 'GET', '/api/account/appearance', token)).json()) as {
+        appearance: unknown;
+      };
+
+    expect(await read(alice)).toEqual({ appearance: null });
+    const saved = await call(handlers.account, 'PUT', '/api/account/appearance', alice, {
+      mode: 'dark',
+      theme: 'ocean',
+    });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ appearance: { mode: 'dark', theme: 'ocean' } });
+    await call(handlers.account, 'PUT', '/api/account/appearance', alice, {
+      mode: 'light',
+      theme: 'kd',
+    });
+    expect(await read(alice)).toEqual({ appearance: { mode: 'light', theme: 'kd' } });
+    // Another user sees only their own (nothing yet).
+    expect(await read(bob)).toEqual({ appearance: null });
+
+    for (const body of [
+      { mode: 'dim', theme: 'kd' },
+      { mode: 'dark', theme: 'Ocean;x' },
+      { mode: 'dark', theme: 'kd', css: 'body{}' },
+      { mode: 'dark' },
+    ]) {
+      const response = await call(handlers.account, 'PUT', '/api/account/appearance', bob, body);
+      expect(response.status).toBe(400);
+    }
+    expect(await read(bob)).toEqual({ appearance: null });
+    expect((await call(handlers.account, 'GET', '/api/account/appearance')).status).toBe(401);
+  });
+
   it('requires a token, and answers unknown paths with 404', async () => {
     const { handlers } = make();
     expect((await call(handlers.account, 'GET', '/api/account/settings')).status).toBe(401);
