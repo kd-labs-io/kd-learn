@@ -39,7 +39,7 @@ Bốn quyết định sản phẩm chốt ngày 2026-11-22:
 - **Không phải event log.** Nguồn là dữ liệu lớn và xoá được, nên lưu ở bảng riêng, không chép vào log buổi học (log của khách đi theo mỗi request, giới hạn 1 MiB):
   - `sources (owner, id, kind, title, origin, state, error, bytes, created_at)` và `source_chunks (owner, source_id, ordinal, id, text, locator)`.
   - `source_files (owner, source_id, bytes)`: file gốc, chỉ giữ tới khi ingest xong để chạy lại được sau khi bị ngắt; xong thì xoá.
-  - Khách: migration v4; server: thêm vào migration v8 hoặc v9 (chốt ở bước 4).
+  - Khách: migration v4; server: migration v9 (v8 là bảng `jobs`).
 - Port `storage` thêm: `putSource` (tạo `pending` kèm file gốc), `completeSource` (ghi đoạn và `ready` trong một lô; nguồn đã `ready` thì từ chối), `failSource`, `listSources`, `readChunks(sourceId, ids?)`, `deleteSource` (xoá cả đoạn và file), thay đổi `SourcesChanged` trong `StorageChange`. Driver server cấp qua `forUser`.
 - **Gắn nguồn vào buổi học:** event mới `SourceAttached {sourceId, title, kind}` và `SourceDetached {sourceId}` trong log buổi học; projection `Session` có danh sách nguồn đang gắn. Gắn lúc tạo buổi hoặc giữa buổi. Log cũ không có event này nên vẫn dựng được.
 - **Không job nào ghi vào log buổi học.** `SourceAttached` ghi ngay lúc người học yêu cầu, kể cả khi nguồn còn `pending` (research theo chủ đề lúc tạo buổi: nguồn `web` `pending` được tạo và gắn trong lô tạo buổi). Chọn lát (A3) bỏ qua nguồn chưa `ready`. Gắn / gỡ giữa buổi đi qua cùng chỗ ghi lô của lượt: tài khoản qua runner theo buổi (đang có lượt chạy thì xếp sau lô của lượt); khách dưới Web Lock `kd-learn:turn:<sessionId>`.

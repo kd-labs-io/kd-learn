@@ -8,6 +8,7 @@
 import { Effect, Queue, Stream } from 'effect';
 import {
   KnowledgeConflict,
+  SourceConflict,
   StorageFailure,
   type AppendResult,
   type StorageChange,
@@ -22,7 +23,13 @@ import {
   summarize,
   toEventRow,
   toKnowledgeRow,
+  checkChunks,
+  checkNewSourceInfo,
+  fromChunkRow,
+  fromSourceRow,
+  toChunkRow,
   type SessionRow,
+  type SourceRow,
 } from '../sqlite/codec.ts';
 import { toStorageError, type ServerDatabase } from './database.ts';
 
@@ -97,6 +104,36 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
   const knowledgeRead = db.prepare(
     'SELECT payload FROM knowledge_events WHERE owner = ? ORDER BY seq',
   );
+
+  const src = {
+    insert: db.prepare(
+      `INSERT INTO sources (owner, source_id, kind, title, origin, state, failure, bytes, chunk_count, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+    ),
+    get: db.prepare('SELECT * FROM sources WHERE owner = ? AND source_id = ?'),
+    list: db.prepare('SELECT * FROM sources WHERE owner = ? ORDER BY created_at DESC, source_id'),
+    ready: db.prepare(
+      `UPDATE sources SET state = 'ready', failure = NULL, bytes = ?, chunk_count = ?,
+              title = COALESCE(?, title) WHERE owner = ? AND source_id = ?`,
+    ),
+    fail: db.prepare(
+      "UPDATE sources SET state = 'failed', failure = ? WHERE owner = ? AND source_id = ?",
+    ),
+    pending: db.prepare(
+      "UPDATE sources SET state = 'pending', failure = NULL WHERE owner = ? AND source_id = ?",
+    ),
+    remove: db.prepare('DELETE FROM sources WHERE owner = ? AND source_id = ?'),
+    chunk: db.prepare(
+      'INSERT INTO source_chunks (owner, source_id, ordinal, text, locator) VALUES (?, ?, ?, ?, ?)',
+    ),
+    chunks: db.prepare(
+      'SELECT ordinal, text, locator FROM source_chunks WHERE owner = ? AND source_id = ? ORDER BY ordinal',
+    ),
+    removeChunks: db.prepare('DELETE FROM source_chunks WHERE owner = ? AND source_id = ?'),
+    file: db.prepare('SELECT bytes FROM source_files WHERE owner = ? AND source_id = ?'),
+    putFile: db.prepare('INSERT INTO source_files (owner, source_id, bytes) VALUES (?, ?, ?)'),
+    removeFile: db.prepare('DELETE FROM source_files WHERE owner = ? AND source_id = ?'),
+  };
 
   /** Runs a synchronous query as an Effect, mapping anything thrown to a typed storage error. */
   const run = <T>(work: () => T): Effect.Effect<T, StorageError> =>
@@ -204,6 +241,125 @@ export const makeServerStorage = (database: ServerDatabase): ServerStorage => {
         }),
       ),
     ),
+
+    createSource: (source) =>
+      run(() => {
+        const info = checkNewSourceInfo(source.info);
+        const bytes = source.state === 'ready' ? checkChunks(source.chunks) : 0;
+        transaction(() => {
+          src.insert.run(
+            userId,
+            info.sourceId,
+            info.kind,
+            info.title,
+            info.origin,
+            source.state,
+            bytes,
+            source.state === 'ready' ? source.chunks.length : 0,
+            info.createdAt,
+          );
+          if (source.state === 'ready') {
+            for (const chunk of source.chunks) {
+              const row = toChunkRow(chunk);
+              src.chunk.run(userId, info.sourceId, row.ordinal, row.text, row.locator);
+            }
+          } else if (source.file !== undefined) {
+            src.putFile.run(userId, info.sourceId, source.file);
+          }
+        });
+        notify(userId, { _tag: 'SourcesChanged' });
+      }),
+
+    completeSource: (sourceId, chunks, options) =>
+      Effect.try({
+        try: () => {
+          const bytes = checkChunks(chunks);
+          transaction(() => {
+            const row = src.get.get(userId, sourceId) as SourceRow | undefined;
+            if (row?.state !== 'pending') {
+              throw new SourceConflict({ message: 'The source is not pending.' });
+            }
+            src.removeChunks.run(userId, sourceId);
+            for (const chunk of chunks) {
+              const r = toChunkRow(chunk);
+              src.chunk.run(userId, sourceId, r.ordinal, r.text, r.locator);
+            }
+            src.ready.run(bytes, chunks.length, options?.title ?? null, userId, sourceId);
+            src.removeFile.run(userId, sourceId);
+          });
+          notify(userId, { _tag: 'SourcesChanged' });
+        },
+        catch: (error) => (error instanceof SourceConflict ? error : toStorageError(error)),
+      }),
+
+    failSource: (sourceId, failure) =>
+      Effect.try({
+        try: () => {
+          transaction(() => {
+            const row = src.get.get(userId, sourceId) as SourceRow | undefined;
+            if (row?.state !== 'pending') {
+              throw new SourceConflict({ message: 'The source is not pending.' });
+            }
+            src.fail.run(JSON.stringify(failure), userId, sourceId);
+          });
+          notify(userId, { _tag: 'SourcesChanged' });
+        },
+        catch: (error) => (error instanceof SourceConflict ? error : toStorageError(error)),
+      }),
+
+    retrySource: (sourceId) =>
+      Effect.try({
+        try: () => {
+          transaction(() => {
+            const row = src.get.get(userId, sourceId) as SourceRow | undefined;
+            if (row === undefined || row.state === 'ready') {
+              throw new SourceConflict({ message: 'The source cannot run again.' });
+            }
+            src.pending.run(userId, sourceId);
+          });
+          notify(userId, { _tag: 'SourcesChanged' });
+        },
+        catch: (error) => (error instanceof SourceConflict ? error : toStorageError(error)),
+      }),
+
+    listSources: run(() => (src.list.all(userId) as unknown as SourceRow[]).map(fromSourceRow)),
+
+    getSource: (sourceId) =>
+      run(() => {
+        const row = src.get.get(userId, sourceId) as SourceRow | undefined;
+        return row === undefined ? undefined : fromSourceRow(row);
+      }),
+
+    readSourceFile: (sourceId) =>
+      run(() => {
+        const row = src.file.get(userId, sourceId) as { bytes: Uint8Array } | undefined;
+        return row === undefined ? undefined : new Uint8Array(row.bytes);
+      }),
+
+    readChunks: (sourceIds) =>
+      run(() =>
+        sourceIds.flatMap((sourceId) => {
+          const row = src.get.get(userId, sourceId) as SourceRow | undefined;
+          if (row === undefined) return [];
+          return (
+            src.chunks.all(userId, sourceId) as Array<{
+              ordinal: number;
+              text: string;
+              locator: string;
+            }>
+          ).map((chunk) => ({ sourceId, title: row.title, chunk: fromChunkRow(chunk) }));
+        }),
+      ),
+
+    deleteSource: (sourceId) =>
+      run(() => {
+        transaction(() => {
+          src.removeChunks.run(userId, sourceId);
+          src.removeFile.run(userId, sourceId);
+          src.remove.run(userId, sourceId);
+        });
+        notify(userId, { _tag: 'SourcesChanged' });
+      }),
 
     getSettings: Effect.succeed(undefined),
     saveSettings: () => guestOnly,

@@ -3,6 +3,7 @@
 import { Schema } from 'effect';
 import { LessonPlan, StepId } from './plan.ts';
 import { TeachingProfile } from './profile.ts';
+import { Citation, SourceChunkRef, SourceId, SourceKind, SourceTitle } from './source-schema.ts';
 
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -51,6 +52,8 @@ export const MessageAppended = Schema.TaggedStruct('MessageAppended', {
   messageId: MessageId,
   agent: Schema.Literals(['prober', 'teacher']),
   content: Schema.String,
+  /** The `[S<n>]` marks of `content`, resolved to chunks of the turn's slice (phase 4 A3). */
+  citations: Schema.optionalKey(Schema.Array(Citation)),
 });
 
 /** Token usage summed over the model calls of one turn. `model` is what served them, to price them later. */
@@ -74,6 +77,8 @@ export const TurnCompleted = Schema.TaggedStruct('TurnCompleted', {
   ...base,
   turnId: TurnId,
   reason: FinishReason,
+  /** Chunks of the sources the turn was given (phase 4 A3), for extraction to cite. */
+  sourceRefs: Schema.optionalKey(Schema.Array(SourceChunkRef)),
 });
 
 /** `message` must never contain a key (plan A7). */
@@ -150,6 +155,22 @@ export const SideTurnFailed = Schema.TaggedStruct('SideTurnFailed', {
   retryable: Schema.Boolean,
 });
 
+/**
+ * The learner attached a source to the session (phase 4 A2), possibly still `pending`: turns use
+ * it once it is ready. A learner action, so it has no turn.
+ */
+export const SourceAttached = Schema.TaggedStruct('SourceAttached', {
+  ...base,
+  sourceId: SourceId,
+  title: SourceTitle,
+  kind: SourceKind,
+});
+
+export const SourceDetached = Schema.TaggedStruct('SourceDetached', {
+  ...base,
+  sourceId: SourceId,
+});
+
 export const DomainEvent = Schema.Union([
   SessionCreated,
   TurnStarted,
@@ -164,6 +185,8 @@ export const DomainEvent = Schema.Union([
   SessionCompleted,
   SideMessageAppended,
   SideTurnFailed,
+  SourceAttached,
+  SourceDetached,
 ]);
 export type DomainEvent = typeof DomainEvent.Type;
 

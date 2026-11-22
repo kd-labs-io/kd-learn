@@ -11,7 +11,7 @@
 | Bước 1: spike tìm kiếm (C2) | Xong (2026-11-22). SearXNG `searxng/searxng:2026.11.20-cd6d28091` chạy được, đoạn trích quá ngắn (khoảng 160 ký tự) nên thêm bộ tải trang có chặn SSRF cho SearXNG; Exa dùng `highlights`; cắt web search của provider (không vừa `SearchPort`). Xem ghi chú bước 1 bên dưới |
 | Bước 2: spike dạy dựa trên nguồn (C3) | Chưa bắt đầu |
 | Bước 3: job bền | Xong (2026-11-22). Bảng `jobs` (migration server v8), runner trong `packages/server/src/jobs/runner.ts`, job extraction chạy qua runner; chạy lại sau khởi động lại tối đa 3 lần. Xem ghi chú bước 3 bên dưới |
-| Bước 4: nguồn trong core và storage | Chưa bắt đầu |
+| Bước 4: nguồn trong core và storage | Xong (2026-11-22). Schema và hàm cắt đoạn, chọn lát trong `core`; bảng nguồn ở cả ba driver (khách v4, server v9). Xem ghi chú bước 4 bên dưới |
 | Bước 5: `packages/search` | Chưa bắt đầu |
 | Bước 6: ingest PDF và ghi chú | Chưa bắt đầu |
 | Bước 7: dạy dựa trên nguồn | Chưa bắt đầu |
@@ -42,4 +42,11 @@
 - **Exa** (đọc tài liệu, chưa gọi): `POST https://api.exa.ai/search`, `Authorization: Bearer`, body `{query, type: 'auto', numResults, contents: {highlights: true}}`; kết quả `{results: [{title, url, publishedDate?, highlights?, text?}], costDollars}`; lỗi 401 `INVALID_API_KEY`, 402 `NO_MORE_CREDITS`, 429 kèm `Retry-After`. Giá `auto` $7 / 1.000 request, 10 QPS. `highlights` đủ thay toàn văn.
 - **Web search của provider: cắt khỏi phase 4** (thứ tự cắt giảm của plan). TanStack AI 1.4 có tool tìm web do provider chạy cho cả ba provider, nhưng adapter của kd-learn bỏ kết quả `providerExecuted`; gọi thật Anthropic (Haiku, 1 lần tìm): 15k token vào, kết quả chỉ có `title`, `url` và `encrypted_content`, chữ đọc được chỉ nằm trong `citations` của câu trả lời. Không vừa `SearchPort`; nếu làm sau thì là biến thể của pipeline research, cần mở rộng `AiPort`. Hệ quả: người dùng chọn trong các nguồn của server (SearXNG, Exa); A6 đổi theo.
 - Bản đầy đủ của spike chỉ ở máy local (không giữ trong repo).
+
+## Bước 4: nguồn trong core và storage (2026-11-22)
+
+- **`core`:** `source-schema.ts` (schema: `SourceInfo`, `SourceChunk`, `ChunkLocator`, `SourceChunkRef`, `Citation`; tách khỏi `source.ts` để event import không bị vòng) và `source.ts` (hàm thuần: `chunkPages`, `chunkNote` / `cleanNote`, `chunkWeb`, `selectSourceSlice`, `sourceQueryText`). Đoạn được định danh bằng `ordinal` trong nguồn (không có `chunkId` riêng): tham chiếu là `{sourceId, ordinal}`. Cỡ đoạn mặc định 1.500 ký tự (tối đa 4.000), lát mặc định 8 đoạn / 24 KiB; chốt lại ở spike C3.
+- **Event:** `SourceAttached` / `SourceDetached` (projection chặt: gắn hai lần, gỡ cái chưa gắn thì `ProjectionError`); `MessageAppended.citations`, `TurnCompleted.sourceRefs`, `PropositionSource.documents` đều tuỳ chọn. Fixture log phase 1–3 vẫn dựng được. `Session.sources`, `HistoryMessage.citations`.
+- **`storage`:** bảng `sources`, `source_chunks`, `source_files` (DDL chung `sourcesTables`; migration khách v4, server v9). Port thêm `createSource` (`pending` kèm file, hay `ready` kèm đoạn), `completeSource` (chỉ từ `pending`, xoá file), `failSource`, `retrySource`, `listSources`, `getSource`, `readSourceFile`, `readChunks`, `deleteSource`, lỗi `SourceConflict`, thay đổi `SourcesChanged`. Kiểm đoạn (thứ tự `ordinal`, trần 2 MiB) trước khi ghi, ở mọi driver.
+- **Test:** bộ test port thêm 5 test nguồn (memory, sqlite-node); test hai người dùng cho nguồn (không đọc, ghi, xoá được nguồn của người kia; id theo owner). Driver WASM chưa có test riêng cho nguồn: kiểm bằng Playwright ở bước 6.
 

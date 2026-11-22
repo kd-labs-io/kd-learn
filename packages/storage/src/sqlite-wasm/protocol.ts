@@ -1,5 +1,5 @@
 // Messages between the page (index.ts) and the Worker (worker.ts). Structured-clone values only.
-import type { EventRow, SessionRow } from '../sqlite/codec.ts';
+import type { EventRow, SessionRow, SourceRow } from '../sqlite/codec.ts';
 import type { SettingsKey } from '../sqlite/schema.ts';
 
 /** An event as stored. */
@@ -28,7 +28,39 @@ export type Operation =
   | { readonly op: 'getProfile' }
   /** `payload` undefined removes the saved profile. */
   | { readonly op: 'putProfile'; readonly payload: string | undefined; readonly at: number }
+  | {
+      readonly op: 'createSource';
+      readonly row: Omit<SourceRow, 'failure'>;
+      readonly chunks: ReadonlyArray<WireChunk>;
+      readonly file: Uint8Array | undefined;
+    }
+  | {
+      readonly op: 'completeSource';
+      readonly sourceId: string;
+      readonly chunks: ReadonlyArray<WireChunk>;
+      readonly bytes: number;
+      readonly title: string | undefined;
+    }
+  | { readonly op: 'failSource'; readonly sourceId: string; readonly failure: string }
+  | { readonly op: 'retrySource'; readonly sourceId: string }
+  | { readonly op: 'listSources' }
+  | { readonly op: 'getSource'; readonly sourceId: string }
+  | { readonly op: 'readSourceFile'; readonly sourceId: string }
+  | { readonly op: 'readChunks'; readonly sourceIds: ReadonlyArray<string> }
+  | { readonly op: 'deleteSource'; readonly sourceId: string }
   | { readonly op: 'close' };
+
+/** A chunk as stored: the locator is JSON. */
+export interface WireChunk {
+  readonly ordinal: number;
+  readonly text: string;
+  readonly locator: string;
+}
+
+export interface WireStoredChunk extends WireChunk {
+  readonly sourceId: string;
+  readonly title: string;
+}
 
 export type Request = Operation & { readonly id: number };
 
@@ -41,7 +73,7 @@ export type Response =
   | {
       readonly id: number;
       readonly ok: false;
-      readonly kind: 'unavailable' | 'failure';
+      readonly kind: 'unavailable' | 'failure' | 'sourceConflict';
       readonly message: string;
     }
   | {

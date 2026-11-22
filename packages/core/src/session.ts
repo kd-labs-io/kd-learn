@@ -6,6 +6,7 @@ import type { DomainEvent } from './event.ts';
 import { isPlanResolved, nextStep, validatePlan } from './plan.ts';
 import type { LessonPlan, PlanNode, StepId } from './plan.ts';
 import type { TeachingProfile } from './profile.ts';
+import type { Citation, SourceKind } from './source-schema.ts';
 
 /** `probing -> planning -> teaching(step) -> done` (plan A4). */
 export type SessionState =
@@ -44,6 +45,15 @@ export interface Turn {
 export interface HistoryMessage {
   readonly role: 'user' | 'assistant';
   readonly content: string;
+  /** Resolved `[S<n>]` marks of an assistant message (phase 4 A3). */
+  readonly citations?: ReadonlyArray<Citation>;
+}
+
+/** A source attached to the session (phase 4 A2). */
+export interface AttachedSource {
+  readonly sourceId: string;
+  readonly title: string;
+  readonly kind: SourceKind;
 }
 
 export interface SideMessage {
@@ -78,6 +88,8 @@ export interface Session {
   readonly history: ReadonlyArray<HistoryMessage>;
   /** Side chat messages by thread id (plan A5). Not part of `history`. */
   readonly sideThreads: Readonly<Record<string, ReadonlyArray<SideMessage>>>;
+  /** Attached sources, in attach order. */
+  readonly sources: ReadonlyArray<AttachedSource>;
   readonly usage: { readonly inputTokens: number; readonly outputTokens: number };
 }
 
@@ -92,7 +104,7 @@ interface TurnDraft {
   input: string;
   status: TurnStatus;
   failure?: Turn['failure'];
-  messages: Array<string>;
+  messages: Array<{ content: string; citations?: ReadonlyArray<Citation> }>;
   /** The turn moved the session on (assessment, plan, step), so it does not count towards N or M. */
   moved: boolean;
 }
@@ -120,6 +132,7 @@ export const projectSession = (
   const turns: Array<TurnDraft> = [];
   const turnById = new Map<string, TurnDraft>();
   const sideThreads: Record<string, Array<SideMessage>> = {};
+  const sources: Array<AttachedSource> = [];
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -164,7 +177,11 @@ export const projectSession = (
       case 'MessageAppended': {
         const turn = openTurn(event.turnId);
         if (typeof turn === 'string') return fail(index, turn);
-        turn.messages.push(event.content);
+        turn.messages.push(
+          event.citations === undefined
+            ? { content: event.content }
+            : { content: event.content, citations: event.citations },
+        );
         break;
       }
 
@@ -284,6 +301,21 @@ export const projectSession = (
       case 'SideTurnFailed':
         // Changes no state: the UI reads the log to offer a retry.
         break;
+
+      case 'SourceAttached': {
+        if (sources.some((source) => source.sourceId === event.sourceId)) {
+          return fail(index, `Source "${event.sourceId}" is already attached.`);
+        }
+        sources.push({ sourceId: event.sourceId, title: event.title, kind: event.kind });
+        break;
+      }
+
+      case 'SourceDetached': {
+        const at = sources.findIndex((source) => source.sourceId === event.sourceId);
+        if (at < 0) return fail(index, `Source "${event.sourceId}" is not attached.`);
+        sources.splice(at, 1);
+        break;
+      }
     }
   }
 
@@ -291,7 +323,7 @@ export const projectSession = (
   for (const turn of turns) {
     if (turn.status !== 'completed') continue;
     history.push({ role: 'user', content: turn.input });
-    for (const content of turn.messages) history.push({ role: 'assistant', content });
+    for (const message of turn.messages) history.push({ role: 'assistant', ...message });
   }
 
   return Result.succeed({
@@ -311,6 +343,7 @@ export const projectSession = (
     })),
     history,
     sideThreads,
+    sources,
     usage: { inputTokens, outputTokens },
   });
 };

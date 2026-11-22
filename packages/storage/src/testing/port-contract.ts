@@ -1,6 +1,6 @@
 // Behaviour every driver of the storage port must have (plan step 1: run the port suite on each
 // driver). Imported by each driver's test file; not a test file itself.
-import { Effect, Stream } from 'effect';
+import { Effect, Fiber, Stream } from 'effect';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_PROMPT_LENGTH,
@@ -270,5 +270,122 @@ export const portContract = (name: string, make: () => StorageService) =>
         'other',
         'mine-1',
       ]);
+    });
+
+    describe('sources', () => {
+      const info = (sourceId: string, createdAt = 1) => ({
+        sourceId,
+        kind: 'pdf' as const,
+        title: `Doc ${sourceId}`,
+        origin: `${sourceId}.pdf`,
+        createdAt,
+      });
+      const chunks = [
+        { ordinal: 0, text: 'Trang một có dấu.', locator: { page: 1 } },
+        { ordinal: 1, text: 'Page two.', locator: { page: 2 } },
+      ];
+
+      it('runs a pending source to ready: chunks in, file gone, title replaced', async () => {
+        const storage = make();
+        const file = new Uint8Array([1, 2, 3]);
+        await Effect.runPromise(storage.createSource({ state: 'pending', info: info('a'), file }));
+        expect(await Effect.runPromise(storage.readSourceFile('a'))).toEqual(file);
+        expect(await Effect.runPromise(storage.getSource('a'))).toMatchObject({
+          state: 'pending',
+          bytes: 0,
+          chunkCount: 0,
+        });
+        await Effect.runPromise(storage.completeSource('a', chunks, { title: 'Real title' }));
+        const ready = await Effect.runPromise(storage.getSource('a'));
+        expect(ready).toMatchObject({ state: 'ready', title: 'Real title', chunkCount: 2 });
+        expect(ready!.bytes).toBe(new TextEncoder().encode('Trang một có dấu.Page two.').length);
+        expect(await Effect.runPromise(storage.readSourceFile('a'))).toBeUndefined();
+        expect(await Effect.runPromise(storage.readChunks(['a', 'missing']))).toEqual(
+          chunks.map((chunk) => ({ sourceId: 'a', title: 'Real title', chunk })),
+        );
+        // Once ready, never again.
+        const again = await Effect.runPromiseExit(storage.completeSource('a', chunks));
+        expect(JSON.stringify(again)).toContain('SourceConflict');
+      });
+
+      it('fails and retries a pending source, keeping its file', async () => {
+        const storage = make();
+        await Effect.runPromise(
+          storage.createSource({ state: 'pending', info: info('a'), file: new Uint8Array([9]) }),
+        );
+        await Effect.runPromise(storage.failSource('a', { code: 'NoText', message: 'No text.' }));
+        expect(await Effect.runPromise(storage.getSource('a'))).toMatchObject({
+          state: 'failed',
+          failure: { code: 'NoText', message: 'No text.' },
+        });
+        expect(
+          JSON.stringify(
+            await Effect.runPromiseExit(storage.failSource('a', { code: 'x', message: '' })),
+          ),
+        ).toContain('SourceConflict');
+        await Effect.runPromise(storage.retrySource('a'));
+        const retried = await Effect.runPromise(storage.getSource('a'));
+        expect(retried?.state).toBe('pending');
+        expect(retried?.failure).toBeUndefined();
+        expect(await Effect.runPromise(storage.readSourceFile('a'))).toEqual(new Uint8Array([9]));
+      });
+
+      it('creates a ready source in one go, lists newest first, deletes everything', async () => {
+        const storage = make();
+        await Effect.runPromise(
+          storage.createSource({ state: 'ready', info: info('old', 1), chunks }),
+        );
+        await Effect.runPromise(storage.createSource({ state: 'pending', info: info('new', 2) }));
+        expect((await Effect.runPromise(storage.listSources)).map((s) => s.sourceId)).toEqual([
+          'new',
+          'old',
+        ]);
+        const dup = await Effect.runPromiseExit(
+          storage.createSource({ state: 'pending', info: info('old', 3) }),
+        );
+        expect(dup._tag).toBe('Failure');
+        await Effect.runPromise(storage.deleteSource('old'));
+        await Effect.runPromise(storage.deleteSource('unknown'));
+        expect(await Effect.runPromise(storage.readChunks(['old']))).toEqual([]);
+        expect((await Effect.runPromise(storage.listSources)).map((s) => s.sourceId)).toEqual([
+          'new',
+        ]);
+      });
+
+      it('rejects chunks out of order or over the size limit, writing nothing', async () => {
+        const storage = make();
+        const bad = await Effect.runPromiseExit(
+          storage.createSource({
+            state: 'ready',
+            info: info('a'),
+            chunks: [{ ordinal: 1, text: 'x', locator: {} }],
+          }),
+        );
+        expect(bad._tag).toBe('Failure');
+        const big = Array.from({ length: 600 }, (_, ordinal) => ({
+          ordinal,
+          text: 'é'.repeat(2000),
+          locator: {},
+        }));
+        await Effect.runPromise(storage.createSource({ state: 'pending', info: info('b') }));
+        expect((await Effect.runPromiseExit(storage.completeSource('b', big)))._tag).toBe(
+          'Failure',
+        );
+        expect((await Effect.runPromise(storage.getSource('b')))?.state).toBe('pending');
+        expect(await Effect.runPromise(storage.getSource('a'))).toBeUndefined();
+      });
+
+      it('notifies a change of sources', async () => {
+        const storage = make();
+        const seen: StorageChange[] = [];
+        const fiber = Effect.runFork(
+          Stream.runForEach(storage.changes, (change) => Effect.sync(() => void seen.push(change))),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await Effect.runPromise(storage.createSource({ state: 'pending', info: info('a') }));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        expect(seen).toContainEqual({ _tag: 'SourcesChanged' });
+        await Effect.runPromise(Fiber.interrupt(fiber));
+      });
     });
   });

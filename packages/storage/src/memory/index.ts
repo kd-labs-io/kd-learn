@@ -5,10 +5,14 @@ import {
   SavedProfile,
   type DomainEvent,
   type KnowledgeEvent,
+  type SourceChunk,
+  type SourceInfo,
   type TeachingProfile,
 } from '@kd-learn/core';
+import { checkChunks, checkNewSourceInfo } from '../sqlite/codec.ts';
 import {
   KnowledgeConflict,
+  SourceConflict,
   StorageFailure,
   type AppendResult,
   type GuestSettings,
@@ -24,6 +28,13 @@ export const makeMemoryStorage = (): StorageService => {
   const knowledgeIds = new Set<string>();
   let settings: GuestSettings | undefined;
   let profile: TeachingProfile | undefined;
+  const sources = new Map<
+    string,
+    { info: SourceInfo; chunks: ReadonlyArray<SourceChunk>; file?: Uint8Array }
+  >();
+  const failure = (error: unknown) =>
+    new StorageFailure({ message: error instanceof Error ? error.message : String(error) });
+  const changed = () => emit({ _tag: 'SourcesChanged' });
   const listeners = new Set<(change: StorageChange) => void>();
   const emit = (change: StorageChange) => listeners.forEach((listener) => listener(change));
 
@@ -88,6 +99,102 @@ export const makeMemoryStorage = (): StorageService => {
       }),
 
     readKnowledge: Effect.sync(() => [...knowledge]),
+
+    createSource: (source) =>
+      Effect.try({
+        try: () => {
+          const info = checkNewSourceInfo(source.info);
+          if (sources.has(info.sourceId)) throw new Error(`Duplicate source ${info.sourceId}`);
+          if (source.state === 'ready') {
+            const bytes = checkChunks(source.chunks);
+            sources.set(info.sourceId, {
+              info: { ...info, state: 'ready', bytes, chunkCount: source.chunks.length },
+              chunks: structuredClone([...source.chunks]),
+            });
+          } else {
+            sources.set(info.sourceId, {
+              info,
+              chunks: [],
+              ...(source.file === undefined ? {} : { file: source.file.slice() }),
+            });
+          }
+          changed();
+        },
+        catch: failure,
+      }),
+
+    completeSource: (sourceId, chunks, options) =>
+      Effect.try({
+        try: () => {
+          const bytes = checkChunks(chunks);
+          const entry = sources.get(sourceId);
+          if (entry?.info.state !== 'pending') {
+            throw new SourceConflict({ message: 'The source is not pending.' });
+          }
+          const { failure: _failure, ...info } = entry.info;
+          sources.set(sourceId, {
+            info: {
+              ...info,
+              ...(options?.title === undefined ? {} : { title: options.title }),
+              state: 'ready',
+              bytes,
+              chunkCount: chunks.length,
+            },
+            chunks: structuredClone([...chunks]),
+          });
+          changed();
+        },
+        catch: (error) => (error instanceof SourceConflict ? error : failure(error)),
+      }),
+
+    failSource: (sourceId, why) =>
+      Effect.suspend(() => {
+        const entry = sources.get(sourceId);
+        if (entry?.info.state !== 'pending') {
+          return Effect.fail(new SourceConflict({ message: 'The source is not pending.' }));
+        }
+        entry.info = { ...entry.info, state: 'failed', failure: why };
+        changed();
+        return Effect.void;
+      }),
+
+    retrySource: (sourceId) =>
+      Effect.suspend(() => {
+        const entry = sources.get(sourceId);
+        if (entry === undefined || entry.info.state === 'ready') {
+          return Effect.fail(new SourceConflict({ message: 'The source cannot run again.' }));
+        }
+        const { failure: _failure, ...info } = entry.info;
+        entry.info = { ...info, state: 'pending' };
+        changed();
+        return Effect.void;
+      }),
+
+    listSources: Effect.sync(() =>
+      [...sources.values()]
+        .map((entry) => entry.info)
+        .sort((a, b) => b.createdAt - a.createdAt || a.sourceId.localeCompare(b.sourceId)),
+    ),
+
+    getSource: (sourceId) => Effect.sync(() => sources.get(sourceId)?.info),
+
+    readSourceFile: (sourceId) => Effect.sync(() => sources.get(sourceId)?.file?.slice()),
+
+    readChunks: (sourceIds) =>
+      Effect.sync(() =>
+        sourceIds.flatMap((sourceId) => {
+          const entry = sources.get(sourceId);
+          return entry === undefined
+            ? []
+            : entry.chunks.map((chunk) => ({ sourceId, title: entry.info.title, chunk }));
+        }),
+      ),
+
+    deleteSource: (sourceId) =>
+      Effect.sync(() => {
+        sources.delete(sourceId);
+        changed();
+      }),
 
     getSettings: Effect.sync(() => settings),
 
